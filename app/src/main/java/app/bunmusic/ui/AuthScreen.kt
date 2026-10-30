@@ -8,6 +8,8 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.Image
+import androidx.compose.ui.res.painterResource
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -152,13 +154,15 @@ fun AuthScreen(onGuest: () -> Unit) {
             Spacer(Modifier.height(26.dp))
 
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(
-                    Modifier
-                        .size(38.dp)
-                        .clip(RoundedCornerShape(13.dp))
-                        .background(Ink.Lime),
-                    contentAlignment = Alignment.Center,
-                ) { Glyph(G.Play, Ink.OnAccent, 17.dp, 0.dp) }
+                // The same artwork the launcher shows, so the first screen and the
+                // home screen agree about what this app looks like.
+                Image(
+                    painter = painterResource(app.bunmusic.R.mipmap.ic_launcher_foreground),
+                    contentDescription = null,
+                    modifier = Modifier
+                        .size(42.dp)
+                        .clip(RoundedCornerShape(13.dp)),
+                )
                 Spacer(Modifier.width(10.dp))
                 Text(
                     "BunMusic",

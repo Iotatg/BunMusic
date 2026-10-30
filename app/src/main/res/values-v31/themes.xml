@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.BunMusic" parent="android:Theme.Material.NoActionBar">
+        <item name="android:statusBarColor">#08070B</item>
+        <item name="android:navigationBarColor">#08070B</item>
+        <item name="android:windowBackground">#08070B</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <!-- Android 12+ draws its own splash from the app icon. Point it at the
+             foreground layer so the bun sits on the void instead of a white card. -->
+        <item name="android:windowSplashScreenBackground">#08070B</item>
+        <item name="android:windowSplashScreenAnimatedIcon">@mipmap/ic_launcher_foreground</item>
+    </style>
+</resources>

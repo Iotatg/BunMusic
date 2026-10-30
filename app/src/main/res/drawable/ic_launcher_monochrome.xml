@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Themed icons (Android 13+) need a single-colour silhouette: a bun in
+     headphones. Everything is one fill so the launcher can tint it. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- body -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M54,38 C42,38 33,47 33,58 C33,69 42,78 54,78 C66,78 75,69 75,58 C75,47 66,38 54,38 Z" />
+    <!-- headband -->
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M31,58 A23,23 0 0,1 77,58"
+        android:strokeColor="#FFFFFF"
+        android:strokeLineCap="round"
+        android:strokeWidth="6" />
+    <!-- ear cups -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M31,54.5 A7,7 0 1,0 31,68.5 A7,7 0 1,0 31,54.5 Z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M77,54.5 A7,7 0 1,0 77,68.5 A7,7 0 1,0 77,54.5 Z" />
+</vector>

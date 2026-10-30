@@ -47,7 +47,7 @@ fun AboutScreen(onBack: () -> Unit) {
                 Display("BunMusic", 32)
                 Spacer(Modifier.height(4.dp))
                 Text(
-                    "1.0.5 · build 6 · ${Skin.current.title} bun",
+                    "1.0.6 · build 7 · ${Skin.current.title} bun",
                     color = Ink.Muted, fontSize = 12.sp, fontFamily = SoraFamily,
                 )
             }
@@ -56,6 +56,7 @@ fun AboutScreen(onBack: () -> Unit) {
         item { GroupTitle("What's new") }
         item {
             AboutCard {
+                Change("A real icon", "The bun in headphones — adaptive, themed, and on the status bar too")
                 Change("Caching actually works now", "The cache is keyed on the song, not the URL — YouTube signs a new URL every time, so the old key never matched")
                 Change("Plays with the internet off", "A finished song is read straight off disk; the signed URL is never opened again")
                 Change("Whole songs, not half", "Each track is pulled to the end after it starts, and the next two are warmed up behind it")
@@ -72,7 +73,7 @@ fun AboutScreen(onBack: () -> Unit) {
         item { GroupTitle("Build") }
         item {
             AboutCard {
-                Fact("Version", "1.0.5 (6)")
+                Fact("Version", "1.0.6 (7)")
                 Fact("Package", "app.bunmusic")
                 Fact("Min SDK", "26 · Android 8.0")
                 Fact("Target SDK", "37")

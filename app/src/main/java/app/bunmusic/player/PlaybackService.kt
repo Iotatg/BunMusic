@@ -18,6 +18,14 @@ class PlaybackService : MediaSessionService() {
             this, 0, intent,
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
+        // Media3 would fall back to a generic play glyph in the status bar. The bun
+        // belongs there instead.
+        val notifications = androidx.media3.session.DefaultMediaNotificationProvider.Builder(this)
+            .build()
+            .apply { setSmallIcon(app.bunmusic.R.drawable.ic_notification) }
+
+        setMediaNotificationProvider(notifications)
+
         session = MediaSession.Builder(this, Playback.player)
             .setSessionActivity(pending)
             .build()
