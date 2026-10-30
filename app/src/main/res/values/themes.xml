@@ -15,4 +15,12 @@
         <item name="android:windowBackground">#FFFFFF</item>
         <item name="android:windowLightStatusBar">true</item>
     </style>
+
+    <!-- Cloud's window: the chalk page, not paper white, so the cold-start frame
+         already matches the bun the user picked. -->
+    <style name="Theme.BunMusic.Cloud" parent="Theme.BunMusic.Light">
+        <item name="android:statusBarColor">#F6F8FD</item>
+        <item name="android:navigationBarColor">#F6F8FD</item>
+        <item name="android:windowBackground">#F6F8FD</item>
+    </style>
 </resources>

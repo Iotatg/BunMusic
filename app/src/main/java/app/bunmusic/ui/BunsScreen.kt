@@ -33,6 +33,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
@@ -205,20 +206,22 @@ private fun BunCard(bun: BunSkin, active: Boolean, onPick: () -> Unit) {
         Spacer(Modifier.height(12.dp))
 
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Swatch(p.void, if (p.light) "FFFFFF" else "08070B")
-            Swatch(p.text, if (p.light) "171C26" else "F4F1E9")
-            Swatch(p.muted, if (p.light) "6C7689" else "938DA0")
-            Swatch(p.accent, if (p.light) "171C26" else "D8F65C")
+            Swatch(p.void, hex(p.void))
+            Swatch(p.text, hex(p.text))
+            Swatch(p.muted, hex(p.muted))
+            Swatch(p.accent, hex(p.accent))
         }
         Spacer(Modifier.height(8.dp))
         Text(
-            if (p.light) "Inter · Regular / Medium / SemiBold / Bold" else "Sora + Instrument Serif",
+            bun.typeLabel,
             color = p.faint,
             fontSize = 10.sp,
             fontFamily = SoraFamily,
         )
     }
 }
+
+private fun hex(c: Color): String = "%06X".format(c.toArgb() and 0xFFFFFF)
 
 @Composable
 private fun Swatch(color: Color, hex: String) {
@@ -324,7 +327,7 @@ private fun BunPreview(p: BunPalette, modifier: Modifier) {
                             .weight(1f)
                             .height(h)
                             .clip(RoundedCornerShape(1.dp))
-                            .background(if (i < 13) p.text else p.text.copy(alpha = 0.2f))
+                            .background(if (i < 13) p.accent else p.accent.copy(alpha = 0.22f))
                     )
                 }
             }

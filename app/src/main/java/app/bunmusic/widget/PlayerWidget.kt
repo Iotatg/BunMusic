@@ -12,6 +12,7 @@ import android.view.View
 import android.widget.RemoteViews
 import app.bunmusic.MainActivity
 import app.bunmusic.R
+import androidx.compose.ui.graphics.toArgb
 import app.bunmusic.core.Skin
 import app.bunmusic.data.hq
 import app.bunmusic.player.Playback
@@ -112,6 +113,7 @@ internal object Bar {
         lastPush = now
 
         val light = Skin.light
+        val p = Skin.p
         val views = RemoteViews(context.packageName, R.layout.widget_player)
 
         views.setInt(
@@ -120,29 +122,31 @@ internal object Bar {
         )
         views.setInt(
             R.id.widget_toggle, "setBackgroundResource",
-            if (light) R.drawable.widget_btn_light else R.drawable.widget_btn_dark,
+            when {
+                Skin.isCloud -> R.drawable.widget_btn_cloud
+                light -> R.drawable.widget_btn_light
+                else -> R.drawable.widget_btn_dark
+            },
         )
-        views.setInt(
-            R.id.widget_title, "setTextColor",
-            if (light) 0xFF171C26.toInt() else 0xFFFFFFFF.toInt(),
-        )
-        views.setInt(
-            R.id.widget_artist, "setTextColor",
-            if (light) 0x99171C26.toInt() else 0x99FFFFFF.toInt(),
-        )
-        val tint = if (light) 0xFF171C26.toInt() else 0xFFFFFFFF.toInt()
-        views.setInt(R.id.widget_prev, "setColorFilter", tint)
-        views.setInt(R.id.widget_next, "setColorFilter", tint)
+        // The widget is painted by the launcher, so it reads the bun's palette
+        // directly rather than hard-coding one light bun's ink.
+        val ink = p.text.toArgb()
+        val sub = p.text.copy(alpha = 0.6f).toArgb()
+        val accent = p.accent.toArgb()
+        views.setInt(R.id.widget_title, "setTextColor", ink)
+        views.setInt(R.id.widget_artist, "setTextColor", sub)
+        views.setInt(R.id.widget_prev, "setColorFilter", ink)
+        views.setInt(R.id.widget_next, "setColorFilter", ink)
         // The toggle sits on a contrasting pill, so its glyph is always the opposite ink.
-        views.setInt(R.id.widget_toggle, "setColorFilter", if (light) 0xFFFFFFFF.toInt() else 0xFF171C26.toInt())
+        views.setInt(R.id.widget_toggle, "setColorFilter", p.onAccent.toArgb())
         if (android.os.Build.VERSION.SDK_INT >= 31) {
             views.setColorStateList(
                 R.id.widget_progress, "setProgressTintList",
-                android.content.res.ColorStateList.valueOf(tint),
+                android.content.res.ColorStateList.valueOf(accent),
             )
             views.setColorStateList(
                 R.id.widget_progress, "setProgressBackgroundTintList",
-                android.content.res.ColorStateList.valueOf(if (light) 0x1F171C26 else 0x33FFFFFF.toInt()),
+                android.content.res.ColorStateList.valueOf(p.accent.copy(alpha = 0.18f).toArgb()),
             )
         }
 

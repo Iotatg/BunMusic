@@ -21,22 +21,26 @@ object Icons {
 
     private const val MIDNIGHT_ALIAS = ".LauncherMidnight"
     private const val CHARCOAL_ALIAS = ".LauncherCharcoal"
+    private const val CLOUD_ALIAS = ".LauncherCloud"
 
     fun aliasOf(skin: BunSkin): String = when (skin) {
         BunSkin.MIDNIGHT -> MIDNIGHT_ALIAS
         BunSkin.CHARCOAL -> CHARCOAL_ALIAS
+        BunSkin.CLOUD -> CLOUD_ALIAS
     }
 
     /** The drawable the launcher shows for this bun — reused by the in-app previews. */
     fun launcherOf(skin: BunSkin): Int = when (skin) {
         BunSkin.MIDNIGHT -> R.mipmap.ic_launcher
         BunSkin.CHARCOAL -> R.mipmap.ic_launcher_charcoal
+        BunSkin.CLOUD -> R.mipmap.ic_launcher_cloud
     }
 
     /** The full 108 dp layer, for places that draw the icon without a mask. */
     fun layerOf(skin: BunSkin): Int = when (skin) {
         BunSkin.MIDNIGHT -> R.mipmap.ic_launcher_foreground
         BunSkin.CHARCOAL -> R.mipmap.ic_launcher_charcoal_foreground
+        BunSkin.CLOUD -> R.mipmap.ic_launcher_cloud_foreground
     }
 
     /**
@@ -49,9 +53,10 @@ object Icons {
      */
     fun apply(context: Context, skin: BunSkin) {
         val target = aliasOf(skin)
-        val other = aliasOf(if (skin == BunSkin.MIDNIGHT) BunSkin.CHARCOAL else BunSkin.MIDNIGHT)
         if (!setEnabled(context, target, true)) return
-        setEnabled(context, other, false)
+        BunSkin.entries.forEach { other ->
+            if (other != skin) setEnabled(context, aliasOf(other), false)
+        }
     }
 
     /**
@@ -65,8 +70,8 @@ object Icons {
      * currently running under is the one call that can disturb a live task.
      */
     fun reconcile(context: Context, skin: BunSkin) {
-        val other = if (skin == BunSkin.MIDNIGHT) BunSkin.CHARCOAL else BunSkin.MIDNIGHT
-        if (isOn(context, skin) && !isOn(context, other)) return
+        val wrong = BunSkin.entries.any { it != skin && isOn(context, it) }
+        if (isOn(context, skin) && !wrong) return
         apply(context, skin)
     }
 

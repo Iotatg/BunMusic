@@ -46,6 +46,12 @@ object Ink {
     val MiniText: Color get() = Skin.p.miniText
     val Shadow: Color get() = Skin.p.shadow
 
+    val Hero: List<Color> get() = Skin.p.hero
+    val HeroInk: Color get() = Skin.p.heroInk
+    val HeroSub: Color get() = Skin.p.heroSub
+    val HeroBtn: Color get() = Skin.p.heroBtn
+    val HeroBtnInk: Color get() = Skin.p.heroBtnInk
+
     val isLight: Boolean get() = Skin.p.light
 }
 
@@ -68,11 +74,16 @@ private val Inter = FontFamily(
 )
 
 /**
- * Type follows the bun. Midnight pairs Sora with Instrument Serif; Charcoal is
- * Inter all the way down, which is what the reference layout is set in.
+ * Type follows the bun. Midnight pairs Sora with Instrument Serif, Charcoal is
+ * Inter all the way down, and Cloud is Sora — a geometric sans that sits closer
+ * to the rounded lettering the blue study is set in.
  */
-val SoraFamily: FontFamily get() = if (Skin.light) Inter else Sora
-val SerifFamily: FontFamily get() = if (Skin.light) Inter else InstrumentSerif
+val SoraFamily: FontFamily get() = if (Skin.current == BunSkin.CHARCOAL) Inter else Sora
+val SerifFamily: FontFamily get() = when (Skin.current) {
+    BunSkin.CHARCOAL -> Inter
+    BunSkin.CLOUD -> Sora
+    BunSkin.MIDNIGHT -> InstrumentSerif
+}
 
 private fun typographyFor(sans: FontFamily, display: FontFamily): Typography = Typography(
     displayLarge = TextStyle(fontFamily = display, fontWeight = FontWeight.Bold, fontSize = 40.sp, lineHeight = 44.sp, letterSpacing = (-1.2).sp),

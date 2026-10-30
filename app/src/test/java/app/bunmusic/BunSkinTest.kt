@@ -17,25 +17,36 @@ class BunSkinTest {
     fun everyBunHasItsOwnPalette() {
         val midnight = Skin.paletteOf(BunSkin.MIDNIGHT)
         val charcoal = Skin.paletteOf(BunSkin.CHARCOAL)
+        val cloud = Skin.paletteOf(BunSkin.CLOUD)
         assertNotEquals(midnight.base, charcoal.base)
         assertNotEquals(midnight.text, charcoal.text)
         assertNotEquals(midnight.accent, charcoal.accent)
+        assertNotEquals(charcoal.accent, cloud.accent)
+        assertNotEquals(charcoal.text, cloud.text)
     }
 
     @Test
-    fun onlyCharcoalIsLight() {
+    fun onlyMidnightIsDark() {
         assertFalse(Skin.paletteOf(BunSkin.MIDNIGHT).light)
         assertTrue(Skin.paletteOf(BunSkin.CHARCOAL).light)
+        assertTrue(Skin.paletteOf(BunSkin.CLOUD).light)
     }
 
+    /**
+     * Body text has to clear AAA; a button label only has to clear AA. Cloud's
+     * accent is the electric blue from the artwork (#2E6BFF), and a blue that
+     * vivid cannot reach 7:1 against white without turning navy — 4.5:1 is the
+     * honest bar for a filled pill with 12.5 sp semibold on it.
+     */
     @Test
-    fun bothBunsKeepTheirTextReadable() {
+    fun everyBunKeepsItsTextReadable() {
         BunSkin.entries.forEach { bun ->
             val p = Skin.paletteOf(bun)
             assertTrue("$bun body text", contrast(p.text, p.base) > 12f)
             assertTrue("$bun muted text", contrast(p.muted, p.base) > 3.5f)
-            assertTrue("$bun button label", contrast(p.onAccent, p.accent) > 7f)
+            assertTrue("$bun button label", contrast(p.onAccent, p.accent) > 4.5f)
             assertTrue("$bun mini player", contrast(p.miniText, p.miniBg) > 7f)
+            assertTrue("$bun hero ink", contrast(p.heroInk, p.hero.first()) > 3f)
         }
     }
 

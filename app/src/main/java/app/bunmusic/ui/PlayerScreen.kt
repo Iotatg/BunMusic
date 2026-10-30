@@ -65,6 +65,7 @@ import app.bunmusic.core.Glyph
 import app.bunmusic.core.Haptics
 import app.bunmusic.core.Ink
 import app.bunmusic.core.SerifFamily
+import app.bunmusic.core.Skin
 import app.bunmusic.core.SoraFamily
 import app.bunmusic.data.Downloads
 import app.bunmusic.data.Lyrics
@@ -489,13 +490,22 @@ private fun ColumnScope.CharcoalPlayer(
     Spacer(Modifier.height(10.dp))
 
     Column(Modifier.padding(horizontal = 24.dp)) {
-        WaveSeekBar(
-            positionMs = state.positionMs,
-            durationMs = state.durationMs,
-            onSeek = { Playback.seekTo(it) },
-            activeColor = Ink.Text,
-            seed = track.id.hashCode(),
-        )
+        if (Skin.isCloud) {
+            LineSeekBar(
+                positionMs = state.positionMs,
+                durationMs = state.durationMs,
+                onSeek = { Playback.seekTo(it) },
+                activeColor = Ink.Lime,
+            )
+        } else {
+            WaveSeekBar(
+                positionMs = state.positionMs,
+                durationMs = state.durationMs,
+                onSeek = { Playback.seekTo(it) },
+                activeColor = Ink.Lime,
+                seed = track.id.hashCode(),
+            )
+        }
         Row(Modifier.fillMaxWidth().padding(top = 2.dp)) {
             Text(fmtTime(state.positionMs), color = Ink.Muted, fontSize = 11.sp, fontFamily = SoraFamily)
             Spacer(Modifier.weight(1f))
@@ -533,7 +543,7 @@ private fun ColumnScope.CharcoalPlayer(
             Modifier
                 .size(68.dp)
                 .clip(CircleShape)
-                .background(Ink.Text)
+                .background(Ink.Lime)
                 .clickable { Playback.toggle() },
             contentAlignment = Alignment.Center,
         ) {

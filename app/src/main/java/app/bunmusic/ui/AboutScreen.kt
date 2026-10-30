@@ -47,7 +47,7 @@ fun AboutScreen(onBack: () -> Unit) {
                 Display("BunMusic", 32)
                 Spacer(Modifier.height(4.dp))
                 Text(
-                    "1.0.7 · build 8 · ${Skin.current.title} bun",
+                    "1.0.8 · build 9 · ${Skin.current.title} bun",
                     color = Ink.Muted, fontSize = 12.sp, fontFamily = SoraFamily,
                 )
             }
@@ -56,7 +56,12 @@ fun AboutScreen(onBack: () -> Unit) {
         item { GroupTitle("What's new") }
         item {
             AboutCard {
-                Change("An icon per bun", "Midnight wears the violet disc, Charcoal wears the black one — and the home screen swaps with them")
+                Change("A third bun: Cloud Blue", "Chalk white and electric blue, drawn from a study of a blue-on-white music app")
+                Change("The bun in headphones", "Cloud's icon is the artwork itself — blue disc, closed eyes, a transport pill under it")
+                Change("Blue where it counts", "Hero card, play disc, nav pill, chips — the same places, in blue")
+                Change("A line seek bar", "Cloud's player uses a hairline track and a knob; Charcoal keeps its waveform")
+                Change("Same bones", "Every screen, row, setting and shortcut sits exactly where it did")
+                Change("An icon per bun", "Midnight wears the violet disc, Charcoal the black one, Cloud the bun — and the home screen swaps with them")
                 Change("A real icon", "The bun in headphones — adaptive, themed, and on the status bar too")
                 Change("Caching actually works now", "The cache is keyed on the song, not the URL — YouTube signs a new URL every time, so the old key never matched")
                 Change("Plays with the internet off", "A finished song is read straight off disk; the signed URL is never opened again")
@@ -74,7 +79,7 @@ fun AboutScreen(onBack: () -> Unit) {
         item { GroupTitle("Build") }
         item {
             AboutCard {
-                Fact("Version", "1.0.7 (8)")
+                Fact("Version", "1.0.8 (9)")
                 Fact("Package", "app.bunmusic")
                 Fact("Min SDK", "26 · Android 8.0")
                 Fact("Target SDK", "37")

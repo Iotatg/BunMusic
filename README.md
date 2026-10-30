@@ -1,13 +1,13 @@
 # BunMusic
 
 A quiet music player for Android — built from scratch in Kotlin + Jetpack Compose.
-Two skins, "buns", and you pick which one the app wears.
+Three skins, "buns", and you pick which one the app wears.
 Nothing is bundled: every track comes from YouTube Music, and anything you like can be
 saved offline.
 
 ```
 package   app.bunmusic
-version   1.0.4 (5)
+version   1.0.8 (9)
 minSdk    26  ·  target/compile 37
 author    Iota Coder · iota14934@gmail.com
 ```
@@ -17,7 +17,7 @@ author    Iota Coder · iota14934@gmail.com
 ## What it does
 
 **Buns**
-Two complete skins, switched in Settings → Buns. A bun is not a tint: it replaces the
+Three complete skins, switched in Settings → Buns. A bun is not a tint: it replaces the
 palette, the typeface, the corner radii, the shape of the bottom bar, whether a list shows
 cover art or a track number, and whether the seek bar is a line or a waveform.
 
@@ -25,6 +25,7 @@ cover art or a track number, and whether the seek bar is a line or a waveform.
 |---|---|
 | **Midnight Lime** | Ink black, acid lime, lavender hero, Sora + Instrument Serif. The house bun. |
 | **Charcoal** | Paper white, charcoal ink, Inter throughout, 24 dp cards, waveform seek bar, white nav bar with a dark active pill, dark mini player. |
+| **Cloud Blue** | Chalk white and electric blue, Sora throughout, blue hero gradient, hairline seek bar with a knob, blue active nav pill, navy mini player. Its launcher icon is the bun in headphones. |
 
 Switching restarts the process — the only way to be sure no `remember`ed colour from the old
 bun survives. Nothing else is touched: library, downloads and account stay put.
@@ -221,12 +222,28 @@ home, album pages, Explore, Charts, mood pages and the automix radio queue.
 - **Google sign-in needs your OAuth client ID** (see above). Until then the button opens the
   setup sheet rather than failing silently.
 - **Not implemented yet:** per-bun custom accents, Discord Rich Presence, Last.fm scrobbling, song recognition,
-  synced group listening, word-by-word lyrics, Android Auto and the home-screen widget.
+  synced group listening, word-by-word lyrics and Android Auto.
 - **Debug builds** install as `app.bunmusic.debug`, so they can sit next to the release build.
 
 ---
 
 ## Changelog
+
+**1.0.8** — a third bun, **Cloud Blue**: chalk-white surfaces, electric blue, Sora throughout.
+Its own launcher icon (the bun in headphones, cut from the supplied artwork into adaptive,
+legacy and round layers at every density), a blue hero card, a blue play disc, a blue nav
+pill, and a hairline seek bar with a knob instead of Charcoal's waveform. Every screen, row
+and setting stays exactly where it was.
+
+**1.0.7** — one launcher icon per bun, swapped through activity-aliases and re-pointed on
+every cold start so an app update cannot leave the wrong face on the home screen.
+
+**1.0.6** — the bun gets a face: a new app icon, a themed monochrome layer, and a matching
+status-bar icon.
+
+**1.0.5** — the cache is keyed on the song rather than the signed URL, so a finished track
+really does play with the internet off; whole-track prefetch, bigger buffers, a home-screen
+widget, 1080 px artwork, a sleep fade, artist-aware shuffle and skip-silence.
 
 **1.0.4** — bun switch fixed (the choice is committed to disk before the restart), bundled
 demo audio removed (3.6 MB lighter), stream cache with an LRU ceiling and a size readout,

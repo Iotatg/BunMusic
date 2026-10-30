@@ -31,18 +31,29 @@ enum class BunSkin(
     val title: String,
     val tagline: String,
     val credit: String,
+    /** What the picker prints under the swatches. */
+    val typeLabel: String,
 ) {
     MIDNIGHT(
         id = "MIDNIGHT",
         title = "Midnight Lime",
         tagline = "Ink black, acid lime, lavender hero. The house bun.",
         credit = "BunMusic original",
+        typeLabel = "Sora + Instrument Serif",
     ),
     CHARCOAL(
         id = "CHARCOAL",
         title = "Charcoal",
         tagline = "Paper white, charcoal ink, Inter. Quiet and typographic.",
         credit = "After a Dribbble study",
+        typeLabel = "Inter · Regular / Medium / SemiBold / Bold",
+    ),
+    CLOUD(
+        id = "CLOUD",
+        title = "Cloud Blue",
+        tagline = "Chalk white, electric blue, the bun in headphones.",
+        credit = "After the Lunkgem study",
+        typeLabel = "Sora · geometric, tight tracking",
     ),
     ;
 
@@ -81,6 +92,13 @@ data class BunPalette(
     val miniBg: Color,
     val miniText: Color,
     val shadow: Color,
+    /** Home hero gradient, top to bottom. Midnight is lavender, Cloud is blue. */
+    val hero: List<Color>,
+    val heroInk: Color,
+    val heroSub: Color,
+    /** The button sitting on the hero. */
+    val heroBtn: Color,
+    val heroBtnInk: Color,
     /** True for light buns — a handful of layouts flip on this. */
     val light: Boolean,
 )
@@ -108,6 +126,11 @@ private val Midnight = BunPalette(
     miniBg = Color(0xFF211C2C),
     miniText = Color(0xFFF4F1E9),
     shadow = Color(0x66000000),
+    hero = listOf(Color(0xFFC6BEF2), Color(0xFF8F86D6), Color(0xFF6D63B8)),
+    heroInk = Color(0xFF15112A),
+    heroSub = Color(0xFF2E2650),
+    heroBtn = Color(0xFF15112A),
+    heroBtnInk = Color(0xFFD8F65C),
     light = false,
 )
 
@@ -134,6 +157,49 @@ private val Charcoal = BunPalette(
     miniBg = Color(0xFF171C26),
     miniText = Color(0xFFFFFFFF),
     shadow = Color(0x1F171C26),
+    hero = listOf(Color(0xFF171C26), Color(0xFF171C26)),
+    heroInk = Color(0xFFFFFFFF),
+    heroSub = Color(0xB8FFFFFF),
+    heroBtn = Color(0xFFFFFFFF),
+    heroBtnInk = Color(0xFF171C26),
+    light = true,
+)
+
+/**
+ * Cloud Blue — the third bun, drawn from a white-and-electric-blue study.
+ *
+ * It is a light bun, so it borrows Charcoal's layouts wholesale; what changes is
+ * the weather. Chalk surfaces, a blue that is allowed to be loud, a navy mini
+ * player, and a hero card that is a blue gradient rather than a black block.
+ */
+private val Cloud = BunPalette(
+    void = Color(0xFFEEF2FA),
+    base = Color(0xFFF6F8FD),
+    raised = Color(0xFFFFFFFF),
+    card = Color(0xFFFFFFFF),
+    line = Color(0xFFE3EAF7),
+    text = Color(0xFF0E1A33),
+    muted = Color(0xFF66769A),
+    faint = Color(0xFFA6B2CB),
+    accent = Color(0xFF2E6BFF),
+    onAccent = Color(0xFFFFFFFF),
+    lavender = Color(0xFF6E8CFF),
+    rose = Color(0xFFFF5C7C),
+    mint = Color(0xFF12B48A),
+    hairline = Color(0xFFE7EEFB),
+    field = Color(0xFFEDF3FF),
+    sheet = Color(0xFFFFFFFF),
+    navBg = Color(0xFFFFFFFF),
+    navActiveBg = Color(0xFF2E6BFF),
+    navActiveInk = Color(0xFFFFFFFF),
+    miniBg = Color(0xFF13234A),
+    miniText = Color(0xFFFFFFFF),
+    shadow = Color(0x1F2E6BFF),
+    hero = listOf(Color(0xFF2E6BFF), Color(0xFF5B8DFF), Color(0xFF86B4FF)),
+    heroInk = Color(0xFFFFFFFF),
+    heroSub = Color(0xCCFFFFFF),
+    heroBtn = Color(0xFFFFFFFF),
+    heroBtnInk = Color(0xFF2E6BFF),
     light = true,
 )
 
@@ -149,9 +215,17 @@ object Skin {
     fun paletteOf(skin: BunSkin): BunPalette = when (skin) {
         BunSkin.MIDNIGHT -> Midnight
         BunSkin.CHARCOAL -> Charcoal
+        BunSkin.CLOUD -> Cloud
     }
 
     val light: Boolean get() = p.light
+
+    /**
+     * Cloud is the one bun that is light *and* blue. A few pieces — the line
+     * seek bar, the blue play disc — key off this rather than off "light", so
+     * Charcoal keeps its waveform and its black button.
+     */
+    val isCloud: Boolean get() = current == BunSkin.CLOUD
 
     /**
      * The bun is stored in its own tiny preferences file, written with [commit]

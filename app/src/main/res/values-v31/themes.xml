@@ -19,4 +19,14 @@
         <item name="android:windowSplashScreenBackground">#FFFFFF</item>
         <item name="android:windowSplashScreenAnimatedIcon">@mipmap/ic_launcher_charcoal_foreground</item>
     </style>
+
+    <!-- Cloud's splash: the bun in headphones on the chalk page, not the black
+         disc on white that it would otherwise inherit from Light. -->
+    <style name="Theme.BunMusic.Cloud" parent="Theme.BunMusic.Light">
+        <item name="android:statusBarColor">#F6F8FD</item>
+        <item name="android:navigationBarColor">#F6F8FD</item>
+        <item name="android:windowBackground">#F6F8FD</item>
+        <item name="android:windowSplashScreenBackground">#F6F8FD</item>
+        <item name="android:windowSplashScreenAnimatedIcon">@mipmap/ic_launcher_cloud_foreground</item>
+    </style>
 </resources>

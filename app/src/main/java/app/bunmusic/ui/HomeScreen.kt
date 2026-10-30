@@ -2,6 +2,7 @@ package app.bunmusic.ui
 
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -33,7 +34,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -237,6 +237,8 @@ private fun SearchPill(onClick: () -> Unit, modifier: Modifier = Modifier) {
             .fillMaxWidth()
             .clip(RoundedCornerShape(16.dp))
             .background(Ink.Card)
+            // On a chalk page a white pill needs an edge, or it dissolves.
+            .then(if (Ink.isLight) Modifier.border(1.dp, Ink.Hairline, RoundedCornerShape(16.dp)) else Modifier)
             .clickable { onClick() }
             .padding(horizontal = 16.dp, vertical = 14.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -293,19 +295,13 @@ private fun StartCard(onOpenSearch: () -> Unit) {
 @Composable
 private fun HeroCard(track: Track, playing: Boolean, onPlay: () -> Unit) {
     val pulse by animateFloatAsState(if (playing) 1f else 0.92f, label = "pulse")
-    val light = Ink.isLight
-    val heroColors = if (light) listOf(Ink.Text, Ink.Text) else listOf(Color(0xFFC6BEF2), Color(0xFF8F86D6), Color(0xFF6D63B8))
-    val heroInk = if (light) Ink.OnAccent else Color(0xFF15112A)
-    val heroSub = if (light) Ink.OnAccent.copy(alpha = 0.72f) else Color(0xFF2E2650)
-    val btnBg = if (light) Color.White else Color(0xFF15112A)
-    val btnInk = if (light) Ink.Text else Ink.Lime
     Box(
         Modifier
             .padding(horizontal = 20.dp)
             .fillMaxWidth()
             .clip(RoundedCornerShape(28.dp))
             .background(
-                Brush.linearGradient(heroColors)
+                Brush.linearGradient(Ink.Hero)
             )
             .clickable { onPlay() }
             .padding(20.dp)
@@ -314,12 +310,12 @@ private fun HeroCard(track: Track, playing: Boolean, onPlay: () -> Unit) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Box(
                     Modifier.clip(RoundedCornerShape(6.dp))
-                        .background(Ink.Void.copy(alpha = 0.18f))
+                        .background(Ink.HeroInk.copy(alpha = 0.16f))
                         .padding(horizontal = 7.dp, vertical = 3.dp)
                 ) {
                     Text(
                         if (playing) "PLAYING NOW" else "PICK UP WHERE YOU LEFT",
-                        color = heroInk,
+                        color = Ink.HeroInk,
                         fontSize = 8.5.sp,
                         fontFamily = SoraFamily,
                         fontWeight = FontWeight.Bold,
@@ -332,7 +328,7 @@ private fun HeroCard(track: Track, playing: Boolean, onPlay: () -> Unit) {
                 Column(Modifier.weight(1f)) {
                     Text(
                         track.title,
-                        color = heroInk,
+                        color = Ink.HeroInk,
                         fontSize = 24.sp,
                         fontFamily = SerifFamily,
                         lineHeight = 26.sp,
@@ -342,7 +338,7 @@ private fun HeroCard(track: Track, playing: Boolean, onPlay: () -> Unit) {
                     Spacer(Modifier.height(4.dp))
                     Text(
                         track.artist + " · " + track.album,
-                        color = heroSub,
+                        color = Ink.HeroSub,
                         fontSize = 11.5.sp,
                         fontFamily = SoraFamily,
                         maxLines = 1,
@@ -352,15 +348,15 @@ private fun HeroCard(track: Track, playing: Boolean, onPlay: () -> Unit) {
                     Row(
                         Modifier
                             .clip(CircleShape)
-                            .background(btnBg)
+                            .background(Ink.HeroBtn)
                             .padding(horizontal = 16.dp, vertical = 9.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Glyph(if (playing) G.Pause else G.Play, btnInk, 13.dp)
+                        Glyph(if (playing) G.Pause else G.Play, Ink.HeroBtnInk, 13.dp)
                         Spacer(Modifier.width(7.dp))
                         Text(
                             if (playing) "Pause" else "Play",
-                            color = if (light) Ink.Text else Color(0xFFF4F1E9),
+                            color = Ink.HeroBtnInk,
                             fontSize = 11.5.sp,
                             fontFamily = SoraFamily,
                             fontWeight = FontWeight.Medium,

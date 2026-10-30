@@ -13,6 +13,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -558,8 +559,9 @@ fun Chip(
             .clip(RoundedCornerShape(if (light) 10.dp else 11.dp))
             .background(
                 when {
-                    selected && light -> Ink.Text
-                    selected -> Ink.Lime
+                    // A picked chip wears the bun's selected fill: lime on
+                    // Midnight, ink on Charcoal, electric blue on Cloud.
+                    selected -> Ink.NavActiveBg
                     light -> Ink.Field
                     else -> Ink.Card
                 }
@@ -569,16 +571,12 @@ fun Chip(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         if (leading != null) {
-            Glyph(leading, if (selected) Ink.OnAccent else Ink.Muted, 13.dp)
+            Glyph(leading, if (selected) Ink.NavActiveInk else Ink.Muted, 13.dp)
             Spacer(Modifier.width(6.dp))
         }
         Text(
             text,
-            color = when {
-                selected -> Ink.OnAccent
-                light -> Ink.Muted
-                else -> Ink.Muted
-            },
+            color = if (selected) Ink.NavActiveInk else Ink.Muted,
             fontSize = 12.sp,
             fontFamily = SoraFamily,
             fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
@@ -888,6 +886,10 @@ fun SeekBar(
     modifier: Modifier = Modifier,
     activeColor: Color = Ink.Lime,
 ) {
+    if (Skin.isCloud) {
+        LineSeekBar(positionMs, durationMs, onSeek, modifier, activeColor)
+        return
+    }
     if (Ink.isLight) {
         WaveSeekBar(positionMs, durationMs, onSeek, modifier, activeColor)
         return
@@ -981,9 +983,77 @@ fun WaveSeekBar(
     }
 }
 
+/**
+ * Cloud's seek bar: a hairline track with a single blue knob, no waveform. It is
+ * the one place the blue bun is deliberately plainer than the others — the study
+ * it is drawn from uses a line, and a line is easier to hit on a light surface.
+ */
 @Composable
-fun BackBar(title: String, onBack: () -> Unit, trailing: @Composable (() -> Unit)? = null) {
-    Row(
+fun LineSeekBar(
+    positionMs: Long,
+    durationMs: Long,
+    onSeek: (Long) -> Unit,
+    modifier: Modifier = Modifier,
+    activeColor: Color = Ink.Lime,
+) {
+    val value = if (durationMs > 0) (positionMs.toFloat() / durationMs).coerceIn(0f, 1f) else 0f
+    var dragging by remember { mutableStateOf(false) }
+    var local by remember { mutableFloatStateOf(0f) }
+    val shown = if (dragging) local else value
+    val animated by animateFloatAsState(shown, tween(180), label = "line")
+
+    Canvas(
+        modifier
+            .fillMaxWidth()
+            .height(34.dp)
+            .pointerInput(durationMs) {
+                detectHorizontalDragGestures(
+                    onDragStart = { offset ->
+                        dragging = true
+                        local = (offset.x / size.width.toFloat()).coerceIn(0f, 1f)
+                    },
+                    onDragEnd = {
+                        dragging = false
+                        onSeek((local * durationMs).toLong())
+                        Haptics.tick()
+                    },
+                ) { change, _ ->
+                    local = (change.position.x / size.width.toFloat()).coerceIn(0f, 1f)
+                }
+            }
+            .pointerInput(durationMs) {
+                detectTapGestures { offset ->
+                    val f = (offset.x / size.width.toFloat()).coerceIn(0f, 1f)
+                    onSeek((f * durationMs).toLong())
+                    Haptics.tick()
+                }
+            },
+    ) {
+        val cy = size.height / 2f
+        val track = 4.dp.toPx()
+        val knob = 7.dp.toPx()
+        val x = (animated * size.width).coerceIn(knob, size.width - knob)
+
+        drawRoundRect(
+            color = Ink.Line,
+            topLeft = Offset(0f, cy - track / 2f),
+            size = Size(size.width, track),
+            cornerRadius = androidx.compose.ui.geometry.CornerRadius(track / 2f),
+        )
+        drawRoundRect(
+            color = activeColor,
+            topLeft = Offset(0f, cy - track / 2f),
+            size = Size(x.coerceAtLeast(0f), track),
+            cornerRadius = androidx.compose.ui.geometry.CornerRadius(track / 2f),
+        )
+        // A white ring keeps the knob readable where the track is pale.
+        drawCircle(color = Color.White, radius = knob, center = Offset(x, cy))
+        drawCircle(color = activeColor, radius = knob - 2.dp.toPx(), center = Offset(x, cy))
+    }
+}
+
+@Composable
+fun BackBar(title: String, onBack: () -> Unit, trailing: @Composable (() -> Unit)? = null) {    Row(
         Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
