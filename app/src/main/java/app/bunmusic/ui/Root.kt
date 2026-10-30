@@ -47,6 +47,7 @@ import app.bunmusic.core.G
 import app.bunmusic.core.Glyph
 import app.bunmusic.core.Ink
 import app.bunmusic.core.SoraFamily
+import app.bunmusic.data.Auth
 import app.bunmusic.data.Collection
 import app.bunmusic.data.CollectionKind
 import app.bunmusic.data.Downloads
@@ -63,6 +64,8 @@ sealed interface Route {
     data object Settings : Route
     data object Stats : Route
     data object Downloads : Route
+    data object Profile : Route
+    data object Equalizer : Route
     data class Detail(
         val title: String,
         val artUrl: String?,
@@ -82,6 +85,22 @@ private val Route.depth: Int
 
 @Composable
 fun Root() {
+    val account by Auth.account.collectAsState()
+    var guest by remember { mutableStateOf(Auth.guest) }
+
+    if (account == null && !guest) {
+        AuthScreen(onGuest = {
+            Auth.continueAsGuest()
+            guest = true
+        })
+        return
+    }
+
+    Shell(guest = guest, onLeaveGuest = { guest = false })
+}
+
+@Composable
+private fun Shell(guest: Boolean, onLeaveGuest: () -> Unit) {
     val state by Playback.state.collectAsState()
     val downloads by Downloads.entries.collectAsState()
     var stack by remember { mutableStateOf<List<Route>>(listOf(Route.Home)) }
@@ -190,7 +209,21 @@ fun Root() {
                             onBack = pop,
                             onOpenStats = { push(Route.Stats) },
                             onOpenDownloads = { push(Route.Downloads) },
+                            onOpenProfile = { push(Route.Profile) },
+                            onOpenEqualizer = { push(Route.Equalizer) },
+                            onToast = { toast = it },
                         )
+
+                        Route.Profile -> ProfileScreen(
+                            onBack = pop,
+                            onSignIn = {
+                                stack = listOf(Route.Home)
+                                onLeaveGuest()
+                            },
+                            onToast = { toast = it },
+                        )
+
+                        Route.Equalizer -> EqualizerScreen(onBack = pop)
 
                         Route.Stats -> StatsScreen(onBack = pop)
                         Route.Downloads -> DownloadsScreen(onBack = pop, onPlay = { list, i -> Playback.play(list, i) })

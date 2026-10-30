@@ -9,8 +9,11 @@ import androidx.media3.common.PlaybackParameters
 import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
 import app.bunmusic.data.Downloads
+import app.bunmusic.data.Eq
+import app.bunmusic.data.Prefs
 import app.bunmusic.data.Store
 import app.bunmusic.data.Track
+import app.bunmusic.data.YtMusic
 import app.bunmusic.data.YtStream
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -67,6 +70,8 @@ object Playback {
     private var shuffleOrder: List<Int> = emptyList()
     private var ticker: Job? = null
     private var loadJob: Job? = null
+    private var radioJob: Job? = null
+    private var eqSession: Int = -1
 
     fun init(context: Context) {
         if (_player != null) return
@@ -102,11 +107,12 @@ object Playback {
 
             override fun onPlaybackStateChanged(playbackState: Int) {
                 if (playbackState == Player.STATE_ENDED) {
-                    if (_state.value.repeat == 2) {
-                        p.seekTo(0)
-                        p.play()
-                    } else {
-                        next(auto = true)
+                    when {
+                        _state.value.repeat == 2 -> {
+                            p.seekTo(0)
+                            p.play()
+                        }
+                        !next(auto = true) -> extendWithRadio()
                     }
                 }
                 publish()
@@ -152,23 +158,61 @@ object Playback {
         publish()
     }
 
-    fun next(auto: Boolean = false) {
-        if (queue.isEmpty()) return
+    /** Returns true when playback actually moved to another track. */
+    fun next(auto: Boolean = false): Boolean {
+        if (queue.isEmpty()) return false
         val nextIdx = when {
             shuffleOrder.isNotEmpty() && _state.value.shuffle -> {
                 val pos = shuffleOrder.indexOf(index)
                 shuffleOrder.getOrNull(pos + 1) ?: if (_state.value.repeat == 1 || auto) shuffleOrder.first() else -1
             }
             index < queue.lastIndex -> index + 1
-            _state.value.repeat == 1 || (auto && _state.value.repeat != 0) -> 0
+            _state.value.repeat == 1 -> 0
             else -> -1
         }
         if (nextIdx < 0) {
             _player?.pause()
-            return
+            return false
         }
         index = nextIdx
         load(index, autoplay = true)
+        return true
+    }
+
+    /**
+     * Queue ran out and autoplay is on: pull the next twenty or so tracks from the
+     * current song's YouTube radio and keep going. Fails silently — a dead network
+     * should never interrupt a listener, it should just stop.
+     */
+    private fun extendWithRadio() {
+        val current = _state.value.track ?: return
+        if (!Prefs.settings.value.autoplay) return
+        if (current.videoId.isBlank()) return
+        if (radioJob?.isActive == true) return
+        radioJob = scope.launch {
+            val extra = runCatching { YtMusic.radio(current.videoId, 25) }.getOrNull().orEmpty()
+            if (extra.isEmpty()) return@launch
+            val known = queue.map { it.id }.toSet()
+            val fresh = extra.filterNot { known.contains(it.id) }
+            if (fresh.isEmpty()) return@launch
+            val startAt = queue.size
+            queue = queue + fresh
+            rebuildShuffle()
+            load(startAt, autoplay = true)
+        }
+    }
+
+    /** Seed a never-ending station from a single track. */
+    fun startRadio(track: Track) {
+        scope.launch {
+            val station = runCatching { YtMusic.radio(track.videoId, 40) }.getOrNull().orEmpty()
+            val rest = station.filterNot { it.id == track.id }
+            if (rest.isEmpty()) {
+                playSingle(track)
+            } else {
+                play(listOf(track) + rest, 0)
+            }
+        }
     }
 
     fun previous() {
@@ -334,8 +378,17 @@ object Playback {
         Store.recordPlay(track)
 
         loadJob = scope.launch {
+            val local = localUri(track)
+            if (local == null && !track.isLocal && Prefs.settings.value.offlineOnly) {
+                _state.value = _state.value.copy(
+                    buffering = false,
+                    isPlaying = false,
+                    error = "Offline mode is on — download this track to play it",
+                )
+                return@launch
+            }
             val uri = try {
-                localUri(track) ?: if (track.isLocal) track.uri() else YtStream.audioUrl(track.videoId)
+                local ?: if (track.isLocal) track.uri() else YtStream.audioUrl(track.videoId)
             } catch (t: Throwable) {
                 _state.value = _state.value.copy(
                     buffering = false,
@@ -359,10 +412,20 @@ object Playback {
                 .build()
             p.setMediaItem(item)
             p.prepare()
+            bindEffects(p)
             if (autoplay) p.play()
             _state.value = _state.value.copy(buffering = false, track = track)
             publish()
         }
+    }
+
+    /** The audio session only exists once something has been prepared. */
+    private fun bindEffects(p: ExoPlayer) {
+        val session = runCatching { p.audioSessionId }.getOrDefault(-1)
+        if (session <= 0 || session == eqSession) return
+        eqSession = session
+        Eq.attach(session)
+        Eq.restore(Prefs.settings.value)
     }
 
     private fun localUri(track: Track): String? {

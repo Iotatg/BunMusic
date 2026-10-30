@@ -1,5 +1,8 @@
 package app.bunmusic.ui
 
+import android.content.Intent
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -24,10 +27,15 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -35,18 +43,75 @@ import app.bunmusic.core.G
 import app.bunmusic.core.Glyph
 import app.bunmusic.core.Ink
 import app.bunmusic.core.SoraFamily
+import app.bunmusic.data.Auth
+import app.bunmusic.data.Backup
 import app.bunmusic.data.Downloads
+import app.bunmusic.data.Eq
 import app.bunmusic.data.Prefs
 import app.bunmusic.data.Store
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 @Composable
 fun SettingsScreen(
     onBack: () -> Unit,
     onOpenStats: () -> Unit,
     onOpenDownloads: () -> Unit,
+    onOpenProfile: () -> Unit,
+    onOpenEqualizer: () -> Unit,
+    onToast: (String) -> Unit,
 ) {
     val settings by Prefs.settings.collectAsState()
     val downloads by Downloads.entries.collectAsState()
+    val account by Auth.account.collectAsState()
+    val eq by Eq.state.collectAsState()
+
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var googleSheet by remember { mutableStateOf(false) }
+
+    val exportLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("application/json")
+    ) { uri ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        scope.launch {
+            val outcome = withContext(Dispatchers.IO) {
+                runCatching {
+                    val body = Backup.export(account?.handle ?: "guest")
+                    context.contentResolver.openOutputStream(uri)?.use { it.write(body.toByteArray()) }
+                        ?: error("Could not open the file")
+                }
+            }
+            onToast(
+                outcome.fold(
+                    onSuccess = { "Backup saved" },
+                    onFailure = { it.message ?: "Backup failed" },
+                )
+            )
+        }
+    }
+
+    val importLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        scope.launch {
+            val outcome = withContext(Dispatchers.IO) {
+                runCatching {
+                    val text = context.contentResolver.openInputStream(uri)?.bufferedReader()?.use { it.readText() }
+                        ?: error("Could not read the file")
+                    Backup.import(text).getOrThrow()
+                }
+            }
+            onToast(
+                outcome.fold(
+                    onSuccess = { "Restored · $it" },
+                    onFailure = { it.message ?: "Restore failed" },
+                )
+            )
+        }
+    }
 
     LazyColumn(
         Modifier.fillMaxSize().statusBarsPadding(),
@@ -59,9 +124,46 @@ fun SettingsScreen(
                 Display("Settings", 30)
                 Spacer(Modifier.height(4.dp))
                 Text(
-                    "BunMusic 1.0.1 · Iota Coder",
+                    "BunMusic 1.0.2 · Iota Coder",
                     color = Ink.Muted, fontSize = 12.sp, fontFamily = SoraFamily,
                 )
+            }
+        }
+
+        // ---- account
+        item {
+            Row(
+                Modifier
+                    .padding(horizontal = 16.dp, vertical = 12.dp)
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(20.dp))
+                    .background(Ink.Card)
+                    .clickable { onOpenProfile() }
+                    .padding(horizontal = 14.dp, vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                val acc = account
+                if (acc != null) {
+                    Avatar(acc, 44.dp)
+                } else {
+                    Box(
+                        Modifier.size(44.dp).clip(CircleShape).background(Color.White.copy(alpha = 0.06f)),
+                        contentAlignment = Alignment.Center,
+                    ) { Glyph(G.User, Ink.Muted, 18.dp) }
+                }
+                Spacer(Modifier.width(12.dp))
+                Column(Modifier.weight(1f)) {
+                    Text(
+                        acc?.name ?: "Browsing as guest",
+                        color = Ink.Text, fontSize = 14.sp, fontFamily = SoraFamily,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                    Text(
+                        acc?.handle ?: "Sign in to sync your library",
+                        color = Ink.Faint, fontSize = 11.sp, fontFamily = SoraFamily,
+                    )
+                }
+                Glyph(G.Forward, Ink.Faint, 15.dp)
             }
         }
 
@@ -79,10 +181,6 @@ fun SettingsScreen(
                     }
                 }
                 Divider()
-                ToggleRow("Volume normalisation", "Evens out loud and quiet tracks", settings.normalize) { v ->
-                    Prefs.update { it.copy(normalize = v) }
-                }
-                Divider()
                 ToggleRow("Gapless playback", "No silence between tracks", settings.gapless) { v ->
                     Prefs.update { it.copy(gapless = v) }
                 }
@@ -93,6 +191,38 @@ fun SettingsScreen(
                             Prefs.update { it.copy(crossfadeSec = sec) }
                         }
                     }
+                }
+                Divider()
+                ToggleRow(
+                    "Autoplay radio",
+                    "Keep going with similar tracks when the queue ends",
+                    settings.autoplay,
+                ) { v -> Prefs.update { it.copy(autoplay = v) } }
+                Divider()
+                ToggleRow(
+                    "Offline only",
+                    "Never stream — play downloads and bundled tracks",
+                    settings.offlineOnly,
+                ) { v -> Prefs.update { it.copy(offlineOnly = v) } }
+            }
+        }
+
+        item { GroupLabel("Sound") }
+        item {
+            SettingsCard {
+                NavRow(
+                    "Equaliser",
+                    if (eq.available) {
+                        if (settings.eqEnabled) "${settings.eqPreset} · ${eq.bands.size} bands" else "Off"
+                    } else {
+                        "Not available on this output"
+                    },
+                    G.Sliders,
+                ) { onOpenEqualizer() }
+                Divider()
+                ToggleRow("Volume normalisation", "Evens out loud and quiet tracks", settings.normalize) { v ->
+                    Prefs.update { it.copy(normalize = v) }
+                    Eq.setNormalisation(v)
                 }
             }
         }
@@ -133,22 +263,76 @@ fun SettingsScreen(
                 Divider()
                 NavRow("Listening stats", "Time, top artists, weekly bars", G.Chart) { onOpenStats() }
                 Divider()
-                NavRow("Clear search history", "Removes saved queries", G.Search) { Store.clearQueries() }
+                NavRow("Clear search history", "Removes saved queries", G.Search) {
+                    Store.clearQueries()
+                    onToast("Search history cleared")
+                }
                 Divider()
-                NavRow("Clear play history", "Keeps your playlists and likes", G.Clock) { Store.clearHistory() }
+                NavRow("Clear play history", "Keeps your playlists and likes", G.Clock) {
+                    Store.clearHistory()
+                    onToast("Play history cleared")
+                }
                 Divider()
                 NavRow(
                     "Remove all downloads",
                     if (downloads.isEmpty()) "Nothing saved" else fmtBytes(downloads.sumOf { it.bytes }),
                     G.Trash,
-                ) { Downloads.clearAll() }
+                ) {
+                    Downloads.clearAll()
+                    onToast("Downloads removed")
+                }
+            }
+        }
+
+        item { GroupLabel("Your data") }
+        item {
+            SettingsCard {
+                NavRow(
+                    "Back up library",
+                    "Likes, playlists and history as a JSON file",
+                    G.Shield,
+                ) {
+                    exportLauncher.launch("bunmusic-backup-${System.currentTimeMillis() / 1000}.json")
+                }
+                Divider()
+                NavRow("Restore from backup", "Merges a BunMusic JSON file", G.Refresh) {
+                    importLauncher.launch(arrayOf("application/json", "text/plain", "*/*"))
+                }
+                Divider()
+                NavRow("Share BunMusic", "Send the app link to a friend", G.Share) {
+                    val send = Intent(Intent.ACTION_SEND).apply {
+                        type = "text/plain"
+                        putExtra(
+                            Intent.EXTRA_TEXT,
+                            "BunMusic — a quiet place for loud music. https://github.com/Iotatg/BunMusic",
+                        )
+                    }
+                    context.startActivity(Intent.createChooser(send, "Share BunMusic"))
+                }
+            }
+        }
+
+        item { GroupLabel("Accounts") }
+        item {
+            SettingsCard {
+                NavRow(
+                    "Google sign-in",
+                    if (settings.googleClientId.isBlank()) "Not configured — tap to set up" else "Client ID saved",
+                    G.Google,
+                ) { googleSheet = true }
+                Divider()
+                NavRow(
+                    "Manage account",
+                    account?.let { "Signed in as ${it.name}" } ?: "Guest mode",
+                    G.User,
+                ) { onOpenProfile() }
             }
         }
 
         item { GroupLabel("About") }
         item {
             SettingsCard {
-                NavRow("Version", "1.0.1 (build 2)", G.Sparkle) { }
+                NavRow("Version", "1.0.2 (build 3)", G.Sparkle) { }
                 Divider()
                 NavRow("Built by", "Iota Coder · iota14934@gmail.com", G.User) { }
                 Divider()
@@ -160,7 +344,8 @@ fun SettingsScreen(
             Column(Modifier.padding(20.dp)) {
                 Text(
                     "BunMusic streams from YouTube Music with its own client. " +
-                        "No ads, no tracking, no account required. Bundled tracks are original recordings.",
+                        "No ads, no tracking. Bundled tracks are original recordings. " +
+                        "Accounts live on this device — nothing is uploaded anywhere.",
                     color = Ink.Faint,
                     fontSize = 11.sp,
                     fontFamily = SoraFamily,
@@ -168,6 +353,18 @@ fun SettingsScreen(
                 )
             }
         }
+    }
+
+    if (googleSheet) {
+        GoogleSetupSheet(
+            current = settings.googleClientId,
+            onDismiss = { googleSheet = false },
+            onSave = { id ->
+                Prefs.update { it.copy(googleClientId = id.trim()) }
+                googleSheet = false
+                onToast(if (id.isBlank()) "Client ID cleared" else "Google client ID saved")
+            },
+        )
     }
 }
 

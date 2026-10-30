@@ -1,5 +1,10 @@
 package app.bunmusic.ui
 
+import android.app.Activity
+import android.content.Intent
+import android.speech.RecognizerIntent
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -51,6 +56,7 @@ import app.bunmusic.data.Track
 import app.bunmusic.data.YtMusic
 import app.bunmusic.player.PlayerState
 import kotlinx.coroutines.delay
+import java.util.Locale
 
 private val hints = listOf("lofi beats", "arijit singh", "the weeknd", "jazz café", "karan aujla", "ambient focus")
 private val filters = listOf("Top", "Songs", "Albums", "Artists", "Playlists")
@@ -79,6 +85,23 @@ fun SearchScreen(
         history = Store.queries()
         loading = true
         searched = true
+    }
+
+    val voice = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+        if (result.resultCode == Activity.RESULT_OK) {
+            val heard = result.data?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)?.firstOrNull()
+            if (!heard.isNullOrBlank()) runSearch(heard)
+        }
+    }
+
+    fun listen() {
+        val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+            putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+            putExtra(RecognizerIntent.EXTRA_PROMPT, "Say a song, artist or mood")
+            putExtra(RecognizerIntent.EXTRA_LANGUAGE, Locale.getDefault().toLanguageTag())
+            putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1)
+        }
+        runCatching { voice.launch(intent) }
     }
 
     LaunchedEffect(query) {
@@ -142,7 +165,12 @@ fun SearchScreen(
                         Modifier.size(22.dp).clip(CircleShape).clickable { query = "" },
                         contentAlignment = Alignment.Center,
                     ) { Glyph(G.Close, Ink.Faint, 13.dp) }
+                    Spacer(Modifier.width(6.dp))
                 }
+                Box(
+                    Modifier.size(26.dp).clip(CircleShape).clickable { listen() },
+                    contentAlignment = Alignment.Center,
+                ) { Glyph(G.Mic, Ink.Muted, 15.dp) }
             }
         }
 

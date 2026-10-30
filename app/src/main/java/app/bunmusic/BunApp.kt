@@ -6,6 +6,7 @@ import coil3.PlatformContext
 import coil3.SingletonImageLoader
 import coil3.network.okhttp.OkHttpNetworkFetcherFactory
 import coil3.request.crossfade
+import app.bunmusic.data.Auth
 import app.bunmusic.data.Downloads
 import app.bunmusic.data.Prefs
 import app.bunmusic.data.Store
@@ -17,6 +18,7 @@ class BunApp : Application(), SingletonImageLoader.Factory {
         super.onCreate()
         Store.init(this)
         Prefs.init(this)
+        Auth.init(this)
         Downloads.init(this)
         Playback.init(this)
     }

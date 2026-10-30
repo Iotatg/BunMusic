@@ -4,6 +4,7 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
@@ -24,7 +25,8 @@ enum class G {
     Play, Pause, Next, Prev, Search, Home, Library, Shuffle, Repeat, RepeatOne,
     Heart, HeartFill, Queue, Back, Forward, More, Plus, Close, Mic, Download,
     Youtube, Clock, Check, Trash, Filter, Wave, Sparkle, Disc, List, Share, Offline,
-    Compass, Chart, Gear, Moon, Grid, Flame, User, Drag, Speed, PlayCircle, Refresh
+    Compass, Chart, Gear, Moon, Grid, Flame, User, Drag, Speed, PlayCircle, Refresh,
+    Google, Mail, Phone, Lock, Eye, EyeOff, Logout, Shield, Sliders, Edit, Key
 }
 
 @Composable
@@ -300,6 +302,73 @@ private fun DrawScope.drawGlyph(g: G, c: Color, sw: Float) {
         G.PlayCircle -> {
             drawCircle(c, 8.6f, Offset(12f, 12f), style = s)
             fill(10.2f, 8.2f, 16.4f, 12f, 10.2f, 15.8f)
+        }
+        G.Google -> {
+            drawArc(
+                c, 48f, 292f, false,
+                topLeft = Offset(4.2f, 4.2f), size = Size(15.6f, 15.6f), style = s,
+            )
+            line(12f, 12f, 19.4f, 12f)
+        }
+        G.Mail -> {
+            drawRoundRect(c, Offset(3.4f, 5.6f), Size(17.2f, 12.8f), CornerRadius(2.6f), style = s)
+            poly(4.4f, 7.2f, 12f, 13.2f, 19.6f, 7.2f)
+        }
+        G.Phone -> {
+            drawRoundRect(c, Offset(7.6f, 2.8f), Size(8.8f, 18.4f), CornerRadius(2.6f), style = s)
+            line(10.6f, 17.6f, 13.4f, 17.6f)
+            line(10.4f, 5.4f, 13.6f, 5.4f)
+        }
+        G.Lock -> {
+            drawRoundRect(c, Offset(5.2f, 10.4f), Size(13.6f, 9.6f), CornerRadius(2.4f), style = s)
+            drawArc(
+                c, 180f, 180f, false,
+                topLeft = Offset(8.2f, 4.4f), size = Size(7.6f, 8.4f), style = s,
+            )
+        }
+        G.Eye -> {
+            val p = Path()
+            p.moveTo(3.2f, 12f)
+            p.quadraticBezierTo(12f, 4.4f, 20.8f, 12f)
+            p.quadraticBezierTo(12f, 19.6f, 3.2f, 12f)
+            drawPath(p, c, style = s)
+            drawCircle(c, 2.4f, Offset(12f, 12f), style = s)
+        }
+        G.EyeOff -> {
+            val p = Path()
+            p.moveTo(3.2f, 12f)
+            p.quadraticBezierTo(12f, 4.4f, 20.8f, 12f)
+            p.quadraticBezierTo(12f, 19.6f, 3.2f, 12f)
+            drawPath(p, c, style = s)
+            drawCircle(c, 2.4f, Offset(12f, 12f), style = s)
+            line(4.6f, 4.6f, 19.4f, 19.4f)
+        }
+        G.Logout -> {
+            poly(10f, 4.2f, 5f, 4.2f, 5f, 19.8f, 10f, 19.8f)
+            line(11.4f, 12f, 20.4f, 12f)
+            poly(17.4f, 9f, 20.4f, 12f, 17.4f, 15f)
+        }
+        G.Shield -> {
+            poly(12f, 3f, 19.6f, 6.1f, 19.6f, 12f, 12f, 21f, 4.4f, 12f, 4.4f, 6.1f, close = true)
+            poly(8.4f, 11.8f, 11f, 14.4f, 15.8f, 8.8f)
+        }
+        G.Sliders -> {
+            line(3.8f, 7.2f, 20.2f, 7.2f)
+            drawCircle(c, 2.2f, Offset(9f, 7.2f), style = s)
+            line(3.8f, 12f, 20.2f, 12f)
+            drawCircle(c, 2.2f, Offset(15.2f, 12f), style = s)
+            line(3.8f, 16.8f, 20.2f, 16.8f)
+            drawCircle(c, 2.2f, Offset(7.4f, 16.8f), style = s)
+        }
+        G.Edit -> {
+            poly(4f, 20f, 5.4f, 15.4f, 16f, 4.8f, 19.2f, 8f, 8.6f, 18.6f, close = true)
+            line(5.4f, 15.4f, 8.6f, 18.6f)
+        }
+        G.Key -> {
+            drawCircle(c, 3.4f, Offset(7.8f, 12f), style = s)
+            line(11.2f, 12f, 20.4f, 12f)
+            line(17.4f, 12f, 17.4f, 15.2f)
+            line(20.4f, 12f, 20.4f, 14.6f)
         }
     }
 }

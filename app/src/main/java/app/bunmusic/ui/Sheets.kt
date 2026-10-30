@@ -198,6 +198,11 @@ fun TrackSheet(
                     Playback.addToQueue(track)
                     onToast("Added to queue")
                 }
+                SheetAction("Start radio", G.Wave) {
+                    Playback.startRadio(track)
+                    onToast("Radio started from ${track.title}")
+                    onDismiss()
+                }
                 SheetAction("Add to playlist", G.Plus) { picker = true }
                 SheetAction(
                     when {

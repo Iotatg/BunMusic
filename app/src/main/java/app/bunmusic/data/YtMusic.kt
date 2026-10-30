@@ -279,6 +279,56 @@ object YtMusic {
         return out
     }
 
+    // ----------------------------------------------------------------- radio
+
+    /**
+     * "Play something like this" — YouTube's automix queue for a video.
+     *
+     * `RDAMVM<videoId>` is the radio playlist the web player uses for the same track,
+     * so this is the real recommendation engine rather than a keyword search.
+     */
+    suspend fun radio(videoId: String, limit: Int = 40): List<Track> {
+        if (videoId.isBlank()) return emptyList()
+        val root = runCatching {
+            post(
+                "next",
+                buildJsonObject {
+                    put("playlistId", "RDAMVM$videoId")
+                    put("isAudioOnly", true)
+                    put("enablePersistentPlaylistPanel", true)
+                    put("tunerSettingValue", "AUTOMIX_SETTING_NORMAL")
+                },
+            )
+        }.getOrNull() ?: return emptyList()
+
+        val panel = firstOf(root, "playlistPanelRenderer") ?: return emptyList()
+        val items = panel["contents"] as? JsonArray ?: return emptyList()
+        val out = LinkedHashMap<String, Track>()
+        for (raw in items) {
+            val r = (raw as? JsonObject)?.get("playlistPanelVideoRenderer") as? JsonObject ?: continue
+            val vid = (r["videoId"] as? JsonPrimitive)?.contentOrNull ?: continue
+            if (vid == videoId) continue
+            val title = runsText(r["title"]) ?: continue
+            val byline = runsText(r["longBylineText"]) ?: ""
+            val artist = byline.split("\u2022").firstOrNull()?.trim().orEmpty().ifBlank { "Unknown artist" }
+            out.putIfAbsent(
+                vid,
+                Track(
+                    id = "yt:$vid",
+                    title = title,
+                    artist = artist,
+                    album = "",
+                    artUrl = thumbnails(r["thumbnail"]).lastOrNull(),
+                    durationMs = parseDuration(runsText(r["lengthText"])),
+                    source = Source.YOUTUBE,
+                    videoId = vid,
+                ),
+            )
+            if (out.size >= limit) break
+        }
+        return out.values.toList()
+    }
+
     // ------------------------------------------------------------- internals
 
     private fun responsiveItems(root: JsonElement): List<JsonObject> {
@@ -476,7 +526,22 @@ object YtMusic {
 
     private fun parseDuration(raw: String?): Long {
         if (raw == null) return 0L
-        val m = Regex("^(\\d{1,2}):(\\d{2})$").find(raw.trim()) ?: return 0L
-        return (m.groupValues[1].toLong() * 60 + m.groupValues[2].toLong()) * 1000
+        val parts = raw.trim().split(':')
+        val numbers = parts.mapNotNull { it.toLongOrNull() }
+        if (numbers.isEmpty() || numbers.size != parts.size) return 0L
+        return numbers.fold(0L) { acc, value -> acc * 60 + value } * 1000
+    }
+
+    private fun firstOf(root: JsonElement, key: String): JsonObject? {
+        fun walk(e: JsonElement): JsonObject? {
+            if (e is JsonObject) {
+                (e[key] as? JsonObject)?.let { return it }
+                for ((_, v) in e) walk(v)?.let { return it }
+            } else if (e is JsonArray) {
+                for (v in e) walk(v)?.let { return it }
+            }
+            return null
+        }
+        return walk(root)
     }
 }

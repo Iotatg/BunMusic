@@ -19,9 +19,76 @@ object Store {
 
     private lateinit var prefs: SharedPreferences
 
+    /**
+     * Library namespace. Empty means "this device, no account" — the guest shelf.
+     * Every key is written through [k] so signing in swaps the whole library view
+     * without touching a single call site.
+     */
+    private var scope: String = ""
+
     fun init(context: Context) {
         if (::prefs.isInitialized) return
         prefs = context.getSharedPreferences("bunmusic", Context.MODE_PRIVATE)
+    }
+
+    private fun k(key: String): String = if (scope.isEmpty()) key else "$scope/$key"
+
+    private fun scopePrefix(id: String) = "acct_$id"
+
+    private val SCOPED_KEYS = listOf(
+        KEY_REG, KEY_LIKES, KEY_HISTORY, KEY_RECENT, KEY_PLAYLISTS,
+        KEY_TOTAL_MS, KEY_PLAYS, KEY_ARTISTS, KEY_TRACKS, KEY_DAYS, KEY_QUERIES,
+    )
+
+    /**
+     * Point the store at an account's slice of the library.
+     *
+     * The first time an account is used on a device that already has guest data, the
+     * guest shelf is adopted so nobody loses their playlists by signing up.
+     */
+    @Synchronized
+    fun attach(accountId: String?) {
+        if (!::prefs.isInitialized) return
+        val next = if (accountId.isNullOrBlank()) "" else scopePrefix(accountId)
+        if (next == scope) return
+        val hadGuestData = prefs.contains(KEY_LIKES) || prefs.contains(KEY_PLAYLISTS) || prefs.contains(KEY_HISTORY)
+        val accountHasData = next.isNotEmpty() && (
+            prefs.contains("$next/$KEY_LIKES") || prefs.contains("$next/$KEY_PLAYLISTS") || prefs.contains("$next/$KEY_HISTORY")
+            )
+        scope = next
+        if (next.isNotEmpty() && hadGuestData && !accountHasData) copyScope("", next)
+    }
+
+    fun currentScope(): String = scope
+
+    /** Remove everything an account owned. Called when the account is deleted. */
+    @Synchronized
+    fun dropScope(accountId: String) {
+        val prefix = scopePrefix(accountId)
+        val editor = prefs.edit()
+        SCOPED_KEYS.forEach { editor.remove("$prefix/$it") }
+        editor.apply()
+        if (scope == prefix) scope = ""
+    }
+
+    private fun copyScope(from: String, to: String) {
+        val editor = prefs.edit()
+        for (key in SCOPED_KEYS) {
+            val src = if (from.isEmpty()) key else "$from/$key"
+            val dst = if (to.isEmpty()) key else "$to/$key"
+            if (!prefs.contains(src) || prefs.contains(dst)) continue
+            when (val value = prefs.all[src]) {
+                is String -> editor.putString(dst, value)
+                is Int -> editor.putInt(dst, value)
+                is Long -> editor.putLong(dst, value)
+                is Boolean -> editor.putBoolean(dst, value)
+                is Set<*> -> {
+                    @Suppress("UNCHECKED_CAST")
+                    editor.putStringSet(dst, value as Set<String>)
+                }
+            }
+        }
+        editor.apply()
     }
 
     // ---------------------------------------------------------------- registry
@@ -38,7 +105,7 @@ object Store {
     private const val KEY_TRACKS = "stats_tracks"
     private const val KEY_DAYS = "stats_days"
 
-    private fun regRaw(): String = prefs.getString(KEY_REG, null) ?: ""
+    private fun regRaw(): String = prefs.getString(k(KEY_REG), null) ?: ""
 
     private fun registry(): LinkedHashMap<String, Track> {
         val map = LinkedHashMap<String, Track>()
@@ -58,7 +125,7 @@ object Store {
             val first = map.keys.first()
             map.remove(first)
         }
-        prefs.edit().putString(KEY_REG, map.values.joinToString(R.toString()) { encodeTrack(it) }).apply()
+        prefs.edit().putString(k(KEY_REG), map.values.joinToString(R.toString()) { encodeTrack(it) }).apply()
     }
 
     fun track(id: String): Track? = registry()[id]
@@ -66,10 +133,10 @@ object Store {
     // ------------------------------------------------------------------ likes
 
     private fun likeIds(): List<String> {
-        val raw = prefs.getString(KEY_LIKES, null)
+        val raw = prefs.getString(k(KEY_LIKES), null)
         if (raw != null) return raw.split(R).filter { it.isNotBlank() }
         // migrate the 1.0.0 set-based storage
-        val legacy = prefs.getStringSet(KEY_LEGACY_LIKES, emptySet()) ?: emptySet()
+        val legacy = prefs.getStringSet(k(KEY_LEGACY_LIKES), emptySet()) ?: emptySet()
         return legacy.toList()
     }
 
@@ -85,7 +152,7 @@ object Store {
         } else {
             ids.add(0, id); true
         }
-        prefs.edit().putString(KEY_LIKES, ids.joinToString(R.toString())).apply()
+        prefs.edit().putString(k(KEY_LIKES), ids.joinToString(R.toString())).apply()
         return liked
     }
 
@@ -104,7 +171,7 @@ object Store {
     fun history(): List<HistoryItem> {
         val map = registry()
         val out = ArrayList<HistoryItem>()
-        for (line in (prefs.getString(KEY_HISTORY, null) ?: "").split(R)) {
+        for (line in (prefs.getString(k(KEY_HISTORY), null) ?: "").split(R)) {
             val p = line.split(F)
             if (p.size < 2) continue
             val t = map[p[0]] ?: continue
@@ -117,7 +184,7 @@ object Store {
         val h = history()
         if (h.isEmpty()) {
             // 1.0.0 migration
-            val legacy = prefs.getString(KEY_RECENT, null) ?: return emptyList()
+            val legacy = prefs.getString(k(KEY_RECENT), null) ?: return emptyList()
             return legacy.split(R).mapNotNull { decodeTrack(it) }.take(limit)
         }
         return h.map { it.track }.distinctBy { it.id }.take(limit)
@@ -131,20 +198,20 @@ object Store {
         items.add(0, HistoryItem(track, now))
         while (items.size > 120) items.removeAt(items.size - 1)
         prefs.edit()
-            .putString(KEY_HISTORY, items.joinToString(R.toString()) { "${it.track.id}$F${it.atMs}" })
+            .putString(k(KEY_HISTORY), items.joinToString(R.toString()) { "${it.track.id}$F${it.atMs}" })
             .apply()
     }
 
     @Synchronized
     fun clearHistory() {
-        prefs.edit().remove(KEY_HISTORY).remove(KEY_RECENT).apply()
+        prefs.edit().remove(k(KEY_HISTORY)).remove(k(KEY_RECENT)).apply()
     }
 
     // -------------------------------------------------------------- playlists
 
     fun playlists(): List<Playlist> {
         val out = ArrayList<Playlist>()
-        for (line in (prefs.getString(KEY_PLAYLISTS, null) ?: "").split(R)) {
+        for (line in (prefs.getString(k(KEY_PLAYLISTS), null) ?: "").split(R)) {
             val p = line.split(F)
             if (p.size < 4) continue
             out.add(
@@ -163,7 +230,7 @@ object Store {
 
     private fun writePlaylists(list: List<Playlist>) {
         prefs.edit().putString(
-            KEY_PLAYLISTS,
+            k(KEY_PLAYLISTS),
             list.joinToString(R.toString()) { "${it.id}$F${it.name}$F${it.createdAt}$F${it.trackIds.joinToString(L.toString())}" },
         ).apply()
     }
@@ -237,7 +304,7 @@ object Store {
     private const val KEY_QUERIES = "queries"
 
     fun queries(): List<String> =
-        (prefs.getString(KEY_QUERIES, null) ?: "").split(R).filter { it.isNotBlank() }.take(10)
+        (prefs.getString(k(KEY_QUERIES), null) ?: "").split(R).filter { it.isNotBlank() }.take(10)
 
     @Synchronized
     fun pushQuery(q: String) {
@@ -245,42 +312,42 @@ object Store {
         if (text.isBlank()) return
         val list = queries().filterNot { it.equals(text, true) }.toMutableList()
         list.add(0, text)
-        prefs.edit().putString(KEY_QUERIES, list.take(10).joinToString(R.toString())).apply()
+        prefs.edit().putString(k(KEY_QUERIES), list.take(10).joinToString(R.toString())).apply()
     }
 
     fun clearQueries() {
-        prefs.edit().remove(KEY_QUERIES).apply()
+        prefs.edit().remove(k(KEY_QUERIES)).apply()
     }
 
     // ------------------------------------------------------------------ stats
     @Synchronized
     fun recordPlay(track: Track) {
         remember(track)
-        val plays = prefs.getInt(KEY_PLAYS, 0) + 1
-        val totalMs = prefs.getLong(KEY_TOTAL_MS, 0L) + track.durationMs.coerceAtLeast(0L)
+        val plays = prefs.getInt(k(KEY_PLAYS), 0) + 1
+        val totalMs = prefs.getLong(k(KEY_TOTAL_MS), 0L) + track.durationMs.coerceAtLeast(0L)
 
         val artists = counter(KEY_ARTISTS).toMutableMap()
         artists[track.artist] = (artists[track.artist] ?: 0) + 1
         val tracks = counter(KEY_TRACKS).toMutableMap()
         tracks[track.title] = (tracks[track.title] ?: 0) + 1
 
-        val days = (prefs.getStringSet(KEY_DAYS, emptySet()) ?: emptySet()).toMutableSet()
+        val days = (prefs.getStringSet(k(KEY_DAYS), emptySet()) ?: emptySet()).toMutableSet()
         days.add(epochDay().toString())
 
         prefs.edit()
-            .putInt(KEY_PLAYS, plays)
-            .putLong(KEY_TOTAL_MS, totalMs)
-            .putString(KEY_ARTISTS, writeCounter(artists))
-            .putString(KEY_TRACKS, writeCounter(tracks))
-            .putStringSet(KEY_DAYS, days)
+            .putInt(k(KEY_PLAYS), plays)
+            .putLong(k(KEY_TOTAL_MS), totalMs)
+            .putString(k(KEY_ARTISTS), writeCounter(artists))
+            .putString(k(KEY_TRACKS), writeCounter(tracks))
+            .putStringSet(k(KEY_DAYS), days)
             .apply()
     }
 
     fun stats(): LibraryStats {
-        val days = prefs.getStringSet(KEY_DAYS, emptySet()) ?: emptySet()
+        val days = prefs.getStringSet(k(KEY_DAYS), emptySet()) ?: emptySet()
         return LibraryStats(
-            totalMs = prefs.getLong(KEY_TOTAL_MS, 0L),
-            plays = prefs.getInt(KEY_PLAYS, 0),
+            totalMs = prefs.getLong(k(KEY_TOTAL_MS), 0L),
+            plays = prefs.getInt(k(KEY_PLAYS), 0),
             topArtists = counter(KEY_ARTISTS).entries.sortedByDescending { it.value }.take(6).map { it.key to it.value },
             topTracks = counter(KEY_TRACKS).entries.sortedByDescending { it.value }.take(6).map { it.key to it.value },
             days = days.size,
@@ -311,7 +378,7 @@ object Store {
 
     private fun counter(key: String): Map<String, Int> {
         val out = LinkedHashMap<String, Int>()
-        for (line in (prefs.getString(key, null) ?: "").split(R)) {
+        for (line in (prefs.getString(k(key), null) ?: "").split(R)) {
             val p = line.split(F)
             if (p.size < 2) continue
             out[p[0]] = p[1].toIntOrNull() ?: 0

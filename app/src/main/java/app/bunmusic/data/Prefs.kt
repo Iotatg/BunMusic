@@ -40,6 +40,13 @@ object Prefs {
         val wifiOnly: Boolean = true,
         val lyricsOnPlayer: Boolean = true,
         val showStats: Boolean = true,
+        val autoplay: Boolean = true,
+        val offlineOnly: Boolean = false,
+        val eqEnabled: Boolean = false,
+        val eqPreset: String = "Flat",
+        val eqBands: List<Int> = emptyList(),
+        val bassBoost: Int = 0,
+        val googleClientId: String = "",
     )
 
     private lateinit var sp: SharedPreferences
@@ -64,6 +71,13 @@ object Prefs {
             wifiOnly = sp.getBoolean("wifiOnly", d.wifiOnly),
             lyricsOnPlayer = sp.getBoolean("lyricsOnPlayer", d.lyricsOnPlayer),
             showStats = sp.getBoolean("showStats", d.showStats),
+            autoplay = sp.getBoolean("autoplay", d.autoplay),
+            offlineOnly = sp.getBoolean("offlineOnly", d.offlineOnly),
+            eqEnabled = sp.getBoolean("eqEnabled", d.eqEnabled),
+            eqPreset = sp.getString("eqPreset", d.eqPreset) ?: d.eqPreset,
+            eqBands = (sp.getString("eqBands", "") ?: "").split(',').mapNotNull { it.toIntOrNull() },
+            bassBoost = sp.getInt("bassBoost", d.bassBoost),
+            googleClientId = sp.getString("googleClientId", d.googleClientId) ?: "",
         )
     }
 
@@ -81,6 +95,13 @@ object Prefs {
             .putBoolean("wifiOnly", next.wifiOnly)
             .putBoolean("lyricsOnPlayer", next.lyricsOnPlayer)
             .putBoolean("showStats", next.showStats)
+            .putBoolean("autoplay", next.autoplay)
+            .putBoolean("offlineOnly", next.offlineOnly)
+            .putBoolean("eqEnabled", next.eqEnabled)
+            .putString("eqPreset", next.eqPreset)
+            .putString("eqBands", next.eqBands.joinToString(","))
+            .putInt("bassBoost", next.bassBoost)
+            .putString("googleClientId", next.googleClientId)
             .apply()
     }
 }
