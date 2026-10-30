@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -28,6 +29,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -64,6 +66,7 @@ import app.bunmusic.core.G
 import app.bunmusic.core.Glyph
 import app.bunmusic.core.Haptics
 import app.bunmusic.core.Ink
+import app.bunmusic.core.LocalBunWindow
 import app.bunmusic.core.SerifFamily
 import app.bunmusic.core.Skin
 import app.bunmusic.core.SoraFamily
@@ -87,6 +90,7 @@ fun PlayerScreen(state: PlayerState, onClose: () -> Unit, onMore: () -> Unit) {
     var showSleep by remember { mutableStateOf(false) }
     var showSpeed by remember { mutableStateOf(false) }
     var inlineLyrics by remember { mutableStateOf(false) }
+    val window = LocalBunWindow.current
 
     val tint = Ambient.colorFor(track)
     val glowAlpha = when (settings.glow) {
@@ -133,9 +137,35 @@ fun PlayerScreen(state: PlayerState, onClose: () -> Unit, onMore: () -> Unit) {
         Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding()) {
 
             if (Ink.isLight) {
-                CharcoalPlayer(
+                // Charcoal keeps its single centred column at every size — but on
+                // a tablet the column is capped, or the artwork becomes a wall.
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
+                    Column(Modifier.fillMaxHeight().widthIn(max = window.readingMax)) {
+                        CharcoalPlayer(
+                            state = state,
+                            track = track,
+                            onClose = onClose,
+                            onMore = onMore,
+                            onQueue = { showQueue = true },
+                            onLyrics = { showLyrics = true },
+                            onSleep = { showSleep = true },
+                            onSpeed = { showSpeed = true },
+                            window = window,
+                        )
+                    }
+                }
+                return@Column
+            }
+
+            // Two panes from 840 dp in landscape: artwork left, controls right.
+            // A single column there is 300 dp of artwork in 700 dp of nothing,
+            // with the transport row pinned to the bottom bezel.
+            if (window.twoPane) {
+                WidePlayer(
                     state = state,
                     track = track,
+                    style = settings.playerStyle,
+                    tint = tint,
                     onClose = onClose,
                     onMore = onMore,
                     onQueue = { showQueue = true },
@@ -145,6 +175,9 @@ fun PlayerScreen(state: PlayerState, onClose: () -> Unit, onMore: () -> Unit) {
                 )
                 return@Column
             }
+
+            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
+            Column(Modifier.fillMaxHeight().widthIn(max = window.readingMax)) {
 
             // ---- top bar
             Row(
@@ -183,10 +216,16 @@ fun PlayerScreen(state: PlayerState, onClose: () -> Unit, onMore: () -> Unit) {
                 }
             }
 
-            Spacer(Modifier.weight(0.45f))
+            Spring(0.45f, window.short)
 
             // ---- artwork
-            Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+            Box(
+                Modifier
+                    .align(Alignment.CenterHorizontally)
+                    .widthIn(max = window.artCap())
+                    .fillMaxWidth(),
+                contentAlignment = Alignment.Center,
+            ) {
                 when (settings.playerStyle) {
                     Prefs.PlayerStyle.DISC -> DiscArt(track, state.isPlaying, tint)
                     Prefs.PlayerStyle.VINYL -> VinylArt(track, state.isPlaying, tint)
@@ -194,7 +233,7 @@ fun PlayerScreen(state: PlayerState, onClose: () -> Unit, onMore: () -> Unit) {
                 }
             }
 
-            Spacer(Modifier.weight(0.30f))
+            Spring(0.30f, window.short)
 
             // ---- inline lyrics peek
             if (settings.lyricsOnPlayer) {
@@ -261,84 +300,27 @@ fun PlayerScreen(state: PlayerState, onClose: () -> Unit, onMore: () -> Unit) {
             Spacer(Modifier.height(12.dp))
 
             // ---- seek
-            Column(Modifier.padding(horizontal = 22.dp)) {
-                SeekBar(
-                    positionMs = state.positionMs,
-                    durationMs = state.durationMs,
-                    onSeek = { Playback.seekTo(it) },
-                    activeColor = tint,
-                )
-                Row(Modifier.fillMaxWidth()) {
-                    Text(fmtTime(state.positionMs), color = Ink.Faint, fontSize = 11.sp, fontFamily = SoraFamily)
-                    Spacer(Modifier.weight(1f))
-                    Text(fmtTime(state.durationMs), color = Ink.Faint, fontSize = 11.sp, fontFamily = SoraFamily)
-                }
-                if (state.error != null) {
-                    Spacer(Modifier.height(6.dp))
-                    Text(
-                        state.error ?: "",
-                        color = Ink.Rose,
-                        fontSize = 11.sp,
-                        fontFamily = SoraFamily,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
-            }
+            SeekBlock(state, tint, Modifier.padding(horizontal = 22.dp))
 
             Spacer(Modifier.height(6.dp))
 
             // ---- transport
-            Row(
-                Modifier.fillMaxWidth().padding(horizontal = 24.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween,
-            ) {
-                IconBtn(G.Shuffle, if (state.shuffle) tint else Ink.Faint, 40.dp, 18.dp) { Playback.toggleShuffle() }
-                IconBtn(G.Prev, Ink.Text, 48.dp, 24.dp) { Playback.previous() }
-                Box(
-                    Modifier
-                        .size(72.dp)
-                        .clip(CircleShape)
-                        .background(tint)
-                        .clickable { Playback.toggle() },
-                    contentAlignment = Alignment.Center,
-                ) {
-                    if (state.buffering && !state.isPlaying) {
-                        Glyph(G.Wave, Ink.Void, 26.dp)
-                    } else {
-                        Glyph(if (state.isPlaying) G.Pause else G.Play, Ink.Void, 26.dp)
-                    }
-                }
-                IconBtn(G.Next, Ink.Text, 48.dp, 24.dp) { Playback.next() }
-                IconBtn(
-                    if (state.repeat == 2) G.RepeatOne else G.Repeat,
-                    if (state.repeat != 0) tint else Ink.Faint,
-                    40.dp, 18.dp,
-                ) { Playback.cycleRepeat() }
-            }
+            TransportRow(state, tint, Modifier.padding(horizontal = 24.dp))
 
             Spacer(Modifier.height(10.dp))
 
             // ---- secondary actions
-            Row(
-                Modifier.fillMaxWidth().padding(horizontal = 18.dp),
-                horizontalArrangement = Arrangement.SpaceEvenly,
-            ) {
-                SecondaryAction("Lyrics", G.Mic, active = false) { showLyrics = true }
-                SecondaryAction(
-                    if (state.sleepActive) fmtTime(state.sleepRemainingMs) else "Sleep",
-                    G.Moon,
-                    active = state.sleepActive,
-                ) { showSleep = true }
-                SecondaryAction(
-                    if (state.speed == 1f) "Speed" else "${state.speed}x",
-                    G.Speed,
-                    active = state.speed != 1f,
-                ) { showSpeed = true }
-                SecondaryAction("Queue", G.List, active = false) { showQueue = true }
-            }
+            SecondaryRow(
+                state = state,
+                onLyrics = { showLyrics = true },
+                onSleep = { showSleep = true },
+                onSpeed = { showSpeed = true },
+                onQueue = { showQueue = true },
+                modifier = Modifier.padding(horizontal = 18.dp),
+            )
             Spacer(Modifier.height(8.dp))
+            }
+            }
         }
 
         AnimatedVisibility(
@@ -376,6 +358,244 @@ fun PlayerScreen(state: PlayerState, onClose: () -> Unit, onMore: () -> Unit) {
 }
 
 
+// ------------------------------------------------------------ shared pieces
+
+/**
+ * A gap that collapses on a short screen.
+ *
+ * The phone layout breathes with `weight` spacers — on an 891 × 411 landscape
+ * window those weights resolve to a few dp each and the page still overflows,
+ * so they become a fixed 8 dp and the controls keep their room.
+ */
+@Composable
+private fun ColumnScope.Spring(weight: Float, short: Boolean) {
+    if (short) Spacer(Modifier.height(8.dp)) else Spacer(Modifier.weight(weight))
+}
+
+/** Seek bar, its two timestamps, and the last playback error. Shared by both layouts. */
+@Composable
+private fun SeekBlock(state: PlayerState, tint: Color, modifier: Modifier = Modifier) {
+    Column(modifier) {
+        SeekBar(
+            positionMs = state.positionMs,
+            durationMs = state.durationMs,
+            onSeek = { Playback.seekTo(it) },
+            activeColor = tint,
+        )
+        Row(Modifier.fillMaxWidth()) {
+            Text(fmtTime(state.positionMs), color = Ink.Faint, fontSize = 11.sp, fontFamily = SoraFamily)
+            Spacer(Modifier.weight(1f))
+            Text(fmtTime(state.durationMs), color = Ink.Faint, fontSize = 11.sp, fontFamily = SoraFamily)
+        }
+        if (state.error != null) {
+            Spacer(Modifier.height(6.dp))
+            Text(
+                state.error ?: "",
+                color = Ink.Rose,
+                fontSize = 11.sp,
+                fontFamily = SoraFamily,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+    }
+}
+
+/** Shuffle · previous · play · next · repeat. */
+@Composable
+private fun TransportRow(state: PlayerState, tint: Color, modifier: Modifier = Modifier) {
+    Row(
+        modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween,
+    ) {
+        IconBtn(G.Shuffle, if (state.shuffle) tint else Ink.Faint, 40.dp, 18.dp) { Playback.toggleShuffle() }
+        IconBtn(G.Prev, Ink.Text, 48.dp, 24.dp) { Playback.previous() }
+        Box(
+            Modifier
+                .size(72.dp)
+                .clip(CircleShape)
+                .background(tint)
+                .clickable { Playback.toggle() },
+            contentAlignment = Alignment.Center,
+        ) {
+            if (state.buffering && !state.isPlaying) {
+                Glyph(G.Wave, Ink.Void, 26.dp)
+            } else {
+                Glyph(if (state.isPlaying) G.Pause else G.Play, Ink.Void, 26.dp)
+            }
+        }
+        IconBtn(G.Next, Ink.Text, 48.dp, 24.dp) { Playback.next() }
+        IconBtn(
+            if (state.repeat == 2) G.RepeatOne else G.Repeat,
+            if (state.repeat != 0) tint else Ink.Faint,
+            40.dp, 18.dp,
+        ) { Playback.cycleRepeat() }
+    }
+}
+
+/** Lyrics · sleep · speed · queue. */
+@Composable
+private fun SecondaryRow(
+    state: PlayerState,
+    onLyrics: () -> Unit,
+    onSleep: () -> Unit,
+    onSpeed: () -> Unit,
+    onQueue: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Row(modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
+        SecondaryAction("Lyrics", G.Mic, active = false) { onLyrics() }
+        SecondaryAction(
+            if (state.sleepActive) fmtTime(state.sleepRemainingMs) else "Sleep",
+            G.Moon,
+            active = state.sleepActive,
+        ) { onSleep() }
+        SecondaryAction(
+            if (state.speed == 1f) "Speed" else "${state.speed}x",
+            G.Speed,
+            active = state.speed != 1f,
+        ) { onSpeed() }
+        SecondaryAction("Queue", G.List, active = false) { onQueue() }
+    }
+}
+
+/**
+ * The tablet now-playing screen: artwork on the left, everything you can touch
+ * on the right.
+ *
+ * Same components as the phone, arranged rather than stacked. The artwork is
+ * squared off the *height* so a 16:9 tablet doesn't produce a disc wider than
+ * the pane, and the control column never exceeds [BunWindow.readingMax].
+ */
+@Composable
+private fun WidePlayer(
+    state: PlayerState,
+    track: Track,
+    style: Prefs.PlayerStyle,
+    tint: Color,
+    onClose: () -> Unit,
+    onMore: () -> Unit,
+    onQueue: () -> Unit,
+    onLyrics: () -> Unit,
+    onSleep: () -> Unit,
+    onSpeed: () -> Unit,
+) {
+    var liked by remember(track.id) { mutableStateOf(Store.isLiked(track.id)) }
+
+    Row(
+        Modifier.fillMaxSize().padding(horizontal = 26.dp, vertical = 14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(Modifier.weight(1f).fillMaxHeight(), contentAlignment = Alignment.Center) {
+            Box(Modifier.fillMaxHeight(0.92f).aspectRatio(1f), contentAlignment = Alignment.Center) {
+                when (style) {
+                    Prefs.PlayerStyle.DISC -> DiscArt(track, state.isPlaying, tint)
+                    Prefs.PlayerStyle.VINYL -> VinylArt(track, state.isPlaying, tint)
+                    Prefs.PlayerStyle.CARD -> CardArt(track, tint)
+                }
+            }
+        }
+
+        Spacer(Modifier.width(34.dp))
+
+        // 1 : 0.85 — the artwork is the thing you look at; the controls only
+        // need enough width for five buttons and a title.
+        Column(Modifier.weight(0.85f).fillMaxHeight()) {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Box(
+                    Modifier.size(40.dp).clip(CircleShape).clickable { onClose() },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Box(Modifier.rotate(90f)) { Glyph(G.Back, Ink.Text, 20.dp, 2.dp) }
+                }
+                Spacer(Modifier.weight(1f))
+                Text(
+                    "NOW PLAYING",
+                    color = Ink.Faint,
+                    fontSize = 10.sp,
+                    fontFamily = SoraFamily,
+                    letterSpacing = 1.4.sp,
+                    fontWeight = FontWeight.SemiBold,
+                )
+                Spacer(Modifier.weight(1f))
+                IconBtn(G.Queue, Ink.Text, 38.dp, 18.dp) { onQueue() }
+                IconBtn(G.More, Ink.Text, 38.dp, 18.dp, onMore)
+            }
+
+            Spacer(Modifier.weight(0.4f))
+
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text(
+                        track.title,
+                        color = Ink.Text,
+                        fontSize = 26.sp,
+                        fontFamily = SerifFamily,
+                        lineHeight = 30.sp,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    Spacer(Modifier.height(6.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        if (Downloads.isDownloaded(track.id) || track.isLocal) {
+                            Text(
+                                "OFFLINE",
+                                color = Ink.Mint,
+                                fontSize = 10.sp,
+                                fontFamily = SoraFamily,
+                                fontWeight = FontWeight.SemiBold,
+                                letterSpacing = 0.7.sp,
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(4.dp))
+                                    .background(Ink.Mint.copy(alpha = 0.14f))
+                                    .padding(horizontal = 5.dp, vertical = 1.5.dp),
+                            )
+                            Spacer(Modifier.width(7.dp))
+                        }
+                        Text(
+                            track.artist,
+                            color = Ink.Muted,
+                            fontSize = 12.5.sp,
+                            fontFamily = SoraFamily,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                }
+                Box(
+                    Modifier.size(42.dp).clip(CircleShape).clickable {
+                        liked = Store.toggleLike(track.id)
+                        Haptics.tick()
+                    },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Glyph(
+                        if (liked) G.HeartFill else G.Heart,
+                        if (liked) Ink.Rose else Ink.Muted,
+                        20.dp,
+                    )
+                }
+            }
+
+            Spacer(Modifier.height(14.dp))
+
+            SeekBlock(state, tint)
+
+            Spacer(Modifier.height(8.dp))
+
+            TransportRow(state, tint)
+
+            Spacer(Modifier.height(16.dp))
+
+            SecondaryRow(state, onLyrics, onSleep, onSpeed, onQueue)
+
+            Spacer(Modifier.weight(0.3f))
+        }
+    }
+}
+
+
 // ------------------------------------------------------------- charcoal bun
 
 /**
@@ -392,6 +612,7 @@ private fun ColumnScope.CharcoalPlayer(
     onLyrics: () -> Unit,
     onSleep: () -> Unit,
     onSpeed: () -> Unit,
+    window: app.bunmusic.core.BunWindow,
 ) {
     var liked by remember(track.id) { mutableStateOf(Store.isLiked(track.id)) }
 
@@ -421,12 +642,15 @@ private fun ColumnScope.CharcoalPlayer(
         ) { Glyph(G.Queue, Ink.Text, 20.dp, 2.dp) }
     }
 
-    Spacer(Modifier.weight(0.5f))
+    Spring(0.5f, window.short)
 
     Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
         Box(
             Modifier
-                .fillMaxWidth(0.80f)
+                .then(
+                    if (window.short) Modifier.size(window.artCap())
+                    else Modifier.fillMaxWidth(0.80f)
+                )
                 .aspectRatio(1f)
                 .shadow(26.dp, RoundedCornerShape(30.dp), clip = false, spotColor = Ink.Shadow, ambientColor = Ink.Shadow)
         ) {
@@ -439,7 +663,7 @@ private fun ColumnScope.CharcoalPlayer(
         }
     }
 
-    Spacer(Modifier.weight(0.42f))
+    Spring(0.42f, window.short)
 
     Row(
         Modifier.fillMaxWidth().padding(horizontal = 24.dp),

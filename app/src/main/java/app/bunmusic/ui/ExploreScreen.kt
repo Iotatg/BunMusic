@@ -41,6 +41,7 @@ import app.bunmusic.core.Ambient
 import app.bunmusic.core.G
 import app.bunmusic.core.Glyph
 import app.bunmusic.core.Ink
+import app.bunmusic.core.LocalBunWindow
 import app.bunmusic.core.SoraFamily
 import app.bunmusic.data.Collection
 import app.bunmusic.data.ExplorePage
@@ -61,6 +62,11 @@ fun ExploreScreen(
     var loading by remember { mutableStateOf(true) }
     var failed by remember { mutableStateOf(false) }
     var attempt by remember { mutableIntStateOf(0) }
+    val window = LocalBunWindow.current
+    val gutter = window.gutter
+    // Two tiles per row is a phone answer. At 600 dp three fit without crowding,
+    // at 840 dp four — and the mood wall stops looking like a stretched list.
+    val moodColumns = window.columns(minItem = 150.dp, gap = 10.dp)
 
     // A failed fetch used to leave `loading = false` and an empty page: the
     // screen looked like a deliberately sparse layout with no way back. The
@@ -81,7 +87,7 @@ fun ExploreScreen(
         item { ScreenTitle("Explore", "Moods, new releases and what's hot") }
 
         item {
-            Row(Modifier.padding(horizontal = 20.dp, vertical = 12.dp)) {
+            Row(Modifier.padding(horizontal = gutter, vertical = 12.dp)) {
                 ChartsCard(onClick = onOpenCharts, modifier = Modifier.weight(1f))
             }
         }
@@ -106,15 +112,15 @@ fun ExploreScreen(
 
         if (page.moods.isNotEmpty()) {
             item { SectionHeader("Moods & genres") }
-            items(page.moods.chunked(2)) { pair ->
+            itemsIndexed(page.moods.chunked(moodColumns)) { row, rowItems ->
                 Row(
-                    Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 5.dp),
+                    Modifier.fillMaxWidth().padding(horizontal = gutter, vertical = 5.dp),
                     horizontalArrangement = Arrangement.spacedBy(10.dp),
                 ) {
-                    pair.forEach { m ->
+                    rowItems.forEach { m ->
                         MoodTile(m, Modifier.weight(1f)) { onOpenMood(m) }
                     }
-                    if (pair.size == 1) Spacer(Modifier.weight(1f))
+                    repeat(moodColumns - rowItems.size) { Spacer(Modifier.weight(1f)) }
                 }
             }
         }
@@ -123,10 +129,12 @@ fun ExploreScreen(
             item { SectionHeader("New albums & singles") }
             item {
                 LazyRow(
-                    contentPadding = PaddingValues(horizontal = 20.dp),
+                    contentPadding = PaddingValues(horizontal = gutter),
                     horizontalArrangement = Arrangement.spacedBy(14.dp),
                 ) {
-                    items(page.newReleases) { c -> SquareCard(c, onClick = { onOpenCollection(c) }) }
+                    itemsIndexed(page.newReleases, key = { i, c -> c.id + "#" + i }) { _, c ->
+                        SquareCard(c, onClick = { onOpenCollection(c) })
+                    }
                 }
             }
         }

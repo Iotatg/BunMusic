@@ -62,6 +62,7 @@ import app.bunmusic.core.Glyph
 import app.bunmusic.core.Haptics
 import app.bunmusic.core.Icons
 import app.bunmusic.core.Ink
+import app.bunmusic.core.LocalBunWindow
 import app.bunmusic.core.SerifFamily
 import app.bunmusic.core.Skin
 import app.bunmusic.core.SoraFamily
@@ -189,8 +190,9 @@ fun Panel(
 
 @Composable
 fun SectionHeader(title: String, action: String? = null, onAction: (() -> Unit)? = null) {
+    val gutter = LocalBunWindow.current.gutter
     Row(
-        Modifier.fillMaxWidth().padding(start = 20.dp, end = 20.dp, top = 26.dp, bottom = 12.dp),
+        Modifier.fillMaxWidth().padding(start = gutter, end = gutter, top = 26.dp, bottom = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
@@ -229,8 +231,9 @@ fun Display(text: String, size: Int = 34, color: Color = Ink.Text) {
 
 @Composable
 fun ScreenTitle(title: String, subtitle: String? = null, trailing: @Composable (() -> Unit)? = null) {
+    val gutter = LocalBunWindow.current.gutter
     Row(
-        Modifier.fillMaxWidth().padding(start = 20.dp, end = 20.dp, top = 14.dp, bottom = 6.dp),
+        Modifier.fillMaxWidth().padding(start = gutter, end = gutter, top = 14.dp, bottom = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(Modifier.weight(1f)) {
@@ -246,13 +249,19 @@ fun ScreenTitle(title: String, subtitle: String? = null, trailing: @Composable (
 
 // -------------------------------------------------------------------- pieces
 
+/**
+ * A carousel tile. The size is the phone size unless the caller overrides it —
+ * on a tablet the shared [BunWindow.tile] grows it, because a 124 dp circle on a
+ * 1000 dp page reads as a favicon.
+ */
 @Composable
-fun CircleCard(collection: Collection, onClick: () -> Unit, width: Dp = 124.dp) {
-    Column(Modifier.width(width).clickable { onClick() }) {
+fun CircleCard(collection: Collection, onClick: () -> Unit, width: Dp? = null) {
+    val w = width ?: LocalBunWindow.current.tile(124.dp)
+    Column(Modifier.width(w).clickable { onClick() }) {
         ArtImage(
             url = collection.artUrl,
             asset = collection.artAsset,
-            modifier = Modifier.size(width),
+            modifier = Modifier.size(w),
             shape = CircleShape,
         )
         Spacer(Modifier.height(10.dp))
@@ -279,12 +288,13 @@ fun CircleCard(collection: Collection, onClick: () -> Unit, width: Dp = 124.dp) 
 }
 
 @Composable
-fun SquareCard(collection: Collection, onClick: () -> Unit, width: Dp = 152.dp) {
-    Column(Modifier.width(width).clickable { onClick() }) {
+fun SquareCard(collection: Collection, onClick: () -> Unit, width: Dp? = null) {
+    val w = width ?: LocalBunWindow.current.tile(152.dp)
+    Column(Modifier.width(w).clickable { onClick() }) {
         ArtImage(
             url = collection.artUrl,
             asset = collection.artAsset,
-            modifier = Modifier.size(width),
+            modifier = Modifier.size(w),
             shape = RoundedCornerShape(if (Skin.light) 18.dp else 20.dp),
         )
         Spacer(Modifier.height(10.dp))

@@ -23,6 +23,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
@@ -48,6 +49,7 @@ import androidx.compose.ui.unit.sp
 import app.bunmusic.core.G
 import app.bunmusic.core.Glyph
 import app.bunmusic.core.Ink
+import app.bunmusic.core.LocalBunWindow
 import app.bunmusic.core.SoraFamily
 import app.bunmusic.data.Collection
 import app.bunmusic.data.SearchResults
@@ -76,6 +78,7 @@ fun SearchScreen(
     var history by remember { mutableStateOf(Store.queries()) }
     var filter by remember { mutableStateOf(0) }
     val keyboard = LocalSoftwareKeyboardController.current
+    val gutter = LocalBunWindow.current.gutter
 
     fun runSearch(q: String) {
         if (q.isBlank()) return
@@ -135,7 +138,7 @@ fun SearchScreen(
         item {
             Row(
                 Modifier
-                    .padding(horizontal = 20.dp, vertical = 10.dp)
+                    .padding(horizontal = gutter, vertical = 10.dp)
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(16.dp))
                     .background(Ink.Card)
@@ -183,7 +186,7 @@ fun SearchScreen(
                     })
                 }
                 item {
-                    Column(Modifier.padding(horizontal = 20.dp)) {
+                    Column(Modifier.padding(horizontal = gutter)) {
                         history.forEach { q ->
                             Row(
                                 Modifier
@@ -204,7 +207,7 @@ fun SearchScreen(
 
             item { SectionHeader("Try these") }
             item {
-                Column(Modifier.padding(horizontal = 20.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Column(Modifier.padding(horizontal = gutter), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     hints.chunked(2).forEach { pair ->
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             pair.forEach { h -> Chip(h, leading = G.Sparkle) { runSearch(h) } }
@@ -214,7 +217,7 @@ fun SearchScreen(
             }
         } else if (suggestions.isNotEmpty() && !searched) {
             item {
-                Column(Modifier.padding(horizontal = 20.dp, vertical = 6.dp)) {
+                Column(Modifier.padding(horizontal = gutter, vertical = 6.dp)) {
                     suggestions.forEach { s ->
                         Row(
                             Modifier
@@ -236,7 +239,7 @@ fun SearchScreen(
         if (searched) {
             item {
                 LazyRow(
-                    contentPadding = PaddingValues(horizontal = 20.dp, vertical = 12.dp),
+                    contentPadding = PaddingValues(horizontal = gutter, vertical = 12.dp),
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     items(filters.size) { i ->
@@ -255,8 +258,7 @@ fun SearchScreen(
         }
 
         if (filter == 0 || filter == 1) {
-            items(results.songs.size) { i ->
-                val t = results.songs[i]
+            itemsIndexed(results.songs, key = { i, t -> t.id + "#" + i }) { i, t ->
                 Box(Modifier.padding(horizontal = 8.dp)) {
                     TrackRow(
                         track = t,
@@ -273,10 +275,12 @@ fun SearchScreen(
             item { SectionHeader("Albums") }
             item {
                 LazyRow(
-                    contentPadding = PaddingValues(horizontal = 20.dp),
+                    contentPadding = PaddingValues(horizontal = gutter),
                     horizontalArrangement = Arrangement.spacedBy(14.dp),
                 ) {
-                    items(results.albums) { c -> SquareCard(c, onClick = { onOpenCollection(c) }) }
+                    itemsIndexed(results.albums, key = { i, c -> c.id + "#" + i }) { _, c ->
+                        SquareCard(c, onClick = { onOpenCollection(c) })
+                    }
                 }
             }
         }
@@ -285,10 +289,12 @@ fun SearchScreen(
             item { SectionHeader("Artists") }
             item {
                 LazyRow(
-                    contentPadding = PaddingValues(horizontal = 20.dp),
+                    contentPadding = PaddingValues(horizontal = gutter),
                     horizontalArrangement = Arrangement.spacedBy(14.dp),
                 ) {
-                    items(results.artists) { c -> CircleCard(c, onClick = { onOpenCollection(c) }) }
+                    itemsIndexed(results.artists, key = { i, c -> c.id + "#" + i }) { _, c ->
+                        CircleCard(c, onClick = { onOpenCollection(c) })
+                    }
                 }
             }
         }
@@ -297,10 +303,12 @@ fun SearchScreen(
             item { SectionHeader("Playlists") }
             item {
                 LazyRow(
-                    contentPadding = PaddingValues(horizontal = 20.dp),
+                    contentPadding = PaddingValues(horizontal = gutter),
                     horizontalArrangement = Arrangement.spacedBy(14.dp),
                 ) {
-                    items(results.playlists) { c -> SquareCard(c, onClick = { onOpenCollection(c) }) }
+                    itemsIndexed(results.playlists, key = { i, c -> c.id + "#" + i }) { _, c ->
+                        SquareCard(c, onClick = { onOpenCollection(c) })
+                    }
                 }
             }
         }

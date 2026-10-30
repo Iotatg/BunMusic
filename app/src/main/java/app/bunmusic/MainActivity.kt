@@ -11,6 +11,7 @@ import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
 import app.bunmusic.core.BunTheme
+import app.bunmusic.core.BunWindowProvider
 import app.bunmusic.core.Haptics
 import app.bunmusic.core.Skin
 import app.bunmusic.ui.Root
@@ -46,7 +47,11 @@ class MainActivity : ComponentActivity() {
         }
         setContent {
             BunTheme {
-                Root(openPlayerOnStart = intent?.getBooleanExtra("open_player", false) == true)
+                // The window size is resolved once, at the top, so every screen
+                // and every shared component reads the same answer.
+                BunWindowProvider {
+                    Root(openPlayerOnStart = intent?.getBooleanExtra("open_player", false) == true)
+                }
             }
         }
     }

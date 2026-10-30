@@ -47,7 +47,7 @@ fun AboutScreen(onBack: () -> Unit) {
                 Display("BunMusic", 32)
                 Spacer(Modifier.height(4.dp))
                 Text(
-                    "1.0.10 · build 11 · ${Skin.current.title} bun",
+                    "1.0.11 · build 12 · ${Skin.current.title} bun",
                     color = Ink.Muted, fontSize = 12.sp, fontFamily = SoraFamily,
                 )
             }
@@ -56,6 +56,15 @@ fun AboutScreen(onBack: () -> Unit) {
         item { GroupTitle("What's new") }
         item {
             AboutCard {
+                Change("Every screen, every screen", "The layout has three width classes now — phone, small tablet, large tablet — and each one is drawn for its size instead of the phone being stretched. Tested from 320 dp to 1280 dp")
+                Change("The tabs move to the side", "From 600 dp the bottom bar becomes a rail down the left edge: same four destinations, same glyphs, same selected fill, and 84 dp of height back for the content")
+                Change("A tablet player, not a blown-up phone", "From 840 dp in landscape the now-playing screen splits: artwork left, controls right. Portrait keeps one column, capped so the disc isn't a wall")
+                Change("Landscape stops clipping", "On a short window the flexible gaps collapse to a fixed 8 dp and the artwork is capped by height, so the transport row can't be pushed off the bottom")
+                Change("No more 1000 dp lines", "Reading columns are capped at 720 / 1040 dp and centred. A song title is no longer a 90-character line on a 12-inch tablet")
+                Change("Twice a second, for nothing", "Screens were handed the live player state, so the whole page recomposed at 2 Hz to draw a progress number none of them show. They get the tick-free copy now")
+                Change("A mood wall, not a mood column", "Explore's grid runs 2 / 3 / 4 tiles wide depending on the window, and carousel cards grow with it")
+                Change("Rows remember what they are", "Lists carry stable keys, so a re-render reuses a row instead of rebuilding it — and a duplicated id can no longer take the list down")
+                Change("Resizing doesn't restart", "Rotation, split screen and unfolding are handled in place: the stack, the queue and the scroll position survive a resize")
                 Change("Captions you can actually read", "The caption grey sat at 2.0–2.9:1 in all four buns — under the 4.5:1 floor. Every bun's three text tones were recomputed and now pass, on the page and on a card")
                 Change("No pure-white page", "Charcoal painted #FFFFFF behind #FFFFFF cards. The page is a soft grey now, so a card has an edge")
                 Change("Blue and rose you can read on", "Cloud's blue and Pink's rose were 4.2:1 as text. Both are one step deeper; the fills and hero gradients keep the brighter originals")
@@ -91,7 +100,7 @@ fun AboutScreen(onBack: () -> Unit) {
         item { GroupTitle("Build") }
         item {
             AboutCard {
-                Fact("Version", "1.0.10 (11)")
+                Fact("Version", "1.0.11 (12)")
                 Fact("Package", "app.bunmusic")
                 Fact("Min SDK", "26 · Android 8.0")
                 Fact("Target SDK", "37")

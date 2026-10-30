@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
@@ -41,6 +42,7 @@ import androidx.compose.ui.unit.sp
 import app.bunmusic.core.G
 import app.bunmusic.core.Glyph
 import app.bunmusic.core.Ink
+import app.bunmusic.core.LocalBunWindow
 import app.bunmusic.core.SerifFamily
 import app.bunmusic.core.SoraFamily
 import app.bunmusic.data.Collection
@@ -70,6 +72,8 @@ fun HomeScreen(
     var failed by remember { mutableStateOf(false) }
     var attempt by remember { mutableIntStateOf(0) }
     val recents = remember(state.track?.id) { Store.recent(6) }
+    val window = LocalBunWindow.current
+    val gutter = window.gutter
 
     LaunchedEffect(attempt) {
         loading = true
@@ -87,7 +91,7 @@ fun HomeScreen(
     ) {
         item {
             Row(
-                Modifier.fillMaxWidth().padding(start = 20.dp, end = 14.dp, top = 10.dp, bottom = 2.dp),
+                Modifier.fillMaxWidth().padding(start = gutter, end = gutter - 6.dp, top = 10.dp, bottom = 2.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(
@@ -104,7 +108,7 @@ fun HomeScreen(
         }
 
         item {
-            Column(Modifier.padding(horizontal = 20.dp, vertical = 10.dp)) {
+            Column(Modifier.padding(horizontal = gutter, vertical = 10.dp)) {
                 Display(greeting(), 33)
                 Spacer(Modifier.height(4.dp))
                 Text(
@@ -116,7 +120,7 @@ fun HomeScreen(
             }
         }
 
-        item { SearchPill(onClick = onOpenSearch, modifier = Modifier.padding(horizontal = 20.dp)) }
+        item { SearchPill(onClick = onOpenSearch, modifier = Modifier.padding(horizontal = gutter)) }
 
         item { Spacer(Modifier.height(18.dp)) }
 
@@ -133,10 +137,10 @@ fun HomeScreen(
             item { SectionHeader("Moods", "Explore", onOpenExplore) }
             item {
                 LazyRow(
-                    contentPadding = PaddingValues(horizontal = 20.dp),
+                    contentPadding = PaddingValues(horizontal = gutter),
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    items(moods) { m ->
+                    items(moods, key = { it.browseId + it.title }) { m ->
                         Chip(m.title, leading = G.Sparkle) { onOpenMood(m) }
                     }
                 }
@@ -147,13 +151,17 @@ fun HomeScreen(
             item { SectionHeader("Recently played") }
             item {
                 LazyRow(
-                    contentPadding = PaddingValues(horizontal = 20.dp),
+                    contentPadding = PaddingValues(horizontal = gutter),
                     horizontalArrangement = Arrangement.spacedBy(14.dp),
                 ) {
-                    items(recents) { t ->
-                        RecentTile(t, downloaded = downloadedIds.contains(t.id)) {
-                            onPlay(recents, recents.indexOf(t))
-                        }
+                    // Index comes from the list, not from `indexOf` — that was an
+                    // O(n²) scan per row and it picked the wrong copy of a repeat.
+                    itemsIndexed(recents, key = { i, t -> t.id + "#" + i }) { i, t ->
+                        RecentTile(
+                            track = t,
+                            downloaded = downloadedIds.contains(t.id),
+                            size = window.tile(96.dp),
+                        ) { onPlay(recents, i) }
                     }
                 }
             }
@@ -167,7 +175,7 @@ fun HomeScreen(
             }
         } else if (failed) {
             item {
-                Panel(Modifier.padding(20.dp).fillMaxWidth()) {
+                Panel(Modifier.padding(horizontal = gutter, vertical = 20.dp).fillMaxWidth()) {
                     Column(Modifier.padding(18.dp)) {
                         Text(
                             "YouTube Music unreachable",
@@ -205,10 +213,10 @@ fun HomeScreen(
             } else {
                 item {
                     LazyRow(
-                        contentPadding = PaddingValues(horizontal = 20.dp),
+                        contentPadding = PaddingValues(horizontal = gutter),
                         horizontalArrangement = Arrangement.spacedBy(14.dp),
                     ) {
-                        items(shelf.items) { c ->
+                        itemsIndexed(shelf.items, key = { i, c -> c.id + "#" + i }) { _, c ->
                             if (c.round) CircleCard(c, onClick = { onOpenCollection(c) })
                             else SquareCard(c, onClick = { onOpenCollection(c) })
                         }
@@ -264,7 +272,7 @@ private fun SearchPill(onClick: () -> Unit, modifier: Modifier = Modifier) {
 private fun StartCard(onOpenSearch: () -> Unit) {
     Column(
         Modifier
-            .padding(horizontal = 20.dp)
+            .padding(horizontal = LocalBunWindow.current.gutter)
             .fillMaxWidth()
             .clip(RoundedCornerShape(28.dp))
             .background(Ink.Card)
@@ -297,7 +305,7 @@ private fun HeroCard(track: Track, playing: Boolean, onPlay: () -> Unit) {
     val pulse by animateFloatAsState(if (playing) 1f else 0.92f, label = "pulse")
     Box(
         Modifier
-            .padding(horizontal = 20.dp)
+            .padding(horizontal = LocalBunWindow.current.gutter)
             .fillMaxWidth()
             .clip(RoundedCornerShape(28.dp))
             .background(
@@ -373,13 +381,13 @@ private fun HeroCard(track: Track, playing: Boolean, onPlay: () -> Unit) {
 }
 
 @Composable
-private fun RecentTile(track: Track, downloaded: Boolean, onClick: () -> Unit) {
-    Column(Modifier.width(96.dp).clickable { onClick() }) {
+private fun RecentTile(track: Track, downloaded: Boolean, size: androidx.compose.ui.unit.Dp, onClick: () -> Unit) {
+    Column(Modifier.width(size).clickable { onClick() }) {
         Box {
             ArtImage(
                 url = track.artUrl,
                 asset = track.artAsset,
-                modifier = Modifier.size(96.dp),
+                modifier = Modifier.size(size),
                 shape = RoundedCornerShape(18.dp),
             )
             if (downloaded) {

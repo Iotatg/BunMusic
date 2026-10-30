@@ -7,7 +7,7 @@ saved offline.
 
 ```
 package   app.bunmusic
-version   1.0.10 (11)
+version   1.0.11 (12)
 minSdk    26  ·  target/compile 37
 author    Iota Coder · iota14934@gmail.com
 ```
@@ -229,6 +229,29 @@ home, album pages, Explore, Charts, mood pages and the automix radio queue.
 ---
 
 ## Changelog
+
+**1.0.11** — it fits the screen it is on.
+
+- **Three width classes.** Compact (< 600 dp), medium (600–839), expanded (≥ 840),
+  plus a separate height class so a landscape phone is not treated as a small
+  tablet. One `BunWindow` value, read through a composition local.
+- **Navigation rail from 600 dp.** Same four destinations, same glyphs, same
+  selected fill — moved to the edge a thumb is not holding. 84 dp of height goes
+  back to the content.
+- **Two-pane player from 840 dp in landscape.** Artwork left, controls right, the
+  disc squared off the *height*. Portrait keeps one column, capped at 560 dp.
+- **Landscape no longer clips.** The flexible spacers collapse to 8 dp on a short
+  window and the artwork is height-capped, so the transport row stays on screen.
+- **Reading columns are capped** at 720 / 1040 dp and centred — no 90-character
+  song titles on a 12-inch tablet.
+- **The page stopped redrawing at 2 Hz.** Screens used to receive the live
+  `PlayerState`, so every visible screen recomposed twice a second for a
+  `positionMs` it does not display. They get a derived, tick-free copy now.
+- **Explore's mood grid** runs 2 / 3 / 4 tiles wide; carousel cards scale with the
+  window instead of staying phone-sized.
+- **Stable keys** on every list, so rows are reused rather than rebuilt.
+- **Resizing is handled in place** — rotation, split screen and unfolding keep the
+  stack, the queue and the scroll position.
 
 **1.0.10** — a craft pass over all four buns, measured rather than eyeballed.
 

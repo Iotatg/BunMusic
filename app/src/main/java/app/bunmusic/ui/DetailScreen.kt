@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
@@ -40,6 +41,7 @@ import app.bunmusic.core.Ambient
 import app.bunmusic.core.G
 import app.bunmusic.core.Glyph
 import app.bunmusic.core.Ink
+import app.bunmusic.core.LocalBunWindow
 import app.bunmusic.core.SerifFamily
 import app.bunmusic.core.SoraFamily
 import app.bunmusic.data.Collection
@@ -242,6 +244,8 @@ fun DetailScreen(
     }
 
     val tint = Ambient.colorFor(browseId ?: title)
+    val window = LocalBunWindow.current
+    val gutter = window.gutter
 
     LazyColumn(
         Modifier.fillMaxSize().statusBarsPadding(),
@@ -276,11 +280,11 @@ fun DetailScreen(
                 Column {
                     BackBar("", onBack)
                     Spacer(Modifier.height(6.dp))
-                    Row(Modifier.padding(horizontal = 20.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Row(Modifier.padding(horizontal = gutter), verticalAlignment = Alignment.CenterVertically) {
                         ArtImage(
                             url = headerArt,
                             asset = artAsset,
-                            modifier = Modifier.size(148.dp),
+                            modifier = Modifier.size(window.tile(148.dp)),
                             shape = if (kind == CollectionKind.ARTIST) CircleShape else RoundedCornerShape(22.dp),
                         )
                         Spacer(Modifier.width(16.dp))
@@ -355,8 +359,7 @@ fun DetailScreen(
             item { EmptyState(G.Offline, "Couldn't load", "This page didn't answer. Check your connection.") }
         }
 
-        items(tracks.size) { i ->
-            val t = tracks[i]
+        itemsIndexed(tracks, key = { i, t -> t.id + "#" + i }) { i, t ->
             Box(Modifier.padding(horizontal = 8.dp)) {
                 TrackRow(
                     track = t,
@@ -377,7 +380,7 @@ fun DetailScreen(
                     contentPadding = PaddingValues(horizontal = 20.dp),
                     horizontalArrangement = Arrangement.spacedBy(14.dp),
                 ) {
-                    items(shelf.items) { c ->
+                    itemsIndexed(shelf.items, key = { i, c -> c.id + "#" + i }) { _, c ->
                         if (c.round) CircleCard(c, onClick = { onOpenCollection(c) })
                         else SquareCard(c, onClick = { onOpenCollection(c) })
                     }

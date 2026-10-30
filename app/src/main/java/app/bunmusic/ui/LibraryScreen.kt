@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
@@ -42,6 +43,7 @@ import androidx.compose.ui.unit.sp
 import app.bunmusic.core.G
 import app.bunmusic.core.Glyph
 import app.bunmusic.core.Ink
+import app.bunmusic.core.LocalBunWindow
 import app.bunmusic.core.SoraFamily
 import app.bunmusic.data.Collection
 import app.bunmusic.data.Downloads
@@ -66,6 +68,10 @@ fun LibraryScreen(
     val liked = remember(state.track?.id) { Store.likedTracks() }
     val recents = remember(state.track?.id) { Store.recent(50) }
     val downloads by Downloads.entries.collectAsState()
+    val gutter = LocalBunWindow.current.gutter
+    // One prefs read for the whole list. Asking `Store.isLiked` per row copied
+    // the whole liked set once per row, fifty times, on every recomposition.
+    val likedIds = remember(liked) { liked.map { it.id }.toSet() }
 
     LazyColumn(
         Modifier.fillMaxSize().statusBarsPadding(),
@@ -82,7 +88,7 @@ fun LibraryScreen(
         }
 
         item {
-            Row(Modifier.padding(horizontal = 20.dp, vertical = 10.dp)) {
+            Row(Modifier.padding(horizontal = gutter, vertical = 10.dp)) {
                 ShortcutCard(
                     "Downloads", "${downloads.size} saved", G.Download, Ink.Mint,
                     Modifier.weight(1f), onOpenDownloads,
@@ -99,7 +105,7 @@ fun LibraryScreen(
             Row(
                 Modifier
                     .horizontalScroll(rememberScrollState())
-                    .padding(horizontal = 20.dp, vertical = 8.dp),
+                    .padding(horizontal = gutter, vertical = 8.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 listOf("Playlists", "Liked", "Recent", "Downloaded").forEachIndexed { i, label ->
@@ -113,7 +119,7 @@ fun LibraryScreen(
                 Row(
                     Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 20.dp, vertical = 10.dp)
+                        .padding(horizontal = gutter, vertical = 10.dp)
                         .clip(RoundedCornerShape(16.dp))
                         .background(Ink.Card)
                         .clickable {
@@ -141,7 +147,7 @@ fun LibraryScreen(
                     )
                 }
             } else {
-                items(playlists) { p ->
+                items(playlists, key = { it.id }) { p ->
                     PlaylistRow(p, onClick = { onOpenPlaylist(p.id) })
                 }
             }
@@ -152,8 +158,7 @@ fun LibraryScreen(
             if (liked.isEmpty()) {
                 item { EmptyState(G.Heart, "Nothing liked yet", "Tap the heart on any track and it lands here.") }
             } else {
-                items(liked.size) { i ->
-                    val t = liked[i]
+                itemsIndexed(liked, key = { i, t -> t.id + "#" + i }) { i, t ->
                     Box(Modifier.padding(horizontal = 8.dp)) {
                         TrackRow(
                             track = t,
@@ -174,14 +179,13 @@ fun LibraryScreen(
             if (recents.isEmpty()) {
                 item { EmptyState(G.Clock, "No history yet", "Play something — it shows up here.") }
             } else {
-                items(recents.size) { i ->
-                    val t = recents[i]
+                itemsIndexed(recents, key = { i, t -> t.id + "#" + i }) { i, t ->
                     Box(Modifier.padding(horizontal = 8.dp)) {
                         TrackRow(
                             track = t,
                             playing = state.isPlaying,
                             isCurrent = state.track?.id == t.id,
-                            liked = Store.isLiked(t.id),
+                            liked = likedIds.contains(t.id),
                             downloaded = downloadedIds.contains(t.id),
                             onPlay = { onPlay(recents, i) },
                             onLike = { Store.toggleLike(t.id) },
@@ -201,8 +205,7 @@ fun LibraryScreen(
                     )
                 }
             } else {
-                items(downloads.size) { i ->
-                    val e = downloads[i]
+                itemsIndexed(downloads, key = { _, e -> e.trackId }) { i, e ->
                     val t = Store.track(e.trackId)
                     if (t != null) {
                         Box(Modifier.padding(horizontal = 8.dp)) {
@@ -256,12 +259,13 @@ private fun ShortcutCard(
 
 @Composable
 private fun PlaylistRow(p: Playlist, onClick: () -> Unit) {
+    val gutter = LocalBunWindow.current.gutter
     val first = Store.playlistTracks(p.id).firstOrNull()
     Row(
         Modifier
             .fillMaxWidth()
             .clickable { onClick() }
-            .padding(horizontal = 20.dp, vertical = 8.dp),
+            .padding(horizontal = gutter, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Box(

@@ -20,19 +20,24 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -46,9 +51,11 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import app.bunmusic.core.BunWindow
 import app.bunmusic.core.G
 import app.bunmusic.core.Glyph
 import app.bunmusic.core.Ink
+import app.bunmusic.core.LocalBunWindow
 import app.bunmusic.core.Skin
 import app.bunmusic.core.SoraFamily
 import app.bunmusic.data.Auth
@@ -110,6 +117,12 @@ fun Root(openPlayerOnStart: Boolean = false) {
 private fun Shell(guest: Boolean, onLeaveGuest: () -> Unit, openPlayerOnStart: Boolean = false) {
     val state by Playback.state.collectAsState()
     val downloads by Downloads.entries.collectAsState()
+    val window = LocalBunWindow.current
+    // Playback ticks twice a second with positionMs. Every screen used to be
+    // handed that object, so the whole visible page recomposed at 2 Hz to draw a
+    // number none of them show. Screens get the tick-free copy; the mini player
+    // and the player screen keep the live one, because they draw the progress.
+    val chrome by remember { derivedStateOf { state.copy(positionMs = 0L) } }
     var stack by remember { mutableStateOf<List<Route>>(listOf(Route.Home)) }
     var playerOpen by remember { mutableStateOf(false) }
     // A tap on the home-screen widget drops the user straight into the player.
@@ -158,9 +171,22 @@ private fun Shell(guest: Boolean, onLeaveGuest: () -> Unit, openPlayerOnStart: B
                 }
             )
     ) {
-        Column(Modifier.fillMaxSize()) {
-            Box(Modifier.weight(1f)) {
+        Row(Modifier.fillMaxSize()) {
+            // 600 dp and up: the tabs move to the edge a thumb isn't holding, and
+            // the content keeps the 84 dp the bottom bar used to eat — which on a
+            // tablet was the difference between seeing the transport row and not.
+            if (window.wide) {
+                NavRail(
+                    current = route,
+                    onSelect = { tab(it) },
+                    onSettings = { push(Route.Settings) },
+                )
+            }
+
+            Column(Modifier.weight(1f).fillMaxHeight()) {
+            Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.TopCenter) {
                 AnimatedContent(
+                    modifier = Modifier.widthIn(max = window.contentMax).fillMaxSize(),
                     targetState = route,
                     transitionSpec = {
                         val forward = targetState.depth >= initialState.depth
@@ -180,7 +206,7 @@ private fun Shell(guest: Boolean, onLeaveGuest: () -> Unit, openPlayerOnStart: B
                 ) { r ->
                     when (r) {
                         Route.Home -> HomeScreen(
-                            state = state,
+                            state = chrome,
                             downloadedIds = downloadedIds,
                             onOpenSearch = { tab(Route.Search) },
                             onOpenExplore = { tab(Route.Explore) },
@@ -201,7 +227,7 @@ private fun Shell(guest: Boolean, onLeaveGuest: () -> Unit, openPlayerOnStart: B
                         )
 
                         Route.Library -> LibraryScreen(
-                            state = state,
+                            state = chrome,
                             downloadedIds = downloadedIds,
                             onPlay = { list, i -> Playback.play(list, i) },
                             onOpenCollection = openCollection,
@@ -212,7 +238,7 @@ private fun Shell(guest: Boolean, onLeaveGuest: () -> Unit, openPlayerOnStart: B
                         )
 
                         Route.Search -> SearchScreen(
-                            state = state,
+                            state = chrome,
                             onPlay = { list, i -> Playback.play(list, i) },
                             onOpenCollection = openCollection,
                             onMore = { sheetTrack = it },
@@ -245,7 +271,7 @@ private fun Shell(guest: Boolean, onLeaveGuest: () -> Unit, openPlayerOnStart: B
                         Route.About -> AboutScreen(onBack = pop)
 
                         Route.Hotlist -> HotlistScreen(
-                            state = state,
+                            state = chrome,
                             downloadedIds = downloadedIds,
                             onPlay = { list, i -> Playback.play(list, i) },
                             onMore = { sheetTrack = it },
@@ -256,7 +282,7 @@ private fun Shell(guest: Boolean, onLeaveGuest: () -> Unit, openPlayerOnStart: B
 
                         is Route.PlaylistPage -> PlaylistScreen(
                             playlistId = r.id,
-                            state = state,
+                            state = chrome,
                             onBack = pop,
                             onPlay = { list, i -> Playback.play(list, i) },
                             onMore = { sheetTrack = it },
@@ -276,7 +302,7 @@ private fun Shell(guest: Boolean, onLeaveGuest: () -> Unit, openPlayerOnStart: B
                             artAsset = r.artAsset,
                             browseId = r.browseId,
                             kind = r.kind,
-                            state = state,
+                            state = chrome,
                             downloadedIds = downloadedIds,
                             onPlay = { list, i -> Playback.play(list, i) },
                             onOpenCollection = openCollection,
@@ -287,7 +313,24 @@ private fun Shell(guest: Boolean, onLeaveGuest: () -> Unit, openPlayerOnStart: B
                 }
             }
 
-            if (Ink.isLight) {
+            // ---- bottom chrome
+            if (window.wide) {
+                // No tab bar here — the rail has it. The mini player stays, capped
+                // so it reads as a card rather than a 1000 dp stripe.
+                if (state.hasTrack) {
+                    Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                        Box(Modifier.widthIn(max = 760.dp)) {
+                            MiniPlayer(
+                                state = state,
+                                onOpen = { playerOpen = true },
+                                onToggle = { Playback.toggle() },
+                                onNext = { Playback.next() },
+                            )
+                        }
+                    }
+                }
+                Spacer(Modifier.navigationBarsPadding().height(12.dp))
+            } else if (Ink.isLight) {
                 Box(Modifier.fillMaxWidth().navigationBarsPadding()) {
                     Box(Modifier.fillMaxWidth().height(if (state.hasTrack) 122.dp else 84.dp)) {
                         if (state.hasTrack) {
@@ -318,6 +361,7 @@ private fun Shell(guest: Boolean, onLeaveGuest: () -> Unit, openPlayerOnStart: B
                 }
 
                 BottomNav(route, { tab(it) })
+            }
             }
         }
 
@@ -507,6 +551,89 @@ private fun LightNav(current: Route, onSelect: (Route) -> Unit, modifier: Modifi
     }
 }
 
+/**
+ * The tab bar, stood on its side.
+ *
+ * Same four destinations, same glyphs, same selected fill as [DarkNav] /
+ * [LightNav] — only the axis changes, so switching between a phone and a tablet
+ * doesn't feel like a different app. Labels are kept: an icon-only rail makes the
+ * listener guess what a compass means.
+ */
+@Composable
+private fun NavRail(current: Route, onSelect: (Route) -> Unit, onSettings: () -> Unit) {
+    val window = LocalBunWindow.current
+    val light = Ink.isLight
+    val shape = RoundedCornerShape(26.dp)
+    Column(
+        Modifier
+            .fillMaxHeight()
+            .width(window.railWidth)
+            .statusBarsPadding()
+            .navigationBarsPadding()
+            .padding(start = 12.dp, top = 10.dp, bottom = 10.dp)
+            .then(
+                if (light) {
+                    Modifier.shadow(14.dp, shape, clip = false, ambientColor = Ink.Shadow, spotColor = Ink.Shadow)
+                } else {
+                    Modifier
+                }
+            )
+            .clip(shape)
+            .background(Ink.NavBg)
+            .then(if (light) Modifier.border(1.dp, Ink.Hairline, shape) else Modifier)
+            .padding(vertical = 14.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Box(
+            Modifier
+                .size(34.dp)
+                .clip(RoundedCornerShape(11.dp))
+                .background(Ink.Lime.copy(alpha = 0.14f)),
+            contentAlignment = Alignment.Center,
+        ) { Glyph(G.Disc, Ink.Lime, 17.dp) }
+
+        Spacer(Modifier.height(20.dp))
+
+        tabsFor(light).forEach { t ->
+            RailItem(t.label, t.glyph, current == t.route) { onSelect(t.route) }
+        }
+
+        Spacer(Modifier.weight(1f))
+
+        RailItem("Settings", G.Gear, current == Route.Settings, onSettings)
+    }
+}
+
+@Composable
+private fun RailItem(label: String, glyph: G, selected: Boolean, onClick: () -> Unit) {
+    Column(
+        Modifier
+            .padding(horizontal = 6.dp, vertical = 2.dp)
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(16.dp))
+            .background(if (selected) Ink.NavActiveBg else Color.Transparent)
+            .clickable { onClick() }
+            .padding(vertical = 10.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Glyph(
+            glyph,
+            if (selected) Ink.NavActiveInk else Ink.Faint,
+            20.dp,
+            if (Ink.isLight) 2.0.dp else 1.7.dp,
+        )
+        Spacer(Modifier.height(5.dp))
+        Text(
+            label,
+            color = if (selected) Ink.Text else Ink.Faint,
+            fontSize = 10.sp,
+            fontFamily = SoraFamily,
+            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+            maxLines = 1,
+        )
+    }
+}
+
 @Composable
 fun CountBadge(count: Int) {
     if (count <= 0) return
@@ -514,7 +641,7 @@ fun CountBadge(count: Int) {
     // pressed against the edge. It grows with its label now and caps the number.
     Box(
         Modifier
-            .height(18.dp)
+            .heightIn(min = 18.dp)
             .defaultMinSize(minWidth = 18.dp)
             .clip(CircleShape)
             .background(Ink.Lime)
