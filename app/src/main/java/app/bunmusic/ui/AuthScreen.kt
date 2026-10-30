@@ -8,8 +8,6 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
-import androidx.compose.foundation.Image
-import androidx.compose.ui.res.painterResource
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -58,7 +56,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.bunmusic.core.G
 import app.bunmusic.core.Glyph
-import app.bunmusic.core.Icons
 import app.bunmusic.core.Ink
 import app.bunmusic.core.SerifFamily
 import app.bunmusic.core.Skin
@@ -158,12 +155,10 @@ fun AuthScreen(onGuest: () -> Unit) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 // The same artwork the launcher shows, so the first screen and the
                 // home screen agree about what this app looks like.
-                Image(
-                    painter = painterResource(Icons.launcherOf(Skin.current)),
-                    contentDescription = null,
-                    modifier = Modifier
-                        .size(42.dp)
-                        .clip(RoundedCornerShape(13.dp)),
+                BunIcon(
+                    skin = Skin.current,
+                    modifier = Modifier.size(42.dp),
+                    shape = RoundedCornerShape(13.dp),
                 )
                 Spacer(Modifier.width(10.dp))
                 Text(

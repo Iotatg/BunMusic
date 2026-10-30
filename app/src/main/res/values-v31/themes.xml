@@ -29,4 +29,13 @@
         <item name="android:windowSplashScreenBackground">#F6F8FD</item>
         <item name="android:windowSplashScreenAnimatedIcon">@mipmap/ic_launcher_cloud_foreground</item>
     </style>
+
+    <!-- Pink's splash: the bun with the music note, on blush paper. -->
+    <style name="Theme.BunMusic.Pink" parent="Theme.BunMusic.Light">
+        <item name="android:statusBarColor">#FFF6F9</item>
+        <item name="android:navigationBarColor">#FFF6F9</item>
+        <item name="android:windowBackground">#FFF6F9</item>
+        <item name="android:windowSplashScreenBackground">#FFF6F9</item>
+        <item name="android:windowSplashScreenAnimatedIcon">@mipmap/ic_launcher_pink_foreground</item>
+    </style>
 </resources>

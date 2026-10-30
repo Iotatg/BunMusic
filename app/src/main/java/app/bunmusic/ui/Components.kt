@@ -49,14 +49,17 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import app.bunmusic.core.BunSkin
 import app.bunmusic.core.G
 import app.bunmusic.core.Glyph
 import app.bunmusic.core.Haptics
+import app.bunmusic.core.Icons
 import app.bunmusic.core.Ink
 import app.bunmusic.core.SerifFamily
 import app.bunmusic.core.Skin
@@ -132,6 +135,37 @@ fun ArtImage(
                 Glyph(G.Disc, Ink.Faint, 22.dp)
             }
         }
+    }
+}
+
+/**
+ * The bun's launcher icon, drawn from its two adaptive layers.
+ *
+ * Do not replace this with `painterResource(R.mipmap.ic_launcher_*)`: on API 26+
+ * that resolves to an AdaptiveIconDrawable, which Compose cannot paint. Loading
+ * it from the Settings row was exactly what crashed 1.0.7 the moment the screen
+ * opened. Composing the layers by hand works on every API level and still shows
+ * the same artwork the home screen wears.
+ */
+@Composable
+fun BunIcon(
+    skin: BunSkin,
+    modifier: Modifier = Modifier,
+    shape: Shape = RoundedCornerShape(14.dp),
+) {
+    Box(modifier.clip(shape).background(Ink.Card)) {
+        Image(
+            painter = painterResource(Icons.backgroundOf(skin)),
+            contentDescription = null,
+            modifier = Modifier.fillMaxSize(),
+            contentScale = ContentScale.Crop,
+        )
+        Image(
+            painter = painterResource(Icons.layerOf(skin)),
+            contentDescription = null,
+            modifier = Modifier.fillMaxSize(),
+            contentScale = ContentScale.Crop,
+        )
     }
 }
 

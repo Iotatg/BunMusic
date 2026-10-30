@@ -1,13 +1,13 @@
 # BunMusic
 
 A quiet music player for Android — built from scratch in Kotlin + Jetpack Compose.
-Three skins, "buns", and you pick which one the app wears.
+Four skins, "buns", and you pick which one the app wears.
 Nothing is bundled: every track comes from YouTube Music, and anything you like can be
 saved offline.
 
 ```
 package   app.bunmusic
-version   1.0.8 (9)
+version   1.0.9 (10)
 minSdk    26  ·  target/compile 37
 author    Iota Coder · iota14934@gmail.com
 ```
@@ -17,7 +17,7 @@ author    Iota Coder · iota14934@gmail.com
 ## What it does
 
 **Buns**
-Three complete skins, switched in Settings → Buns. A bun is not a tint: it replaces the
+Four complete skins, switched in Settings → Buns. A bun is not a tint: it replaces the
 palette, the typeface, the corner radii, the shape of the bottom bar, whether a list shows
 cover art or a track number, and whether the seek bar is a line or a waveform.
 
@@ -26,6 +26,7 @@ cover art or a track number, and whether the seek bar is a line or a waveform.
 | **Midnight Lime** | Ink black, acid lime, lavender hero, Sora + Instrument Serif. The house bun. |
 | **Charcoal** | Paper white, charcoal ink, Inter throughout, 24 dp cards, waveform seek bar, white nav bar with a dark active pill, dark mini player. |
 | **Cloud Blue** | Chalk white and electric blue, Sora throughout, blue hero gradient, hairline seek bar with a knob, blue active nav pill, navy mini player. Its launcher icon is the bun in headphones. |
+| **Pink Bun** | Blush paper and deep rose, Sora throughout, pink hero gradient, waveform seek bar, rose active nav pill, plum mini player. Its launcher icon is the bun with the music note. |
 
 Switching restarts the process — the only way to be sure no `remember`ed colour from the old
 bun survives. Nothing else is touched: library, downloads and account stay put.
@@ -228,6 +229,12 @@ home, album pages, Explore, Charts, mood pages and the automix radio queue.
 ---
 
 ## Changelog
+
+**1.0.9** — Settings opens again. 1.0.7 handed the adaptive-icon XML to `painterResource`,
+which resolves to an `AdaptiveIconDrawable` that Compose cannot paint; the Buns row now
+composes the icon's background and foreground layers instead. Plus a fourth bun,
+**Pink Bun**: blush paper, deep rose, Sora, a waveform seek bar, and its own launcher icon
+cut from the pink artwork. Every screen, row, setting and shortcut stays where it was.
 
 **1.0.8** — a third bun, **Cloud Blue**: chalk-white surfaces, electric blue, Sora throughout.
 Its own launcher icon (the bun in headphones, cut from the supplied artwork into adaptive,

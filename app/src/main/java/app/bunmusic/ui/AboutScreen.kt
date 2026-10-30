@@ -47,7 +47,7 @@ fun AboutScreen(onBack: () -> Unit) {
                 Display("BunMusic", 32)
                 Spacer(Modifier.height(4.dp))
                 Text(
-                    "1.0.8 · build 9 · ${Skin.current.title} bun",
+                    "1.0.9 · build 10 · ${Skin.current.title} bun",
                     color = Ink.Muted, fontSize = 12.sp, fontFamily = SoraFamily,
                 )
             }
@@ -56,12 +56,16 @@ fun AboutScreen(onBack: () -> Unit) {
         item { GroupTitle("What's new") }
         item {
             AboutCard {
+                Change("Settings no longer crashes", "1.0.7 handed the adaptive-icon XML to Compose, which cannot paint it. The Buns row now composes the icon's two layers, so Settings opens on every launcher and every Android version")
+                Change("A fourth bun: Pink Bun", "Blush paper, rose ink, Sora throughout — the bun with the music note, from the pink study")
+                Change("Rose where it counts", "Hero card, play disc, nav pill, chips and the home-screen widget all follow the bun's rose")
+                Change("Same bones, again", "Every screen, row, setting, animation and shortcut sits exactly where it did; only the weather changes")
                 Change("A third bun: Cloud Blue", "Chalk white and electric blue, drawn from a study of a blue-on-white music app")
                 Change("The bun in headphones", "Cloud's icon is the artwork itself — blue disc, closed eyes, a transport pill under it")
                 Change("Blue where it counts", "Hero card, play disc, nav pill, chips — the same places, in blue")
                 Change("A line seek bar", "Cloud's player uses a hairline track and a knob; Charcoal keeps its waveform")
                 Change("Same bones", "Every screen, row, setting and shortcut sits exactly where it did")
-                Change("An icon per bun", "Midnight wears the violet disc, Charcoal the black one, Cloud the bun — and the home screen swaps with them")
+                Change("An icon per bun", "Midnight wears the violet disc, Charcoal the black one, Cloud the blue bun, Pink the blush tile — and the home screen swaps with them")
                 Change("A real icon", "The bun in headphones — adaptive, themed, and on the status bar too")
                 Change("Caching actually works now", "The cache is keyed on the song, not the URL — YouTube signs a new URL every time, so the old key never matched")
                 Change("Plays with the internet off", "A finished song is read straight off disk; the signed URL is never opened again")
@@ -79,13 +83,21 @@ fun AboutScreen(onBack: () -> Unit) {
         item { GroupTitle("Build") }
         item {
             AboutCard {
-                Fact("Version", "1.0.8 (9)")
+                Fact("Version", "1.0.9 (10)")
                 Fact("Package", "app.bunmusic")
                 Fact("Min SDK", "26 · Android 8.0")
                 Fact("Target SDK", "37")
                 Fact("Device", "${Build.MANUFACTURER} ${Build.MODEL} · Android ${Build.VERSION.RELEASE}")
                 Fact("Bun", Skin.current.title)
-                Fact("Launcher icon", if (Skin.light) "Charcoal · black disc on paper" else "Midnight · violet disc on ink")
+                Fact(
+                    "Launcher icon",
+                    when (Skin.current) {
+                        app.bunmusic.core.BunSkin.MIDNIGHT -> "Midnight · violet disc on ink"
+                        app.bunmusic.core.BunSkin.CHARCOAL -> "Charcoal · black disc on paper"
+                        app.bunmusic.core.BunSkin.CLOUD -> "Cloud · blue bun on chalk"
+                        app.bunmusic.core.BunSkin.PINK -> "Pink · blush tile, bun and note"
+                    },
+                )
             }
         }
 

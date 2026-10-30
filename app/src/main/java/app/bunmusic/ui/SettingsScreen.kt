@@ -3,7 +3,6 @@ package app.bunmusic.ui
 import android.content.Intent
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -39,13 +38,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import app.bunmusic.core.BunSkin
 import app.bunmusic.core.G
 import app.bunmusic.core.Glyph
-import app.bunmusic.core.Icons
 import app.bunmusic.core.Ink
 import app.bunmusic.core.Skin
 import app.bunmusic.core.SoraFamily
@@ -147,7 +145,7 @@ fun SettingsScreen(
                 Display("Settings", 30)
                 Spacer(Modifier.height(4.dp))
                 Text(
-                    "BunMusic 1.0.4 · Iota Coder",
+                    "BunMusic 1.0.9 · Iota Coder",
                     color = Ink.Muted, fontSize = 12.sp, fontFamily = SoraFamily,
                 )
             }
@@ -257,7 +255,7 @@ fun SettingsScreen(
                     "Buns",
                     "${Skin.current.title} · ${Skin.current.tagline}",
                     G.Grid,
-                    icon = Icons.launcherOf(Skin.current),
+                    bun = Skin.current,
                 ) { onOpenBuns() }
                 Divider()
                 ChoiceRow("Player style", settings.playerStyle.label) {
@@ -454,7 +452,7 @@ fun SettingsScreen(
         item { GroupLabel("About") }
         item {
             SettingsCard {
-                NavRow("About BunMusic", "1.0.4 (build 5) · what changed", G.Sparkle) { onOpenAbout() }
+                NavRow("About BunMusic", "1.0.9 (build 10) · what changed", G.Sparkle) { onOpenAbout() }
                 Divider()
                 NavRow("Built by", "Iota Coder · iota14934@gmail.com", G.User) { }
                 Divider()
@@ -560,18 +558,20 @@ private fun ChoiceRow(title: String, subtitle: String, chips: @Composable () -> 
 }
 
 @Composable
-private fun NavRow(title: String, subtitle: String, glyph: G, icon: Int? = null, onClick: () -> Unit) {
+private fun NavRow(title: String, subtitle: String, glyph: G, bun: BunSkin? = null, onClick: () -> Unit) {
     Row(
         Modifier.fillMaxWidth().clickable { onClick() }.padding(horizontal = 16.dp, vertical = 13.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        if (icon != null) {
+        if (bun != null) {
             // Show the real launcher icon rather than a stand-in glyph: it is what
-            // the home screen is actually wearing.
-            Image(
-                painter = painterResource(icon),
-                contentDescription = null,
-                modifier = Modifier.size(32.dp).clip(RoundedCornerShape(10.dp)),
+            // the home screen is actually wearing. BunIcon composes the adaptive
+            // layers instead of loading the adaptive-icon XML, which Compose
+            // cannot paint — the 1.0.7 Settings crash.
+            BunIcon(
+                skin = bun,
+                modifier = Modifier.size(32.dp),
+                shape = RoundedCornerShape(10.dp),
             )
         } else {
             Box(

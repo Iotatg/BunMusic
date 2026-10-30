@@ -23,4 +23,12 @@
         <item name="android:navigationBarColor">#F6F8FD</item>
         <item name="android:windowBackground">#F6F8FD</item>
     </style>
+
+    <!-- Pink Bun's window: blush paper, so the cold-start frame is already warm
+         before Compose draws the first screen. -->
+    <style name="Theme.BunMusic.Pink" parent="Theme.BunMusic.Light">
+        <item name="android:statusBarColor">#FFF6F9</item>
+        <item name="android:navigationBarColor">#FFF6F9</item>
+        <item name="android:windowBackground">#FFF6F9</item>
+    </style>
 </resources>

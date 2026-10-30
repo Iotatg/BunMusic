@@ -22,7 +22,7 @@ import java.net.URLEncoder
  */
 object LyricsApi {
 
-    private const val UA = "BunMusic/1.0.1 (Android; +https://github.com/Iotatg)"
+    private const val UA = "BunMusic/1.0.9 (Android; +https://github.com/Iotatg)"
     private val json = Json { ignoreUnknownKeys = true; isLenient = true }
 
     private val cache = LinkedHashMap<String, Lyrics>()

@@ -118,14 +118,17 @@ internal object Bar {
 
         views.setInt(
             R.id.widget_root, "setBackgroundResource",
-            if (light) R.drawable.widget_bg_light else R.drawable.widget_bg_dark,
+            when (Skin.current) {
+                app.bunmusic.core.BunSkin.PINK -> R.drawable.widget_bg_pink
+                else -> if (light) R.drawable.widget_bg_light else R.drawable.widget_bg_dark
+            },
         )
         views.setInt(
             R.id.widget_toggle, "setBackgroundResource",
-            when {
-                Skin.isCloud -> R.drawable.widget_btn_cloud
-                light -> R.drawable.widget_btn_light
-                else -> R.drawable.widget_btn_dark
+            when (Skin.current) {
+                app.bunmusic.core.BunSkin.CLOUD -> R.drawable.widget_btn_cloud
+                app.bunmusic.core.BunSkin.PINK -> R.drawable.widget_btn_pink
+                else -> if (light) R.drawable.widget_btn_light else R.drawable.widget_btn_dark
             },
         )
         // The widget is painted by the launcher, so it reads the bun's palette

@@ -22,25 +22,35 @@ object Icons {
     private const val MIDNIGHT_ALIAS = ".LauncherMidnight"
     private const val CHARCOAL_ALIAS = ".LauncherCharcoal"
     private const val CLOUD_ALIAS = ".LauncherCloud"
+    private const val PINK_ALIAS = ".LauncherPink"
 
     fun aliasOf(skin: BunSkin): String = when (skin) {
         BunSkin.MIDNIGHT -> MIDNIGHT_ALIAS
         BunSkin.CHARCOAL -> CHARCOAL_ALIAS
         BunSkin.CLOUD -> CLOUD_ALIAS
+        BunSkin.PINK -> PINK_ALIAS
     }
 
-    /** The drawable the launcher shows for this bun — reused by the in-app previews. */
-    fun launcherOf(skin: BunSkin): Int = when (skin) {
-        BunSkin.MIDNIGHT -> R.mipmap.ic_launcher
-        BunSkin.CHARCOAL -> R.mipmap.ic_launcher_charcoal
-        BunSkin.CLOUD -> R.mipmap.ic_launcher_cloud
-    }
-
-    /** The full 108 dp layer, for places that draw the icon without a mask. */
+    /**
+     * The 108 dp foreground layer. The adaptive-icon XML itself must never be
+     * handed to `painterResource`: it resolves to an AdaptiveIconDrawable, which
+     * Compose cannot draw, and opening Settings with the Buns row visible threw
+     * IllegalArgumentException on API 26+. Drawing the background and this layer
+     * separately keeps the previews honest *and* safe on every API level.
+     */
     fun layerOf(skin: BunSkin): Int = when (skin) {
         BunSkin.MIDNIGHT -> R.mipmap.ic_launcher_foreground
         BunSkin.CHARCOAL -> R.mipmap.ic_launcher_charcoal_foreground
         BunSkin.CLOUD -> R.mipmap.ic_launcher_cloud_foreground
+        BunSkin.PINK -> R.mipmap.ic_launcher_pink_foreground
+    }
+
+    /** The adaptive icon's background layer, paired with [layerOf]. */
+    fun backgroundOf(skin: BunSkin): Int = when (skin) {
+        BunSkin.MIDNIGHT -> R.drawable.ic_launcher_background
+        BunSkin.CHARCOAL -> R.drawable.ic_launcher_background_charcoal
+        BunSkin.CLOUD -> R.drawable.ic_launcher_background_cloud
+        BunSkin.PINK -> R.drawable.ic_launcher_background_pink
     }
 
     /**

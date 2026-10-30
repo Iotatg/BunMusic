@@ -20,7 +20,7 @@
         android:usesCleartextTraffic="false"
         android:theme="@style/Theme.BunMusic">
 
-        <!-- One activity, three launcher entries. Which alias is enabled decides
+        <!-- One activity, four launcher entries. Which alias is enabled decides
              which icon, label and splash theme the home screen sees; MainActivity
              itself carries no LAUNCHER filter, or the app would show up twice.
              See app.bunmusic.core.Icons. -->
@@ -70,6 +70,21 @@
             android:roundIcon="@mipmap/ic_launcher_cloud_round"
             android:targetActivity=".MainActivity"
             android:theme="@style/Theme.BunMusic.Cloud">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <activity-alias
+            android:name=".LauncherPink"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_pink"
+            android:label="@string/app_name"
+            android:roundIcon="@mipmap/ic_launcher_pink_round"
+            android:targetActivity=".MainActivity"
+            android:theme="@style/Theme.BunMusic.Pink">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />

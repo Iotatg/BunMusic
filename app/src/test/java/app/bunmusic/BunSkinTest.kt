@@ -18,11 +18,14 @@ class BunSkinTest {
         val midnight = Skin.paletteOf(BunSkin.MIDNIGHT)
         val charcoal = Skin.paletteOf(BunSkin.CHARCOAL)
         val cloud = Skin.paletteOf(BunSkin.CLOUD)
+        val pink = Skin.paletteOf(BunSkin.PINK)
         assertNotEquals(midnight.base, charcoal.base)
         assertNotEquals(midnight.text, charcoal.text)
         assertNotEquals(midnight.accent, charcoal.accent)
         assertNotEquals(charcoal.accent, cloud.accent)
         assertNotEquals(charcoal.text, cloud.text)
+        assertNotEquals(cloud.accent, pink.accent)
+        assertNotEquals(cloud.base, pink.base)
     }
 
     @Test
@@ -30,6 +33,7 @@ class BunSkinTest {
         assertFalse(Skin.paletteOf(BunSkin.MIDNIGHT).light)
         assertTrue(Skin.paletteOf(BunSkin.CHARCOAL).light)
         assertTrue(Skin.paletteOf(BunSkin.CLOUD).light)
+        assertTrue(Skin.paletteOf(BunSkin.PINK).light)
     }
 
     /**
@@ -57,13 +61,20 @@ class BunSkinTest {
         assertEquals(BunSkin.CHARCOAL, BunSkin.of("CHARCOAL"))
     }
 
-    /** Two buns sharing an alias or an icon would leave one of them unlaunchable. */
+    /**
+     * Two buns sharing an alias or an icon would leave one of them unlaunchable.
+     * The previews are built from the two adaptive layers, never from the
+     * adaptive-icon XML itself — that XML is an AdaptiveIconDrawable and Compose
+     * cannot paint it (the 1.0.7 Settings crash).
+     */
     @Test
     fun everyBunHasItsOwnLauncherEntry() {
         val aliases = BunSkin.entries.map { Icons.aliasOf(it) }
-        val icons = BunSkin.entries.map { Icons.launcherOf(it) }
+        val icons = BunSkin.entries.map { Icons.layerOf(it) }
+        val backgrounds = BunSkin.entries.map { Icons.backgroundOf(it) }
         assertEquals(BunSkin.entries.size, aliases.toSet().size)
         assertEquals(BunSkin.entries.size, icons.toSet().size)
+        assertEquals(BunSkin.entries.size, backgrounds.toSet().size)
         aliases.forEach { assertTrue(it.startsWith(".")) }
     }
 

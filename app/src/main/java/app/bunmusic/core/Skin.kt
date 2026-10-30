@@ -55,6 +55,13 @@ enum class BunSkin(
         credit = "After the Lunkgem study",
         typeLabel = "Sora · geometric, tight tracking",
     ),
+    PINK(
+        id = "PINK",
+        title = "Pink Bun",
+        tagline = "Blush paper, rose ink, a bun that feels the music.",
+        credit = "After the Pink Bun study",
+        typeLabel = "Sora · rounded, soft tracking",
+    ),
     ;
 
     companion object {
@@ -203,6 +210,44 @@ private val Cloud = BunPalette(
     light = true,
 )
 
+/**
+ * Pink Bun — the fourth bun, drawn from the blush-and-rose study.
+ *
+ * It is a light bun and uses the same layouts as Charcoal and Cloud. The rose is
+ * deliberately deeper than the artwork's candy pink (#D63366 rather than #FF6B95)
+ * because white button labels sit on it: at the brighter shade they fail AA.
+ */
+private val Pink = BunPalette(
+    void = Color(0xFFFFE9F0),
+    base = Color(0xFFFFF6F9),
+    raised = Color(0xFFFFFFFF),
+    card = Color(0xFFFFFFFF),
+    line = Color(0xFFF7DDE6),
+    text = Color(0xFF3B1B27),
+    muted = Color(0xFFA36F80),
+    faint = Color(0xFFC9A2AF),
+    accent = Color(0xFFD63366),
+    onAccent = Color(0xFFFFFFFF),
+    lavender = Color(0xFFFF9FBB),
+    rose = Color(0xFFE84678),
+    mint = Color(0xFF2FA37C),
+    hairline = Color(0xFFF8E1E9),
+    field = Color(0xFFFFF0F5),
+    sheet = Color(0xFFFFFFFF),
+    navBg = Color(0xFFFFFFFF),
+    navActiveBg = Color(0xFFD63366),
+    navActiveInk = Color(0xFFFFFFFF),
+    miniBg = Color(0xFF3A1A27),
+    miniText = Color(0xFFFFFFFF),
+    shadow = Color(0x26D63366),
+    hero = listOf(Color(0xFFFF7FA8), Color(0xFFFFA9C1), Color(0xFFFFD0DC)),
+    heroInk = Color(0xFF4A1C2C),
+    heroSub = Color(0xFF642B3E),
+    heroBtn = Color(0xFFD63366),
+    heroBtnInk = Color(0xFFFFFFFF),
+    light = true,
+)
+
 object Skin {
 
     /** Set by [load] at startup and by [apply] on a switch. */
@@ -216,6 +261,7 @@ object Skin {
         BunSkin.MIDNIGHT -> Midnight
         BunSkin.CHARCOAL -> Charcoal
         BunSkin.CLOUD -> Cloud
+        BunSkin.PINK -> Pink
     }
 
     val light: Boolean get() = p.light

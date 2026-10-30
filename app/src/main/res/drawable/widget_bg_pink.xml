@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Pink Bun's widget: blush paper rather than white, with a rose hairline. -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
+    <corners android:radius="24dp" />
+    <solid android:color="#FFF6F9" />
+    <stroke android:width="1dp" android:color="#F8E1E9" />
+</shape>
