@@ -314,6 +314,17 @@ object Playback {
         publish()
     }
 
+    /**
+     * Freeze the queue into a playlist. A radio station that turned out well is
+     * worth keeping, and the queue is the only place it exists.
+     */
+    fun saveQueueAsPlaylist(): String {
+        if (queue.isEmpty()) return ""
+        val p = Store.createPlaylist("Saved queue · ${queue.size}")
+        queue.forEach { Store.addToPlaylist(p.id, it) }
+        return p.name
+    }
+
     fun clearQueue() {
         val current = _state.value.track
         if (current == null) {

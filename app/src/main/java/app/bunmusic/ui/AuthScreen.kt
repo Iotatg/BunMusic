@@ -115,7 +115,7 @@ fun AuthScreen(onGuest: () -> Unit) {
     Box(
         Modifier
             .fillMaxSize()
-            .background(Brush.verticalGradient(listOf(Color(0xFF161022), Ink.Void, Ink.Void)))
+            .background(Brush.verticalGradient(listOf(Ink.Base, Ink.Void, Ink.Void)))
     ) {
         // lime halo behind the wordmark
         Box(
@@ -497,7 +497,7 @@ fun AuthScreen(onGuest: () -> Unit) {
             Spacer(Modifier.height(22.dp))
 
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(Modifier.weight(1f).height(1.dp).background(Color.White.copy(alpha = 0.07f)))
+                Box(Modifier.weight(1f).height(1.dp).background(Ink.Hairline))
                 Text(
                     "or",
                     color = Ink.Faint,
@@ -505,7 +505,7 @@ fun AuthScreen(onGuest: () -> Unit) {
                     fontFamily = SoraFamily,
                     modifier = Modifier.padding(horizontal = 12.dp),
                 )
-                Box(Modifier.weight(1f).height(1.dp).background(Color.White.copy(alpha = 0.07f)))
+                Box(Modifier.weight(1f).height(1.dp).background(Ink.Hairline))
             }
 
             Spacer(Modifier.height(16.dp))
@@ -640,7 +640,7 @@ fun AuthField(
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(15.dp))
                 .background(Ink.Card)
-                .border(1.dp, Color.White.copy(alpha = 0.05f), RoundedCornerShape(15.dp))
+                .border(1.dp, Ink.Hairline, RoundedCornerShape(15.dp))
                 .padding(horizontal = 14.dp, vertical = 3.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
@@ -757,7 +757,7 @@ fun GoogleSetupSheet(
     androidx.compose.material3.ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
-        containerColor = Color(0xFF17131E),
+        containerColor = Ink.Sheet,
         contentColor = Ink.Text,
         dragHandle = { SheetHandle() },
     ) {

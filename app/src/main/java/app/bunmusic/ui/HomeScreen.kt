@@ -283,15 +283,19 @@ private fun SearchPill(onClick: () -> Unit, modifier: Modifier = Modifier) {
 @Composable
 private fun HeroCard(track: Track, playing: Boolean, onPlay: () -> Unit) {
     val pulse by animateFloatAsState(if (playing) 1f else 0.92f, label = "pulse")
+    val light = Ink.isLight
+    val heroColors = if (light) listOf(Ink.Text, Ink.Text) else listOf(Color(0xFFC6BEF2), Color(0xFF8F86D6), Color(0xFF6D63B8))
+    val heroInk = if (light) Ink.OnAccent else Color(0xFF15112A)
+    val heroSub = if (light) Ink.OnAccent.copy(alpha = 0.72f) else Color(0xFF2E2650)
+    val btnBg = if (light) Color.White else Color(0xFF15112A)
+    val btnInk = if (light) Ink.Text else Ink.Lime
     Box(
         Modifier
             .padding(horizontal = 20.dp)
             .fillMaxWidth()
             .clip(RoundedCornerShape(28.dp))
             .background(
-                Brush.linearGradient(
-                    listOf(Color(0xFFC6BEF2), Color(0xFF8F86D6), Color(0xFF6D63B8))
-                )
+                Brush.linearGradient(heroColors)
             )
             .clickable { onPlay() }
             .padding(20.dp)
@@ -305,7 +309,7 @@ private fun HeroCard(track: Track, playing: Boolean, onPlay: () -> Unit) {
                 ) {
                     Text(
                         if (playing) "PLAYING NOW" else "PICK UP WHERE YOU LEFT",
-                        color = Color(0xFF1A1530),
+                        color = heroInk,
                         fontSize = 8.5.sp,
                         fontFamily = SoraFamily,
                         fontWeight = FontWeight.Bold,
@@ -318,7 +322,7 @@ private fun HeroCard(track: Track, playing: Boolean, onPlay: () -> Unit) {
                 Column(Modifier.weight(1f)) {
                     Text(
                         track.title,
-                        color = Color(0xFF15112A),
+                        color = heroInk,
                         fontSize = 24.sp,
                         fontFamily = SerifFamily,
                         lineHeight = 26.sp,
@@ -328,7 +332,7 @@ private fun HeroCard(track: Track, playing: Boolean, onPlay: () -> Unit) {
                     Spacer(Modifier.height(4.dp))
                     Text(
                         track.artist + " · " + track.album,
-                        color = Color(0xFF2E2650),
+                        color = heroSub,
                         fontSize = 11.5.sp,
                         fontFamily = SoraFamily,
                         maxLines = 1,
@@ -338,15 +342,15 @@ private fun HeroCard(track: Track, playing: Boolean, onPlay: () -> Unit) {
                     Row(
                         Modifier
                             .clip(CircleShape)
-                            .background(Color(0xFF15112A))
+                            .background(btnBg)
                             .padding(horizontal = 16.dp, vertical = 9.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Glyph(if (playing) G.Pause else G.Play, Ink.Lime, 13.dp)
+                        Glyph(if (playing) G.Pause else G.Play, btnInk, 13.dp)
                         Spacer(Modifier.width(7.dp))
                         Text(
                             if (playing) "Pause" else "Play",
-                            color = Color(0xFFF4F1E9),
+                            color = if (light) Ink.Text else Color(0xFFF4F1E9),
                             fontSize = 11.5.sp,
                             fontFamily = SoraFamily,
                             fontWeight = FontWeight.Medium,

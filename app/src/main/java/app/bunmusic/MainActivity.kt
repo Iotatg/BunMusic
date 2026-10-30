@@ -6,10 +6,13 @@ import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.SystemBarStyle
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
 import app.bunmusic.core.BunTheme
+import app.bunmusic.core.Haptics
+import app.bunmusic.core.Skin
 import app.bunmusic.ui.Root
 
 class MainActivity : ComponentActivity() {
@@ -19,7 +22,21 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        enableEdgeToEdge()
+        // The status bar has to flip with the bun: dark icons on Charcoal, light on Midnight.
+        val transparent = android.graphics.Color.TRANSPARENT
+        enableEdgeToEdge(
+            statusBarStyle = if (Skin.light) {
+                SystemBarStyle.light(transparent, transparent)
+            } else {
+                SystemBarStyle.dark(transparent)
+            },
+            navigationBarStyle = if (Skin.light) {
+                SystemBarStyle.light(transparent, transparent)
+            } else {
+                SystemBarStyle.dark(transparent)
+            },
+        )
+        Haptics.attach(window.decorView)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS)
                 != PackageManager.PERMISSION_GRANTED

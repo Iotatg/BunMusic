@@ -73,7 +73,7 @@ fun TrackSheet(
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
-        containerColor = Color(0xFF17131E),
+        containerColor = Ink.Sheet,
         contentColor = Ink.Text,
         dragHandle = { SheetHandle() },
     ) {
@@ -251,7 +251,7 @@ fun SleepSheet(onDismiss: () -> Unit, onPick: (Int) -> Unit, onEndOfTrack: () ->
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
-        containerColor = Color(0xFF17131E),
+        containerColor = Ink.Sheet,
         contentColor = Ink.Text,
         dragHandle = { SheetHandle() },
     ) {
@@ -289,7 +289,7 @@ fun SheetHandle() {
             Modifier
                 .size(width = 38.dp, height = 4.dp)
                 .clip(RoundedCornerShape(2.dp))
-                .background(Color.White.copy(alpha = 0.18f))
+                .background(Ink.Line)
         )
     }
 }
@@ -306,7 +306,7 @@ fun SheetAction(label: String, glyph: G? = null, onClick: () -> Unit) {
     ) {
         if (glyph != null) {
             Box(
-                Modifier.size(34.dp).clip(CircleShape).background(Color.White.copy(alpha = 0.06f)),
+                Modifier.size(34.dp).clip(CircleShape).background(Ink.Hairline),
                 contentAlignment = Alignment.Center,
             ) { Glyph(glyph, Ink.Text, 16.dp) }
             Spacer(Modifier.width(14.dp))

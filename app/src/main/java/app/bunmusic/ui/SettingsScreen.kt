@@ -42,6 +42,7 @@ import androidx.compose.ui.unit.sp
 import app.bunmusic.core.G
 import app.bunmusic.core.Glyph
 import app.bunmusic.core.Ink
+import app.bunmusic.core.Skin
 import app.bunmusic.core.SoraFamily
 import app.bunmusic.data.Auth
 import app.bunmusic.data.Backup
@@ -60,6 +61,8 @@ fun SettingsScreen(
     onOpenDownloads: () -> Unit,
     onOpenProfile: () -> Unit,
     onOpenEqualizer: () -> Unit,
+    onOpenBuns: () -> Unit,
+    onOpenAbout: () -> Unit,
     onToast: (String) -> Unit,
 ) {
     val settings by Prefs.settings.collectAsState()
@@ -124,7 +127,7 @@ fun SettingsScreen(
                 Display("Settings", 30)
                 Spacer(Modifier.height(4.dp))
                 Text(
-                    "BunMusic 1.0.2 · Iota Coder",
+                    "BunMusic 1.0.3 · Iota Coder",
                     color = Ink.Muted, fontSize = 12.sp, fontFamily = SoraFamily,
                 )
             }
@@ -147,7 +150,7 @@ fun SettingsScreen(
                     Avatar(acc, 44.dp)
                 } else {
                     Box(
-                        Modifier.size(44.dp).clip(CircleShape).background(Color.White.copy(alpha = 0.06f)),
+                        Modifier.size(44.dp).clip(CircleShape).background(Ink.Hairline),
                         contentAlignment = Alignment.Center,
                     ) { Glyph(G.User, Ink.Muted, 18.dp) }
                 }
@@ -230,6 +233,12 @@ fun SettingsScreen(
         item { GroupLabel("Appearance") }
         item {
             SettingsCard {
+                NavRow(
+                    "Buns",
+                    "${Skin.current.title} · ${Skin.current.tagline}",
+                    G.Grid,
+                ) { onOpenBuns() }
+                Divider()
                 ChoiceRow("Player style", settings.playerStyle.label) {
                     Prefs.PlayerStyle.entries.forEach { s ->
                         Chip(s.label, selected = settings.playerStyle == s) {
@@ -248,6 +257,27 @@ fun SettingsScreen(
                 Divider()
                 ToggleRow("Lyrics on player", "Show the current line under the artwork", settings.lyricsOnPlayer) { v ->
                     Prefs.update { it.copy(lyricsOnPlayer = v) }
+                }
+                Divider()
+                ChoiceRow(
+                    "Lyrics offset",
+                    if (settings.lyricsOffsetMs == 0) "In step" else "${settings.lyricsOffsetMs / 1000f}s shift",
+                ) {
+                    listOf(-1000, 0, 1000, 2000).forEach { ms ->
+                        Chip(
+                            when {
+                                ms == 0 -> "0"
+                                ms > 0 -> "+${ms / 1000}s"
+                                else -> "${ms / 1000}s"
+                            },
+                            selected = settings.lyricsOffsetMs == ms,
+                        ) { Prefs.update { it.copy(lyricsOffsetMs = ms) } }
+                    }
+                }
+                Divider()
+                ToggleRow("Haptics", "A small tick on like and play", settings.haptics) { v ->
+                    Prefs.update { it.copy(haptics = v) }
+                    app.bunmusic.core.Haptics.enabled = v
                 }
             }
         }
@@ -332,7 +362,7 @@ fun SettingsScreen(
         item { GroupLabel("About") }
         item {
             SettingsCard {
-                NavRow("Version", "1.0.2 (build 3)", G.Sparkle) { }
+                NavRow("About BunMusic", "1.0.3 (build 4) · what changed", G.Sparkle) { onOpenAbout() }
                 Divider()
                 NavRow("Built by", "Iota Coder · iota14934@gmail.com", G.User) { }
                 Divider()
@@ -401,7 +431,7 @@ private fun SettingsCard(content: @Composable () -> Unit) {
 
 @Composable
 private fun Divider() {
-    Box(Modifier.padding(horizontal = 16.dp).fillMaxWidth().height(1.dp).background(Color.White.copy(alpha = 0.05f)))
+    Box(Modifier.padding(horizontal = 16.dp).fillMaxWidth().height(1.dp).background(Ink.Hairline))
 }
 
 @Composable
@@ -444,7 +474,7 @@ private fun NavRow(title: String, subtitle: String, glyph: G, onClick: () -> Uni
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Box(
-            Modifier.size(32.dp).clip(CircleShape).background(Color.White.copy(alpha = 0.05f)),
+            Modifier.size(32.dp).clip(CircleShape).background(Ink.Hairline),
             contentAlignment = Alignment.Center,
         ) { Glyph(glyph, Ink.Muted, 15.dp) }
         Spacer(Modifier.width(12.dp))

@@ -38,6 +38,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
@@ -46,6 +47,7 @@ import androidx.compose.ui.unit.sp
 import app.bunmusic.core.G
 import app.bunmusic.core.Glyph
 import app.bunmusic.core.Ink
+import app.bunmusic.core.Skin
 import app.bunmusic.core.SoraFamily
 import app.bunmusic.data.Auth
 import app.bunmusic.data.Collection
@@ -66,6 +68,9 @@ sealed interface Route {
     data object Downloads : Route
     data object Profile : Route
     data object Equalizer : Route
+    data object Hotlist : Route
+    data object Buns : Route
+    data object About : Route
     data class Detail(
         val title: String,
         val artUrl: String?,
@@ -135,11 +140,15 @@ private fun Shell(guest: Boolean, onLeaveGuest: () -> Unit) {
         Modifier
             .fillMaxSize()
             .background(
-                Brush.verticalGradient(
-                    0f to Color(0xFF14101C),
-                    0.35f to Ink.Void,
-                    1f to Ink.Void,
-                )
+                if (Ink.isLight) {
+                    Brush.verticalGradient(listOf(Ink.Base, Ink.Base))
+                } else {
+                    Brush.verticalGradient(
+                        0f to Color(0xFF14101C),
+                        0.35f to Ink.Void,
+                        1f to Ink.Void,
+                    )
+                }
             )
     ) {
         Column(Modifier.fillMaxSize()) {
@@ -211,6 +220,8 @@ private fun Shell(guest: Boolean, onLeaveGuest: () -> Unit) {
                             onOpenDownloads = { push(Route.Downloads) },
                             onOpenProfile = { push(Route.Profile) },
                             onOpenEqualizer = { push(Route.Equalizer) },
+                            onOpenBuns = { push(Route.Buns) },
+                            onOpenAbout = { push(Route.About) },
                             onToast = { toast = it },
                         )
 
@@ -224,6 +235,17 @@ private fun Shell(guest: Boolean, onLeaveGuest: () -> Unit) {
                         )
 
                         Route.Equalizer -> EqualizerScreen(onBack = pop)
+
+                        Route.Buns -> BunsScreen(onBack = pop)
+
+                        Route.About -> AboutScreen(onBack = pop)
+
+                        Route.Hotlist -> HotlistScreen(
+                            state = state,
+                            downloadedIds = downloadedIds,
+                            onPlay = { list, i -> Playback.play(list, i) },
+                            onMore = { sheetTrack = it },
+                        )
 
                         Route.Stats -> StatsScreen(onBack = pop)
                         Route.Downloads -> DownloadsScreen(onBack = pop, onPlay = { list, i -> Playback.play(list, i) })
@@ -261,16 +283,38 @@ private fun Shell(guest: Boolean, onLeaveGuest: () -> Unit) {
                 }
             }
 
-            if (state.hasTrack) {
-                MiniPlayer(
-                    state = state,
-                    onOpen = { playerOpen = true },
-                    onToggle = { Playback.toggle() },
-                    onNext = { Playback.next() },
-                )
-            }
+            if (Ink.isLight) {
+                Box(Modifier.fillMaxWidth().navigationBarsPadding()) {
+                    Box(Modifier.fillMaxWidth().height(if (state.hasTrack) 122.dp else 84.dp)) {
+                        if (state.hasTrack) {
+                            Box(Modifier.align(Alignment.TopCenter)) {
+                                MiniPlayer(
+                                    state = state,
+                                    onOpen = { playerOpen = true },
+                                    onToggle = { Playback.toggle() },
+                                    onNext = { Playback.next() },
+                                )
+                            }
+                        }
+                        BottomNav(
+                            current = route,
+                            onSelect = { tab(it) },
+                            modifier = Modifier.align(Alignment.BottomCenter),
+                        )
+                    }
+                }
+            } else {
+                if (state.hasTrack) {
+                    MiniPlayer(
+                        state = state,
+                        onOpen = { playerOpen = true },
+                        onToggle = { Playback.toggle() },
+                        onNext = { Playback.next() },
+                    )
+                }
 
-            BottomNav(route) { tab(it) }
+                BottomNav(route, { tab(it) })
+            }
         }
 
         AnimatedVisibility(
@@ -314,8 +358,8 @@ private fun Toast(message: String, onDone: () -> Unit) {
         Box(
             Modifier
                 .clip(RoundedCornerShape(14.dp))
-                .background(Color(0xFF27212F))
-                .border(1.dp, Color.White.copy(alpha = 0.08f), RoundedCornerShape(14.dp))
+                .background(Ink.Sheet)
+                .border(1.dp, Ink.Hairline, RoundedCornerShape(14.dp))
                 .padding(horizontal = 16.dp, vertical = 10.dp)
         ) {
             Text(message, color = Ink.Text, fontSize = 12.sp, fontFamily = SoraFamily)
@@ -327,17 +371,40 @@ private fun Toast(message: String, onDone: () -> Unit) {
 
 private data class NavTab(val label: String, val glyph: G, val route: Route)
 
-private val tabs = listOf(
-    NavTab("Home", G.Home, Route.Home),
-    NavTab("Explore", G.Compass, Route.Explore),
-    NavTab("Library", G.Library, Route.Library),
-    NavTab("Search", G.Search, Route.Search),
-)
+/** The two buns disagree about the fourth tab: Explore, or a ranked Hotlist. */
+private fun tabsFor(light: Boolean): List<NavTab> = if (light) {
+    listOf(
+        NavTab("Home", G.Home, Route.Home),
+        NavTab("Search", G.Search, Route.Search),
+        NavTab("Library", G.Library, Route.Library),
+        NavTab("Hotlist", G.Flame, Route.Hotlist),
+    )
+} else {
+    listOf(
+        NavTab("Home", G.Home, Route.Home),
+        NavTab("Explore", G.Compass, Route.Explore),
+        NavTab("Library", G.Library, Route.Library),
+        NavTab("Search", G.Search, Route.Search),
+    )
+}
 
 @Composable
-private fun BottomNav(current: Route, onSelect: (Route) -> Unit) {
+private fun BottomNav(
+    current: Route,
+    onSelect: (Route) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    if (Ink.isLight) {
+        LightNav(current, onSelect, modifier)
+    } else {
+        DarkNav(current, onSelect, modifier)
+    }
+}
+
+@Composable
+private fun DarkNav(current: Route, onSelect: (Route) -> Unit, modifier: Modifier = Modifier) {
     Box(
-        Modifier
+        modifier
             .fillMaxWidth()
             .navigationBarsPadding()
             .padding(horizontal = 16.dp, vertical = 10.dp),
@@ -346,13 +413,13 @@ private fun BottomNav(current: Route, onSelect: (Route) -> Unit) {
             Modifier
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(26.dp))
-                .background(Color(0xFF17131E).copy(alpha = 0.96f))
-                .border(1.dp, Color.White.copy(alpha = 0.06f), RoundedCornerShape(26.dp))
+                .background(Ink.NavBg.copy(alpha = 0.96f))
+                .border(1.dp, Ink.Hairline, RoundedCornerShape(26.dp))
                 .padding(horizontal = 6.dp, vertical = 7.dp),
             horizontalArrangement = Arrangement.SpaceEvenly,
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            tabs.forEach { t ->
+            tabsFor(false).forEach { t ->
                 val selected = current == t.route
                 Column(
                     Modifier
@@ -380,6 +447,57 @@ private fun BottomNav(current: Route, onSelect: (Route) -> Unit) {
                         fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
                     )
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun LightNav(current: Route, onSelect: (Route) -> Unit, modifier: Modifier = Modifier) {
+    val shape = RoundedCornerShape(30.dp)
+    Row(
+        modifier
+            .fillMaxWidth()
+            .padding(horizontal = 14.dp, vertical = 8.dp)
+            .shadow(16.dp, shape, clip = false, ambientColor = Ink.Shadow, spotColor = Ink.Shadow)
+            .clip(shape)
+            .background(Ink.NavBg)
+            .padding(horizontal = 6.dp, vertical = 9.dp),
+        horizontalArrangement = Arrangement.SpaceEvenly,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        tabsFor(true).forEach { t ->
+            val selected = current == t.route
+            Column(
+                Modifier
+                    .weight(1f)
+                    .clip(RoundedCornerShape(20.dp))
+                    .clickable { onSelect(t.route) }
+                    .padding(vertical = 2.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                Box(
+                    Modifier
+                        .size(34.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(if (selected) Ink.NavActiveBg else Color.Transparent),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Glyph(
+                        t.glyph,
+                        if (selected) Ink.NavActiveInk else Ink.Faint,
+                        19.dp,
+                        if (selected) 2.1.dp else 1.7.dp,
+                    )
+                }
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    t.label,
+                    color = if (selected) Ink.Text else Ink.Faint,
+                    fontSize = 10.sp,
+                    fontFamily = SoraFamily,
+                    fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+                )
             }
         }
     }

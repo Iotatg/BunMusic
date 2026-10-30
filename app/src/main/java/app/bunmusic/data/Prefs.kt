@@ -47,6 +47,11 @@ object Prefs {
         val eqBands: List<Int> = emptyList(),
         val bassBoost: Int = 0,
         val googleClientId: String = "",
+        /** Which bun is worn — see [app.bunmusic.core.BunSkin]. */
+        val skin: String = "MIDNIGHT",
+        val haptics: Boolean = true,
+        /** Shift applied to synced lyrics, milliseconds. */
+        val lyricsOffsetMs: Int = 0,
     )
 
     private lateinit var sp: SharedPreferences
@@ -78,6 +83,9 @@ object Prefs {
             eqBands = (sp.getString("eqBands", "") ?: "").split(',').mapNotNull { it.toIntOrNull() },
             bassBoost = sp.getInt("bassBoost", d.bassBoost),
             googleClientId = sp.getString("googleClientId", d.googleClientId) ?: "",
+            skin = sp.getString("skin", d.skin) ?: d.skin,
+            haptics = sp.getBoolean("haptics", d.haptics),
+            lyricsOffsetMs = sp.getInt("lyricsOffset", d.lyricsOffsetMs),
         )
     }
 
@@ -102,6 +110,9 @@ object Prefs {
             .putString("eqBands", next.eqBands.joinToString(","))
             .putInt("bassBoost", next.bassBoost)
             .putString("googleClientId", next.googleClientId)
+            .putString("skin", next.skin)
+            .putBoolean("haptics", next.haptics)
+            .putInt("lyricsOffset", next.lyricsOffsetMs)
             .apply()
     }
 }

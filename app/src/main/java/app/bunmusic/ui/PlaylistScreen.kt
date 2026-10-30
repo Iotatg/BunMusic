@@ -194,7 +194,7 @@ fun PlaylistScreen(
     if (renaming) {
         AlertDialog(
             onDismissRequest = { renaming = false },
-            containerColor = Color(0xFF1C1823),
+            containerColor = Ink.Sheet,
             title = { Text("Rename playlist", color = Ink.Text, fontFamily = SoraFamily, fontSize = 16.sp) },
             text = {
                 OutlinedTextField(
@@ -226,7 +226,7 @@ fun PlaylistScreen(
     if (confirmDelete) {
         AlertDialog(
             onDismissRequest = { confirmDelete = false },
-            containerColor = Color(0xFF1C1823),
+            containerColor = Ink.Sheet,
             title = { Text("Delete playlist?", color = Ink.Text, fontFamily = SoraFamily, fontSize = 16.sp) },
             text = { Text("This only removes the list. Your liked songs stay.", color = Ink.Muted, fontSize = 13.sp) },
             confirmButton = {

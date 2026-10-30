@@ -319,7 +319,7 @@ private fun ProviderChip(acc: Auth.Account) {
     Row(
         Modifier
             .clip(CircleShape)
-            .background(Color.White.copy(alpha = 0.06f))
+            .background(Ink.Hairline)
             .padding(horizontal = 11.dp, vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -393,7 +393,7 @@ private fun ProfileCard(content: @Composable () -> Unit) {
 
 @Composable
 private fun ProfileDivider() {
-    Box(Modifier.padding(horizontal = 16.dp).fillMaxWidth().height(1.dp).background(Color.White.copy(alpha = 0.05f)))
+    Box(Modifier.padding(horizontal = 16.dp).fillMaxWidth().height(1.dp).background(Ink.Hairline))
 }
 
 @Composable
@@ -403,7 +403,7 @@ private fun ProfileRow(title: String, subtitle: String, glyph: G, onClick: () ->
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Box(
-            Modifier.size(32.dp).clip(CircleShape).background(Color.White.copy(alpha = 0.05f)),
+            Modifier.size(32.dp).clip(CircleShape).background(Ink.Hairline),
             contentAlignment = Alignment.Center,
         ) { Glyph(glyph, Ink.Muted, 15.dp) }
         Spacer(Modifier.width(12.dp))

@@ -1,6 +1,8 @@
 package app.bunmusic.ui
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -28,6 +30,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -35,6 +38,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.bunmusic.core.Ambient
 import app.bunmusic.core.G
+import app.bunmusic.core.Glyph
 import app.bunmusic.core.Ink
 import app.bunmusic.core.SerifFamily
 import app.bunmusic.core.SoraFamily
@@ -46,6 +50,150 @@ import app.bunmusic.data.Track
 import app.bunmusic.data.YtMusic
 import app.bunmusic.player.Playback
 import app.bunmusic.player.PlayerState
+
+/**
+ * Charcoal's detail header: art on the left, the record's facts on the right,
+ * three outline actions, then one dark button and one pale one. No hero wash —
+ * the cover is the only thing with colour.
+ */
+@Composable
+private fun CharcoalDetailHeader(
+    title: String,
+    artUrl: String?,
+    artAsset: String?,
+    kind: CollectionKind,
+    count: Int,
+    loading: Boolean,
+    onBack: () -> Unit,
+    onPlayAll: () -> Unit,
+    onShuffle: () -> Unit,
+    onMore: () -> Unit,
+) {
+    Column(Modifier.fillMaxWidth().padding(bottom = 8.dp)) {
+        Row(
+            Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Box(
+                Modifier.size(40.dp).clip(CircleShape).clickable { onBack() },
+                contentAlignment = Alignment.Center,
+            ) { Glyph(G.Back, Ink.Text, 21.dp, 2.2.dp) }
+            Spacer(Modifier.weight(1f))
+            Box(
+                Modifier.size(40.dp).clip(CircleShape).clickable { onMore() },
+                contentAlignment = Alignment.Center,
+            ) { Glyph(G.Search, Ink.Text, 20.dp, 2.dp) }
+        }
+
+        Row(Modifier.padding(horizontal = 20.dp, vertical = 8.dp)) {
+            ArtImage(
+                url = artUrl,
+                asset = artAsset,
+                modifier = Modifier.size(108.dp),
+                shape = if (kind == CollectionKind.ARTIST) CircleShape else RoundedCornerShape(20.dp),
+            )
+            Spacer(Modifier.width(16.dp))
+            Column(Modifier.weight(1f)) {
+                Text(
+                    buildString {
+                        append(
+                            when (kind) {
+                                CollectionKind.ALBUM -> "Album"
+                                CollectionKind.ARTIST -> "Artist"
+                                else -> "Playlist"
+                            }
+                        )
+                        if (count > 0) append("  ·  $count songs")
+                    },
+                    color = Ink.Faint,
+                    fontSize = 11.5.sp,
+                    fontFamily = SoraFamily,
+                )
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    title,
+                    color = Ink.Text,
+                    fontSize = 27.sp,
+                    fontFamily = SerifFamily,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = (-0.9).sp,
+                    lineHeight = 30.sp,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Spacer(Modifier.height(6.dp))
+                Text(
+                    if (loading) "Loading…" else if (count > 0) "BunMusic" else "",
+                    color = Ink.Muted,
+                    fontSize = 13.sp,
+                    fontFamily = SoraFamily,
+                )
+            }
+        }
+
+        Row(
+            Modifier.padding(horizontal = 20.dp, vertical = 6.dp),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            listOf(G.Plus, G.Download, G.More).forEachIndexed { i, g ->
+                Box(
+                    Modifier
+                        .size(36.dp)
+                        .clip(CircleShape)
+                        .border(1.dp, Ink.Hairline, CircleShape)
+                        .clickable { if (i == 2) onMore() },
+                    contentAlignment = Alignment.Center,
+                ) { Glyph(g, Ink.Muted, 16.dp, 1.9.dp) }
+            }
+        }
+
+        Row(
+            Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 8.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Row(
+                Modifier
+                    .weight(1f)
+                    .clip(RoundedCornerShape(15.dp))
+                    .background(Ink.Text)
+                    .clickable { onPlayAll() }
+                    .padding(vertical = 15.dp),
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Glyph(G.PlayCircle, Ink.OnAccent, 16.dp, 2.dp)
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    "Play",
+                    color = Ink.OnAccent,
+                    fontSize = 14.sp,
+                    fontFamily = SoraFamily,
+                    fontWeight = FontWeight.SemiBold,
+                )
+            }
+            Row(
+                Modifier
+                    .weight(1f)
+                    .clip(RoundedCornerShape(15.dp))
+                    .background(Ink.Field)
+                    .clickable { onShuffle() }
+                    .padding(vertical = 15.dp),
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Glyph(G.Shuffle, Ink.Text, 16.dp, 1.9.dp)
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    "Shuffle",
+                    color = Ink.Text,
+                    fontSize = 14.sp,
+                    fontFamily = SoraFamily,
+                    fontWeight = FontWeight.SemiBold,
+                )
+            }
+        }
+    }
+}
 
 @Composable
 fun DetailScreen(
@@ -102,6 +250,20 @@ fun DetailScreen(
         contentPadding = PaddingValues(bottom = 28.dp),
     ) {
         item {
+            if (Ink.isLight) {
+                CharcoalDetailHeader(
+                    title = title,
+                    artUrl = headerArt,
+                    artAsset = artAsset,
+                    kind = kind,
+                    count = tracks.size,
+                    loading = loading,
+                    onBack = onBack,
+                    onPlayAll = { if (tracks.isNotEmpty()) onPlay(tracks, 0) },
+                    onShuffle = { Playback.shufflePlay(tracks) },
+                    onMore = { tracks.firstOrNull()?.let(onMore) },
+                )
+            } else {
             Box(Modifier.fillMaxWidth()) {
                 Box(
                     Modifier
@@ -170,6 +332,7 @@ fun DetailScreen(
                         }
                     }
                 }
+            }
             }
         }
 

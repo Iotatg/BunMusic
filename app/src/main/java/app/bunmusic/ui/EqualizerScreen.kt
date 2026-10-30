@@ -93,7 +93,7 @@ fun EqualizerScreen(onBack: () -> Unit) {
                         Modifier
                             .size(38.dp)
                             .clip(CircleShape)
-                            .background(if (eq.enabled) Ink.Lime else Color.White.copy(alpha = 0.06f)),
+                            .background(if (eq.enabled) Ink.Lime else Ink.Hairline),
                         contentAlignment = Alignment.Center,
                     ) { Glyph(G.Sliders, if (eq.enabled) Ink.OnAccent else Ink.Muted, 17.dp) }
                     Spacer(Modifier.width(12.dp))
@@ -230,7 +230,7 @@ fun EqualizerScreen(onBack: () -> Unit) {
                         colors = SliderDefaults.colors(
                             thumbColor = Ink.Lime,
                             activeTrackColor = Ink.Lime,
-                            inactiveTrackColor = Color.White.copy(alpha = 0.12f),
+                            inactiveTrackColor = Ink.Line,
                         ),
                     )
                 }
@@ -277,7 +277,7 @@ fun EqualizerScreen(onBack: () -> Unit) {
                     Modifier
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(14.dp))
-                        .background(Color.White.copy(alpha = 0.05f))
+                        .background(Ink.Hairline)
                         .clickable { Eq.reset() }
                         .padding(vertical = 13.dp),
                     horizontalArrangement = Arrangement.Center,
@@ -337,7 +337,7 @@ private fun BandColumn(
                 colors = SliderDefaults.colors(
                     thumbColor = if (enabled) Ink.Lime else Ink.Faint,
                     activeTrackColor = if (enabled) Ink.Lime.copy(alpha = 0.7f) else Ink.Line,
-                    inactiveTrackColor = Color.White.copy(alpha = 0.10f),
+                    inactiveTrackColor = Ink.Line,
                 ),
             )
         }

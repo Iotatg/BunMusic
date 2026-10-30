@@ -168,7 +168,7 @@ private fun ChartsCard(onClick: () -> Unit, modifier: Modifier = Modifier) {
     Row(
         modifier
             .clip(RoundedCornerShape(20.dp))
-            .background(Brush.linearGradient(listOf(Color(0xFF2A2135), Color(0xFF1A1524))))
+            .background(if (Ink.isLight) Brush.linearGradient(listOf(Ink.Field, Ink.Card)) else Brush.linearGradient(listOf(Color(0xFF2A2135), Color(0xFF1A1524))))
             .clickable { onClick() }
             .padding(16.dp),
         verticalAlignment = Alignment.CenterVertically,

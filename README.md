@@ -1,12 +1,13 @@
 # BunMusic
 
-A dark, quiet music player for Android — built from scratch in Kotlin + Jetpack Compose.
+A quiet music player for Android — built from scratch in Kotlin + Jetpack Compose.
+Two skins, "buns", and you pick which one the app wears.
 Six original tracks ship inside the APK, YouTube Music is wired in for everything else,
 and anything you like can be saved offline.
 
 ```
 package   app.bunmusic
-version   1.0.2 (3)
+version   1.0.3 (4)
 minSdk    26  ·  target/compile 37
 author    Iota Coder · iota14934@gmail.com
 ```
@@ -14,6 +15,19 @@ author    Iota Coder · iota14934@gmail.com
 ---
 
 ## What it does
+
+**Buns**
+Two complete skins, switched in Settings → Buns. A bun is not a tint: it replaces the
+palette, the typeface, the corner radii, the shape of the bottom bar, whether a list shows
+cover art or a track number, and whether the seek bar is a line or a waveform.
+
+| Bun | What it is |
+|---|---|
+| **Midnight Lime** | Ink black, acid lime, lavender hero, Sora + Instrument Serif. The house bun. |
+| **Charcoal** | Paper white, charcoal ink, Inter throughout, 24 dp cards, waveform seek bar, white nav bar with a dark active pill, dark mini player. |
+
+Switching restarts the process — the only way to be sure no `remember`ed colour from the old
+bun survives. Nothing else is touched: library, downloads and account stay put.
 
 **Accounts, for real**
 Three ways in, all of them implemented rather than mocked (`data/Auth.kt`):
@@ -194,13 +208,17 @@ home, album pages, Explore, Charts, mood pages and the automix radio queue.
   plugged in, the code is shown in the UI so the flow stays usable and testable.
 - **Google sign-in needs your OAuth client ID** (see above). Until then the button opens the
   setup sheet rather than failing silently.
-- **Not implemented yet:** Discord Rich Presence, Last.fm scrobbling, song recognition,
+- **Not implemented yet:** per-bun custom accents, Discord Rich Presence, Last.fm scrobbling, song recognition,
   synced group listening, word-by-word lyrics, Android Auto and the home-screen widget.
 - **Debug builds** install as `app.bunmusic.debug`, so they can sit next to the release build.
 
 ---
 
 ## Changelog
+
+**1.0.3** — the Buns skin system with a second full bun (Charcoal), Hotlist chart tab,
+drag-to-reorder queue with "save queue as playlist", lyrics offset, haptics, About screen,
+Inter bundled, every hard-coded colour folded into the palette.
 
 **1.0.2** — accounts (email, phone, Google), per-account libraries, profile screen, equaliser
 with bass boost, autoplay radio from YouTube's automix, backup/restore, offline-only mode,

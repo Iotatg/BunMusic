@@ -107,7 +107,7 @@ private fun StatTile(label: String, value: String, modifier: Modifier = Modifier
     Column(
         modifier
             .clip(RoundedCornerShape(18.dp))
-            .background(Brush.linearGradient(listOf(Color(0xFF1F1A2A), Color(0xFF171320))))
+            .background(if (Ink.isLight) Brush.linearGradient(listOf(Ink.Field, Ink.Card)) else Brush.linearGradient(listOf(Color(0xFF1F1A2A), Color(0xFF171320))))
             .padding(14.dp),
     ) {
         Text(label.uppercase(), color = Ink.Faint, fontSize = 8.5.sp, fontFamily = SoraFamily, letterSpacing = 1.1.sp)
@@ -144,7 +144,7 @@ private fun WeekBars(week: List<Int>) {
                         .fillMaxWidth()
                         .height((8 + (v.toFloat() / max) * 62).dp)
                         .clip(RoundedCornerShape(6.dp))
-                        .background(if (v > 0) Ink.Lime.copy(alpha = 0.85f) else Color.White.copy(alpha = 0.07f))
+                        .background(if (v > 0) Ink.Lime.copy(alpha = 0.85f) else Ink.Hairline)
                 )
                 Spacer(Modifier.height(6.dp))
                 Text(labels.getOrElse(i) { "" }, color = Ink.Faint, fontSize = 9.sp, fontFamily = SoraFamily)
@@ -173,7 +173,7 @@ private fun BarRow(label: String, count: Int, fraction: Float, tint: Color) {
                 .weight(1f)
                 .height(8.dp)
                 .clip(RoundedCornerShape(4.dp))
-                .background(Color.White.copy(alpha = 0.05f)),
+                .background(Ink.Hairline),
         ) {
             Box(
                 Modifier

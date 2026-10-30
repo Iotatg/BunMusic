@@ -19,6 +19,7 @@ class BunApp : Application(), SingletonImageLoader.Factory {
         Store.init(this)
         Prefs.init(this)
         Auth.init(this)
+        app.bunmusic.core.Skin.load(this)
         Downloads.init(this)
         Playback.init(this)
     }

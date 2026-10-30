@@ -7,10 +7,12 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -37,10 +39,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -50,8 +55,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.bunmusic.core.G
 import app.bunmusic.core.Glyph
+import app.bunmusic.core.Haptics
 import app.bunmusic.core.Ink
 import app.bunmusic.core.SerifFamily
+import app.bunmusic.core.Skin
 import app.bunmusic.core.SoraFamily
 import app.bunmusic.data.Collection
 import app.bunmusic.data.Track
@@ -59,6 +66,9 @@ import app.bunmusic.player.PlayerState
 import coil3.compose.AsyncImage
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlin.math.abs
+import kotlin.math.roundToInt
+import kotlin.math.sin
 
 // ------------------------------------------------------------------ helpers
 
@@ -136,7 +146,7 @@ fun Panel(
         modifier
             .clip(RoundedCornerShape(radius))
             .background(color)
-            .border(1.dp, Color.White.copy(alpha = 0.04f), RoundedCornerShape(radius))
+            .border(1.dp, Ink.Hairline, RoundedCornerShape(radius))
     ) { content() }
 }
 
@@ -149,9 +159,10 @@ fun SectionHeader(title: String, action: String? = null, onAction: (() -> Unit)?
         Text(
             title,
             color = Ink.Text,
-            fontSize = 17.sp,
-            fontFamily = SoraFamily,
+            fontSize = if (Skin.light) 19.sp else 17.sp,
+            fontFamily = if (Skin.light) SerifFamily else SoraFamily,
             fontWeight = FontWeight.SemiBold,
+            letterSpacing = if (Skin.light) (-0.3).sp else 0.sp,
             modifier = Modifier.weight(1f),
         )
         if (action != null) {
@@ -173,6 +184,8 @@ fun Display(text: String, size: Int = 34, color: Color = Ink.Text) {
         color = color,
         fontSize = size.sp,
         fontFamily = SerifFamily,
+        fontWeight = if (Skin.light) FontWeight.Bold else FontWeight.Normal,
+        letterSpacing = if (Skin.light) (-0.8).sp else 0.sp,
         lineHeight = (size * 1.06f).sp,
     )
 }
@@ -235,7 +248,7 @@ fun SquareCard(collection: Collection, onClick: () -> Unit, width: Dp = 152.dp) 
             url = collection.artUrl,
             asset = collection.artAsset,
             modifier = Modifier.size(width),
-            shape = RoundedCornerShape(20.dp),
+            shape = RoundedCornerShape(if (Skin.light) 18.dp else 20.dp),
         )
         Spacer(Modifier.height(10.dp))
         Text(
@@ -260,6 +273,11 @@ fun SquareCard(collection: Collection, onClick: () -> Unit, width: Dp = 152.dp) 
     }
 }
 
+/**
+ * A track in a list. The two buns disagree about what a row *is*: Midnight is
+ * artwork-led, Charcoal is typographic — number, title, artist · time, and no
+ * thumbnail at all, exactly as the reference layout does it.
+ */
 @Composable
 fun TrackRow(
     track: Track,
@@ -271,6 +289,29 @@ fun TrackRow(
     onPlay: () -> Unit,
     onLike: (() -> Unit)? = null,
     onMore: (() -> Unit)? = null,
+) {
+    if (Ink.isLight) {
+        CharcoalTrackRow(
+            track, index, playing, isCurrent, liked, downloaded, onPlay, onLike, onMore,
+        )
+    } else {
+        MidnightTrackRow(
+            track, index, playing, isCurrent, liked, downloaded, onPlay, onLike, onMore,
+        )
+    }
+}
+
+@Composable
+private fun MidnightTrackRow(
+    track: Track,
+    index: Int,
+    playing: Boolean,
+    isCurrent: Boolean,
+    liked: Boolean,
+    downloaded: Boolean,
+    onPlay: () -> Unit,
+    onLike: (() -> Unit)?,
+    onMore: (() -> Unit)?,
 ) {
     Row(
         Modifier
@@ -365,6 +406,80 @@ fun TrackRow(
 }
 
 @Composable
+private fun CharcoalTrackRow(
+    track: Track,
+    index: Int,
+    playing: Boolean,
+    isCurrent: Boolean,
+    liked: Boolean,
+    downloaded: Boolean,
+    onPlay: () -> Unit,
+    onLike: (() -> Unit)?,
+    onMore: (() -> Unit)?,
+) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 10.dp, vertical = 2.dp)
+            .clip(RoundedCornerShape(14.dp))
+            .background(if (isCurrent) Ink.Field else Color.Transparent)
+            .clickable { onPlay() }
+            .padding(start = 10.dp, end = 6.dp, top = 10.dp, bottom = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(Modifier.width(26.dp), contentAlignment = Alignment.CenterStart) {
+            if (isCurrent) MiniWave(Ink.Text, playing) else Text(
+                if (index >= 0) index.toString().padStart(2, '0') else "•",
+                color = Ink.Faint,
+                fontSize = 11.5.sp,
+                fontFamily = SoraFamily,
+                fontWeight = FontWeight.Medium,
+            )
+        }
+        Spacer(Modifier.width(6.dp))
+        Column(Modifier.weight(1f)) {
+            Text(
+                track.title,
+                color = Ink.Text,
+                fontSize = 15.sp,
+                fontFamily = SerifFamily,
+                fontWeight = FontWeight.Bold,
+                letterSpacing = (-0.25).sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Spacer(Modifier.height(2.dp))
+            Text(
+                buildString {
+                    append(track.artist.ifBlank { "Unknown artist" })
+                    if (track.durationMs > 0) append("  ·  ${fmtTime(track.durationMs)}")
+                    if (track.isLocal || downloaded) append("  ·  offline")
+                },
+                color = Ink.Muted,
+                fontSize = 12.sp,
+                fontFamily = SoraFamily,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+        if (onLike != null) {
+            Box(
+                Modifier.size(30.dp).clip(CircleShape).clickable { onLike() },
+                contentAlignment = Alignment.Center,
+            ) {
+                Glyph(if (liked) G.HeartFill else G.Heart, if (liked) Ink.Rose else Ink.Faint, 15.dp)
+            }
+        }
+        if (onMore != null) {
+            Box(
+                Modifier.size(30.dp).clip(CircleShape).clickable { onMore() },
+                contentAlignment = Alignment.Center,
+            ) { Glyph(G.More, Ink.Faint, 15.dp) }
+        }
+    }
+}
+
+@Composable
 fun EqualizerBars(color: Color, barHeight: Dp = 18.dp) {
     val t = rememberInfiniteTransition(label = "eq")
     val heights = (0..2).map { i ->
@@ -396,6 +511,31 @@ fun EqualizerBars(color: Color, barHeight: Dp = 18.dp) {
     }
 }
 
+/** The little four-bar mark that stands in for "this one is playing". */
+@Composable
+fun MiniWave(color: Color, animate: Boolean = true, height: Dp = 14.dp) {
+    val t = rememberInfiniteTransition(label = "miniwave")
+    val phase by t.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(tween(900), RepeatMode.Restart),
+        label = "phase",
+    )
+    Canvas(Modifier.size(width = 15.dp, height = height)) {
+        val bars = 4
+        val gap = size.width / (bars * 2f - 1f)
+        repeat(bars) { i ->
+            val wobble = if (animate) abs(sin((phase * 2 * Math.PI + i * 1.1).toFloat())) else 0.5f
+            val h = size.height * (0.35f + 0.62f * wobble)
+            drawRect(
+                color = color,
+                topLeft = Offset(i * gap * 2f, size.height - h),
+                size = Size(gap, h),
+            )
+        }
+    }
+}
+
 // -------------------------------------------------------------------- inputs
 
 @Composable
@@ -405,10 +545,18 @@ fun Chip(
     leading: G? = null,
     onClick: () -> Unit,
 ) {
+    val light = Ink.isLight
     Row(
         Modifier
-            .clip(RoundedCornerShape(11.dp))
-            .background(if (selected) Ink.Lime else Ink.Card)
+            .clip(RoundedCornerShape(if (light) 10.dp else 11.dp))
+            .background(
+                when {
+                    selected && light -> Ink.Text
+                    selected -> Ink.Lime
+                    light -> Ink.Field
+                    else -> Ink.Card
+                }
+            )
             .clickable { onClick() }
             .padding(horizontal = 14.dp, vertical = 9.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -419,10 +567,14 @@ fun Chip(
         }
         Text(
             text,
-            color = if (selected) Ink.OnAccent else Ink.Muted,
+            color = when {
+                selected -> Ink.OnAccent
+                light -> Ink.Muted
+                else -> Ink.Muted
+            },
             fontSize = 12.sp,
             fontFamily = SoraFamily,
-            fontWeight = FontWeight.Medium,
+            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
         )
     }
 }
@@ -443,12 +595,13 @@ fun FilledBtn(
     contentColor: Color = Ink.OnAccent,
     onClick: () -> Unit,
 ) {
+    val shape = if (Ink.isLight) RoundedCornerShape(13.dp) else CircleShape
     Row(
         Modifier
-            .clip(CircleShape)
+            .clip(shape)
             .background(color)
             .clickable { onClick() }
-            .padding(horizontal = 18.dp, vertical = 11.dp),
+            .padding(horizontal = 18.dp, vertical = if (Ink.isLight) 13.dp else 11.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         if (glyph != null) {
@@ -461,13 +614,15 @@ fun FilledBtn(
 
 @Composable
 fun GhostBtn(text: String, glyph: G? = null, onClick: () -> Unit) {
+    val light = Ink.isLight
+    val shape = if (light) RoundedCornerShape(13.dp) else CircleShape
     Row(
         Modifier
-            .clip(CircleShape)
-            .background(Color.White.copy(alpha = 0.06f))
-            .border(1.dp, Color.White.copy(alpha = 0.08f), CircleShape)
+            .clip(shape)
+            .background(if (light) Ink.Field else Color.White.copy(alpha = 0.06f))
+            .border(1.dp, if (light) Ink.Hairline else Color.White.copy(alpha = 0.08f), shape)
             .clickable { onClick() }
-            .padding(horizontal = 16.dp, vertical = 10.dp),
+            .padding(horizontal = 16.dp, vertical = if (light) 13.dp else 10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         if (glyph != null) {
@@ -487,7 +642,7 @@ fun EmptyState(glyph: G, title: String, body: String, action: String? = null, on
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Box(
-            Modifier.size(58.dp).clip(CircleShape).background(Ink.Card),
+            Modifier.size(58.dp).clip(CircleShape).background(if (Ink.isLight) Ink.Field else Ink.Card),
             contentAlignment = Alignment.Center,
         ) { Glyph(glyph, Ink.Faint, 24.dp) }
         Spacer(Modifier.height(14.dp))
@@ -521,8 +676,8 @@ fun shimmerBrush(): Brush {
     )
     return Brush.linearGradient(
         colors = listOf(Ink.Card, Ink.Raised, Ink.Card),
-        start = androidx.compose.ui.geometry.Offset(x, 0f),
-        end = androidx.compose.ui.geometry.Offset(x + 420f, 260f),
+        start = Offset(x, 0f),
+        end = Offset(x + 420f, 260f),
     )
 }
 
@@ -558,6 +713,91 @@ fun MiniPlayer(
     modifier: Modifier = Modifier,
 ) {
     val track = state.track ?: return
+    if (Ink.isLight) {
+        CharcoalMiniPlayer(state, track, onOpen, onToggle, modifier)
+    } else {
+        MidnightMiniPlayer(state, track, onOpen, onToggle, onNext, modifier)
+    }
+}
+
+@Composable
+private fun CharcoalMiniPlayer(
+    state: PlayerState,
+    track: Track,
+    onOpen: () -> Unit,
+    onToggle: () -> Unit,
+    modifier: Modifier,
+) {
+    Row(
+        modifier
+            .fillMaxWidth()
+            .padding(horizontal = 14.dp)
+            .clip(RoundedCornerShape(24.dp))
+            .background(Ink.MiniBg)
+            .clickable { onOpen() }
+            .padding(start = 10.dp, end = 10.dp, top = 9.dp, bottom = 9.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        ArtImage(
+            url = track.artUrl,
+            asset = track.artAsset,
+            modifier = Modifier.size(44.dp),
+            shape = RoundedCornerShape(14.dp),
+        )
+        Spacer(Modifier.width(12.dp))
+        Column(Modifier.weight(1f)) {
+            Text(
+                track.title,
+                color = Ink.MiniText,
+                fontSize = 14.5.sp,
+                fontFamily = SerifFamily,
+                fontWeight = FontWeight.Bold,
+                letterSpacing = (-0.2).sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Spacer(Modifier.height(1.dp))
+            Text(
+                if (state.buffering) "Loading…" else track.artist,
+                color = Ink.MiniText.copy(alpha = 0.62f),
+                fontSize = 11.5.sp,
+                fontFamily = SoraFamily,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+        Box(
+            Modifier.size(34.dp).clip(CircleShape).clickable { onToggle() },
+            contentAlignment = Alignment.Center,
+        ) { Glyph(if (state.isPlaying) G.HeartFill else G.Heart, Ink.MiniText.copy(alpha = 0.9f), 18.dp) }
+        Spacer(Modifier.width(6.dp))
+        Box(
+            Modifier
+                .size(44.dp)
+                .clip(RoundedCornerShape(15.dp))
+                .background(Color.White)
+                .clickable { onToggle() },
+            contentAlignment = Alignment.Center,
+        ) {
+            Glyph(
+                if (state.buffering && !state.isPlaying) G.Wave else if (state.isPlaying) G.Pause else G.Play,
+                Color(0xFF171C26),
+                18.dp,
+                2.2.dp,
+            )
+        }
+    }
+}
+
+@Composable
+private fun MidnightMiniPlayer(
+    state: PlayerState,
+    track: Track,
+    onOpen: () -> Unit,
+    onToggle: () -> Unit,
+    onNext: () -> Unit,
+    modifier: Modifier,
+) {
     val frac = if (state.durationMs > 0) (state.positionMs.toFloat() / state.durationMs).coerceIn(0f, 1f) else 0f
     val animated by animateFloatAsState(frac, tween(400), label = "mini")
 
@@ -566,7 +806,7 @@ fun MiniPlayer(
             .fillMaxWidth()
             .padding(horizontal = 14.dp, vertical = 6.dp)
             .clip(RoundedCornerShape(20.dp))
-            .background(Brush.linearGradient(listOf(Color(0xFF211C2C), Color(0xFF191521))))
+            .background(Brush.linearGradient(listOf(Ink.MiniBg, Color(0xFF191521))))
             .border(1.dp, Color.White.copy(alpha = 0.07f), RoundedCornerShape(20.dp))
             .clickable { onOpen() }
     ) {
@@ -584,7 +824,7 @@ fun MiniPlayer(
             Column(Modifier.weight(1f)) {
                 Text(
                     track.title,
-                    color = Ink.Text,
+                    color = Ink.MiniText,
                     fontSize = 13.sp,
                     fontFamily = SoraFamily,
                     fontWeight = FontWeight.Medium,
@@ -641,6 +881,10 @@ fun SeekBar(
     modifier: Modifier = Modifier,
     activeColor: Color = Ink.Lime,
 ) {
+    if (Ink.isLight) {
+        WaveSeekBar(positionMs, durationMs, onSeek, modifier, activeColor)
+        return
+    }
     val value = if (durationMs > 0) (positionMs.toFloat() / durationMs).coerceIn(0f, 1f) else 0f
     var dragging by remember { mutableStateOf(false) }
     var local by remember { mutableFloatStateOf(0f) }
@@ -662,6 +906,74 @@ fun SeekBar(
     )
 }
 
+/**
+ * Charcoal's seek bar is a waveform, not a line. The bars are a fixed pseudo
+ * random field seeded by the track, so the same song always draws the same
+ * shape — it reads as the track's own waveform rather than noise.
+ */
+@Composable
+fun WaveSeekBar(
+    positionMs: Long,
+    durationMs: Long,
+    onSeek: (Long) -> Unit,
+    modifier: Modifier = Modifier,
+    activeColor: Color = Ink.Text,
+    seed: Int = 7,
+) {
+    val value = if (durationMs > 0) (positionMs.toFloat() / durationMs).coerceIn(0f, 1f) else 0f
+    var dragging by remember { mutableStateOf(false) }
+    var local by remember { mutableFloatStateOf(0f) }
+    val shown = if (dragging) local else value
+    var widthPx by remember { mutableStateOf(1f) }
+
+    Canvas(
+        modifier
+            .fillMaxWidth()
+            .height(46.dp)
+            .pointerInput(durationMs) {
+                detectHorizontalDragGestures(
+                    onDragStart = { offset ->
+                        dragging = true
+                        local = (offset.x / size.width.toFloat()).coerceIn(0f, 1f)
+                    },
+                    onDragEnd = {
+                        dragging = false
+                        onSeek((local * durationMs).toLong())
+                        Haptics.tick()
+                    },
+                ) { change, _ ->
+                    local = (change.position.x / size.width.toFloat()).coerceIn(0f, 1f)
+                }
+            }
+    ) {
+        widthPx = size.width
+        val bars = 56
+        val slot = size.width / bars
+        val barW = (slot * 0.45f).coerceAtLeast(1.4f)
+        val played = shown * size.width
+        for (i in 0 until bars) {
+            val n = ((i * 37 + seed * 11) % 23) / 22f
+            val n2 = ((i * 17 + seed * 5) % 13) / 12f
+            val h = size.height * (0.16f + 0.84f * (0.35f * n + 0.65f * n2) * (0.55f + 0.45f * sin(i * 0.55f)))
+            val x = i * slot + (slot - barW) / 2f
+            val color = if (x + barW / 2f <= played) activeColor else activeColor.copy(alpha = 0.22f)
+            drawRect(
+                color = color,
+                topLeft = Offset(x, (size.height - h) / 2f),
+                size = Size(barW, h),
+            )
+        }
+        // playhead
+        if (durationMs > 0) {
+            drawRect(
+                color = activeColor,
+                topLeft = Offset((played - 0.75f).coerceIn(0f, size.width - 1.5f), 0f),
+                size = Size(1.5f, size.height),
+            )
+        }
+    }
+}
+
 @Composable
 fun BackBar(title: String, onBack: () -> Unit, trailing: @Composable (() -> Unit)? = null) {
     Row(
@@ -671,7 +983,7 @@ fun BackBar(title: String, onBack: () -> Unit, trailing: @Composable (() -> Unit
         Box(
             Modifier.size(40.dp).clip(CircleShape).clickable { onBack() },
             contentAlignment = Alignment.Center,
-        ) { Glyph(G.Back, Ink.Text, 20.dp) }
+        ) { Glyph(G.Back, Ink.Text, 20.dp, if (Ink.isLight) 2.2.dp else 1.6.dp) }
         Text(
             title,
             color = Ink.Text,

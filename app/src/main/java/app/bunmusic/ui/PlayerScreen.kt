@@ -14,6 +14,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -22,11 +23,13 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
@@ -42,18 +45,24 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.zIndex
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.bunmusic.core.Ambient
 import app.bunmusic.core.G
 import app.bunmusic.core.Glyph
+import app.bunmusic.core.Haptics
 import app.bunmusic.core.Ink
 import app.bunmusic.core.SerifFamily
 import app.bunmusic.core.SoraFamily
@@ -65,6 +74,7 @@ import app.bunmusic.data.Store
 import app.bunmusic.data.Track
 import app.bunmusic.player.Playback
 import app.bunmusic.player.PlayerState
+import kotlin.math.roundToInt
 import kotlinx.coroutines.launch
 
 @Composable
@@ -88,14 +98,18 @@ fun PlayerScreen(state: PlayerState, onClose: () -> Unit, onMore: () -> Unit) {
         Modifier
             .fillMaxSize()
             .background(
-                Brush.verticalGradient(
-                    0f to tint.copy(alpha = 0.22f),
-                    0.45f to Color(0xFF140F1E),
-                    1f to Ink.Void,
-                )
+                if (Ink.isLight) {
+                    Brush.verticalGradient(listOf(Ink.Base, Ink.Base))
+                } else {
+                    Brush.verticalGradient(
+                        0f to tint.copy(alpha = 0.22f),
+                        0.45f to Color(0xFF140F1E),
+                        1f to Ink.Void,
+                    )
+                }
             )
     ) {
-        if (glowAlpha > 0f) {
+        if (glowAlpha > 0f && !Ink.isLight) {
             Box(
                 Modifier
                     .fillMaxWidth()
@@ -116,6 +130,20 @@ fun PlayerScreen(state: PlayerState, onClose: () -> Unit, onMore: () -> Unit) {
         }
 
         Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding()) {
+
+            if (Ink.isLight) {
+                CharcoalPlayer(
+                    state = state,
+                    track = track,
+                    onClose = onClose,
+                    onMore = onMore,
+                    onQueue = { showQueue = true },
+                    onLyrics = { showLyrics = true },
+                    onSleep = { showSleep = true },
+                    onSpeed = { showSpeed = true },
+                )
+                return@Column
+            }
 
             // ---- top bar
             Row(
@@ -345,6 +373,216 @@ fun PlayerScreen(state: PlayerState, onClose: () -> Unit, onMore: () -> Unit) {
     }
 }
 
+
+// ------------------------------------------------------------- charcoal bun
+
+/**
+ * The Charcoal now-playing screen: centred, typographic, no ambient wash. The
+ * artwork is the only colour on the page, and the seek bar is a waveform.
+ */
+@Composable
+private fun ColumnScope.CharcoalPlayer(
+    state: PlayerState,
+    track: Track,
+    onClose: () -> Unit,
+    onMore: () -> Unit,
+    onQueue: () -> Unit,
+    onLyrics: () -> Unit,
+    onSleep: () -> Unit,
+    onSpeed: () -> Unit,
+) {
+    var liked by remember(track.id) { mutableStateOf(Store.isLiked(track.id)) }
+
+    Row(
+        Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(
+            Modifier.size(40.dp).clip(CircleShape).clickable { onClose() },
+            contentAlignment = Alignment.Center,
+        ) {
+            Box(Modifier.rotate(90f)) { Glyph(G.Back, Ink.Text, 21.dp, 2.2.dp) }
+        }
+        Spacer(Modifier.weight(1f))
+        Text(
+            "Now Playing",
+            color = Ink.Text,
+            fontSize = 17.sp,
+            fontFamily = SerifFamily,
+            fontWeight = FontWeight.Bold,
+            letterSpacing = (-0.3).sp,
+        )
+        Spacer(Modifier.weight(1f))
+        Box(
+            Modifier.size(40.dp).clip(CircleShape).clickable { onQueue() },
+            contentAlignment = Alignment.Center,
+        ) { Glyph(G.Queue, Ink.Text, 20.dp, 2.dp) }
+    }
+
+    Spacer(Modifier.weight(0.5f))
+
+    Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+        Box(
+            Modifier
+                .fillMaxWidth(0.80f)
+                .aspectRatio(1f)
+                .shadow(26.dp, RoundedCornerShape(30.dp), clip = false, spotColor = Ink.Shadow, ambientColor = Ink.Shadow)
+        ) {
+            ArtImage(
+                url = track.artUrl,
+                asset = track.artAsset,
+                modifier = Modifier.fillMaxSize(),
+                shape = RoundedCornerShape(30.dp),
+            )
+        }
+    }
+
+    Spacer(Modifier.weight(0.42f))
+
+    Row(
+        Modifier.fillMaxWidth().padding(horizontal = 24.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(
+            Modifier.size(38.dp).clip(CircleShape).clickable {
+                liked = Store.toggleLike(track.id)
+                Haptics.tick()
+            },
+            contentAlignment = Alignment.Center,
+        ) {
+            Glyph(
+                if (liked) G.HeartFill else G.Heart,
+                if (liked) Ink.Rose else Ink.Faint,
+                21.dp,
+                2.dp,
+            )
+        }
+        Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
+            Text(
+                track.title,
+                color = Ink.Text,
+                fontSize = 29.sp,
+                fontFamily = SerifFamily,
+                fontWeight = FontWeight.Bold,
+                letterSpacing = (-1).sp,
+                lineHeight = 33.sp,
+                maxLines = 2,
+                textAlign = TextAlign.Center,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Spacer(Modifier.height(6.dp))
+            Text(
+                track.artist,
+                color = Ink.Muted,
+                fontSize = 15.sp,
+                fontFamily = SoraFamily,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+        Box(
+            Modifier.size(38.dp).clip(CircleShape).clickable { onMore() },
+            contentAlignment = Alignment.Center,
+        ) { Glyph(G.More, Ink.Faint, 20.dp, 2.dp) }
+    }
+
+    Spacer(Modifier.height(10.dp))
+
+    Column(Modifier.padding(horizontal = 24.dp)) {
+        WaveSeekBar(
+            positionMs = state.positionMs,
+            durationMs = state.durationMs,
+            onSeek = { Playback.seekTo(it) },
+            activeColor = Ink.Text,
+            seed = track.id.hashCode(),
+        )
+        Row(Modifier.fillMaxWidth().padding(top = 2.dp)) {
+            Text(fmtTime(state.positionMs), color = Ink.Muted, fontSize = 11.sp, fontFamily = SoraFamily)
+            Spacer(Modifier.weight(1f))
+            Text(fmtTime(state.durationMs), color = Ink.Muted, fontSize = 11.sp, fontFamily = SoraFamily)
+        }
+        if (state.error != null) {
+            Spacer(Modifier.height(4.dp))
+            Text(
+                state.error ?: "",
+                color = Ink.Rose,
+                fontSize = 10.5.sp,
+                fontFamily = SoraFamily,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+    }
+
+    Spacer(Modifier.height(8.dp))
+
+    Row(
+        Modifier.fillMaxWidth().padding(horizontal = 26.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween,
+    ) {
+        Box(
+            Modifier.size(40.dp).clip(CircleShape).clickable { Playback.toggleShuffle() },
+            contentAlignment = Alignment.Center,
+        ) { Glyph(G.Shuffle, if (state.shuffle) Ink.Text else Ink.Faint, 20.dp, 1.9.dp) }
+        Box(
+            Modifier.size(44.dp).clip(CircleShape).clickable { Playback.previous() },
+            contentAlignment = Alignment.Center,
+        ) { Glyph(G.Prev, Ink.Text, 26.dp, 2.2.dp) }
+        Box(
+            Modifier
+                .size(68.dp)
+                .clip(CircleShape)
+                .background(Ink.Text)
+                .clickable { Playback.toggle() },
+            contentAlignment = Alignment.Center,
+        ) {
+            Glyph(
+                if (state.buffering && !state.isPlaying) G.Wave else if (state.isPlaying) G.Pause else G.Play,
+                Ink.OnAccent,
+                25.dp,
+                2.4.dp,
+            )
+        }
+        Box(
+            Modifier.size(44.dp).clip(CircleShape).clickable { Playback.next() },
+            contentAlignment = Alignment.Center,
+        ) { Glyph(G.Next, Ink.Text, 26.dp, 2.2.dp) }
+        Box(
+            Modifier.size(40.dp).clip(CircleShape).clickable { Playback.cycleRepeat() },
+            contentAlignment = Alignment.Center,
+        ) {
+            Glyph(
+                if (state.repeat == 2) G.RepeatOne else G.Repeat,
+                if (state.repeat != 0) Ink.Text else Ink.Faint,
+                20.dp,
+                1.9.dp,
+            )
+        }
+    }
+
+    Spacer(Modifier.height(6.dp))
+
+    Row(
+        Modifier.fillMaxWidth().padding(horizontal = 18.dp),
+        horizontalArrangement = Arrangement.SpaceEvenly,
+    ) {
+        SecondaryAction("Lyrics", G.Mic, active = false) { onLyrics() }
+        SecondaryAction(
+            if (state.sleepActive) fmtTime(state.sleepRemainingMs) else "Sleep",
+            G.Moon,
+            active = state.sleepActive,
+        ) { onSleep() }
+        SecondaryAction(
+            if (state.speed == 1f) "Speed" else "${state.speed}x",
+            G.Speed,
+            active = state.speed != 1f,
+        ) { onSpeed() }
+        SecondaryAction("Queue", G.List, active = false) { onQueue() }
+    }
+    Spacer(Modifier.height(8.dp))
+}
+
 // ------------------------------------------------------------------- artwork
 
 @Composable
@@ -399,7 +637,7 @@ private fun VinylArt(track: Track, playing: Boolean, tint: Color) {
                 .rotate(if (playing) rotation.value else 0f)
                 .clip(CircleShape)
                 .background(Color(0xFF0B0A0E))
-                .border(1.dp, Color.White.copy(alpha = 0.08f), CircleShape),
+                .border(1.dp, Ink.Hairline, CircleShape),
             contentAlignment = Alignment.Center,
         ) {
             repeat(3) { i ->
@@ -407,7 +645,7 @@ private fun VinylArt(track: Track, playing: Boolean, tint: Color) {
                     Modifier
                         .fillMaxWidth(0.94f - i * 0.08f)
                         .aspectRatio(1f)
-                        .border(1.dp, Color.White.copy(alpha = 0.05f), CircleShape)
+                        .border(1.dp, Ink.Hairline, CircleShape)
                 )
             }
             ArtImage(
@@ -478,7 +716,7 @@ private fun SecondaryAction(label: String, glyph: G, active: Boolean, onClick: (
         Modifier.clip(RoundedCornerShape(14.dp)).clickable { onClick() }.padding(horizontal = 10.dp, vertical = 6.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Glyph(glyph, if (active) Ink.Lime else Ink.Muted, 18.dp)
+        Glyph(glyph, if (active) Ink.Lime else Ink.Muted, 18.dp, if (Ink.isLight) 1.9.dp else 1.6.dp)
         Spacer(Modifier.height(5.dp))
         Text(
             label,
@@ -493,7 +731,7 @@ private fun SecondaryAction(label: String, glyph: G, active: Boolean, onClick: (
 // ---------------------------------------------------------------- queue sheet
 
 @Composable
-private fun QueueSheet(state: PlayerState, onClose: () -> Unit) {
+private fun QueueSheet(state: PlayerState, onClose: () -> Unit, onSaved: (String) -> Unit = {}) {
     Column(
         Modifier
             .fillMaxSize()
@@ -509,13 +747,43 @@ private fun QueueSheet(state: PlayerState, onClose: () -> Unit) {
                 Text("Up next", color = Ink.Text, fontSize = 17.sp, fontFamily = SerifFamily)
                 Text("${state.queue.size} tracks", color = Ink.Faint, fontSize = 11.sp, fontFamily = SoraFamily)
             }
+            GhostBtn("Save", G.Plus) {
+                val name = Playback.saveQueueAsPlaylist()
+                if (name.isNotBlank()) onSaved(name)
+            }
+            Spacer(Modifier.width(8.dp))
             GhostBtn("Clear", G.Trash) { Playback.clearQueue() }
             Spacer(Modifier.width(8.dp))
             IconBtn(G.Close, Ink.Text, 38.dp, 16.dp, onClose)
         }
         LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 20.dp)) {
             itemsIndexed(state.queue) { i, t ->
-                Row(Modifier.padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                var drag by remember(i) { mutableStateOf(0f) }
+                val rowPx = with(androidx.compose.ui.platform.LocalDensity.current) { 62.dp.toPx() }
+                Row(
+                    Modifier
+                        .padding(horizontal = 8.dp)
+                        .zIndex(if (drag != 0f) 1f else 0f)
+                        .offset { IntOffset(0, drag.roundToInt()) }
+                        .alpha(if (drag != 0f) 0.9f else 1f)
+                        .pointerInput(i, state.queue.size) {
+                            detectVerticalDragGestures(
+                                onDragEnd = {
+                                    val shift = (drag / rowPx).roundToInt()
+                                    if (shift != 0) {
+                                        Playback.moveInQueue(
+                                            i,
+                                            (i + shift).coerceIn(0, state.queue.lastIndex),
+                                        )
+                                        Haptics.tick()
+                                    }
+                                    drag = 0f
+                                },
+                                onDragCancel = { drag = 0f },
+                            ) { _, amount -> drag += amount }
+                        },
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
                     Box(Modifier.weight(1f)) {
                         TrackRow(
                             track = t,
@@ -524,6 +792,10 @@ private fun QueueSheet(state: PlayerState, onClose: () -> Unit) {
                             onPlay = { Playback.jumpTo(i) },
                         )
                     }
+                    Box(
+                        Modifier.size(30.dp).clip(CircleShape),
+                        contentAlignment = Alignment.Center,
+                    ) { Glyph(G.Drag, Ink.Faint, 14.dp) }
                     Box(
                         Modifier.size(26.dp).clip(CircleShape).clickable { Playback.removeAt(i) },
                         contentAlignment = Alignment.Center,
@@ -549,7 +821,8 @@ private fun LyricsSheet(track: Track, positionMs: Long, onClose: () -> Unit) {
     }
 
     val lines = lyrics?.lines ?: emptyList()
-    val activeIndex = lines.indexOfLast { it.atMs <= positionMs }
+    val shift = Prefs.settings.value.lyricsOffsetMs.toLong()
+    val activeIndex = lines.indexOfLast { it.atMs <= positionMs + shift }
 
     LaunchedEffect(activeIndex) {
         if (activeIndex >= 0) {
@@ -560,7 +833,7 @@ private fun LyricsSheet(track: Track, positionMs: Long, onClose: () -> Unit) {
     Column(
         Modifier
             .fillMaxSize()
-            .background(Brush.verticalGradient(listOf(Color(0xFF1D1730), Ink.Void)))
+            .background(if (Ink.isLight) Ink.Base else Color(0xFF1D1730))
             .statusBarsPadding()
             .navigationBarsPadding()
     ) {
@@ -631,7 +904,7 @@ private fun LyricsPeek(track: Track, positionMs: Long, expanded: Boolean, onTogg
     }
     val lines = lyrics?.lines ?: emptyList()
     if (lines.isEmpty()) return
-    val active = lines.indexOfLast { it.atMs <= positionMs }
+    val active = lines.indexOfLast { it.atMs <= positionMs + Prefs.settings.value.lyricsOffsetMs }
     val current = lines.getOrNull(active)?.text ?: lines.firstOrNull()?.text ?: ""
     val next = lines.getOrNull(active + 1)?.text ?: ""
 
@@ -678,7 +951,7 @@ private fun SpeedSheet(current: Float, onDismiss: () -> Unit, onPick: (Float) ->
     androidx.compose.material3.ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
-        containerColor = Color(0xFF17131E),
+        containerColor = Ink.Sheet,
         contentColor = Ink.Text,
         dragHandle = { SheetHandle() },
     ) {

@@ -252,7 +252,7 @@ private fun ShortcutCard(
     Row(
         modifier
             .clip(RoundedCornerShape(18.dp))
-            .background(Brush.linearGradient(listOf(Color(0xFF1E1A28), Color(0xFF171320))))
+            .background(if (Ink.isLight) Brush.linearGradient(listOf(Ink.Field, Ink.Card)) else Brush.linearGradient(listOf(Color(0xFF1E1A28), Color(0xFF171320))))
             .clickable { onClick() }
             .padding(14.dp),
         verticalAlignment = Alignment.CenterVertically,
