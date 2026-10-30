@@ -201,6 +201,84 @@ object YtMusic {
         return CollectionDetail(collection, tracks, subShelves, desc)
     }
 
+    // --------------------------------------------------------------- explore
+
+    /** Explore page: new albums, mood tiles and the trending list. */
+    suspend fun explore(): ExplorePage {
+        val root = post("browse", buildJsonObject { put("browseId", "FEmusic_explore") })
+        val shelves = shelvesFrom(root)
+
+        val newReleases = shelves.firstOrNull { it.title.contains("New albums", true) }?.items.orEmpty()
+        val trending = shelves.firstOrNull { it.title.contains("Trending", true) }?.tracks.orEmpty()
+            .ifEmpty { shelves.firstOrNull { it.tracks.isNotEmpty() }?.tracks.orEmpty() }
+
+        val moods = navigationButtons(root).mapNotNull { btn ->
+            val title = runsText(btn["buttonText"] as? JsonObject) ?: return@mapNotNull null
+            val ep = (btn["clickCommand"] as? JsonObject)?.get("browseEndpoint") as? JsonObject
+                ?: return@mapNotNull null
+            val id = (ep["browseId"] as? JsonPrimitive)?.contentOrNull ?: return@mapNotNull null
+            val params = (ep["params"] as? JsonPrimitive)?.contentOrNull ?: ""
+            val color = ((btn["solid"] as? JsonObject)?.get("leftStripeColor") as? JsonPrimitive)
+                ?.contentOrNull?.toLongOrNull() ?: 0L
+            Mood(title, id, params, color)
+        }.filterNot { it.params.isBlank() }
+            .filterNot { it.title.equals("New releases", true) || it.title.equals("Charts", true) || it.title.equals("Moods & genres", true) }
+
+        return ExplorePage(newReleases = newReleases, moods = moods, trending = trending)
+    }
+
+    /** Country charts: top artists, top videos, trending playlists. */
+    suspend fun charts(): List<Shelf> {
+        val root = post("browse", buildJsonObject { put("browseId", "FEmusic_charts") })
+        return shelvesFrom(root)
+    }
+
+    /** Generic browse used by mood/genre pages. */
+    suspend fun browseShelves(browseId: String, params: String? = null): List<Shelf> {
+        val extra = buildJsonObject {
+            put("browseId", browseId)
+            if (!params.isNullOrBlank()) put("params", params)
+        }
+        return shelvesFrom(post("browse", extra))
+    }
+
+    suspend fun newReleases(): List<Collection> {
+        val root = post("browse", buildJsonObject { put("browseId", "FEmusic_new_releases_albums") })
+        return shelvesFrom(root).flatMap { it.items }.distinctBy { it.browseId }
+    }
+
+    /** Turns every carousel on a browse page into a shelf of tracks or collections. */
+    private fun shelvesFrom(root: JsonElement): List<Shelf> {
+        val out = ArrayList<Shelf>()
+        for ((title, items) in carousels(root)) {
+            val tracks = items.mapNotNull { toTrack(it) }.distinctBy { it.videoId }
+            val cols = items.mapNotNull { toCollection(it) }.distinctBy { it.browseId }
+            when {
+                cols.isNotEmpty() -> out.add(Shelf(title = title, items = cols, wide = true))
+                tracks.isNotEmpty() -> out.add(Shelf(title = title, tracks = tracks))
+            }
+        }
+        return out
+    }
+
+    private fun navigationButtons(root: JsonElement): List<JsonObject> {
+        val out = ArrayList<JsonObject>()
+        fun walk(e: JsonElement) {
+            if (e is JsonObject) {
+                val r = e["musicNavigationButtonRenderer"] as? JsonObject
+                if (r != null) {
+                    out.add(r)
+                    return
+                }
+                for ((_, v) in e) walk(v)
+            } else if (e is JsonArray) {
+                for (v in e) walk(v)
+            }
+        }
+        walk(root)
+        return out
+    }
+
     // ------------------------------------------------------------- internals
 
     private fun responsiveItems(root: JsonElement): List<JsonObject> {

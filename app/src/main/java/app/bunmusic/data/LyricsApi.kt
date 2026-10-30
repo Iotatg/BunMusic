@@ -12,53 +12,95 @@ import java.net.URL
 import java.net.URLEncoder
 
 /**
- * Synced lyrics from LRCLIB (open, community-maintained, no API key).
- * Timestamps are parsed into [LyricLine] so the player can highlight the
- * line that is being sung right now.
+ * Lyrics, multi-provider and fail-soft:
+ *
+ *  1. LRCLIB exact match  → time-synced LRC
+ *  2. LRCLIB search       → first hit, synced or plain
+ *  3. lyrics.ovh          → plain text fallback
+ *
+ * A miss is never an error: the player just shows "no lyrics".
  */
 object LyricsApi {
 
-    private const val UA = "BunMusic/1.0 (Android; +https://github.com/Iotatg)"
+    private const val UA = "BunMusic/1.0.1 (Android; +https://github.com/Iotatg)"
     private val json = Json { ignoreUnknownKeys = true; isLenient = true }
 
-    suspend fun forTrack(track: Track): Lyrics = withContext(Dispatchers.IO) {
-        val artist = track.artist.substringBefore(",").trim()
-        val title = track.title.substringBefore("(").trim()
+    private val cache = LinkedHashMap<String, Lyrics>()
+    private const val CACHE_MAX = 40
 
+    suspend fun forTrack(track: Track): Lyrics = withContext(Dispatchers.IO) {
+        val key = track.id
+        synchronized(cache) { cache[key] }?.let { return@withContext it }
+
+        val artist = clean(track.artist.substringBefore(","))
+        val title = clean(track.title)
+
+        var result = fromLrclib(artist, title, track)
+        if (result.isEmpty) result = fromOvh(artist, title)
+
+        synchronized(cache) {
+            cache[key] = result
+            while (cache.size > CACHE_MAX) cache.remove(cache.keys.first())
+        }
+        result
+    }
+
+    private fun clean(s: String): String = s
+        .substringBefore("(")
+        .substringBefore("[")
+        .replace(Regex("(?i)\\s*(feat\\.?|ft\\.?|featuring)\\s+.*"), "")
+        .replace(Regex("(?i)\\s*-\\s*(remaster(ed)?|live|radio edit|version).*"), "")
+        .trim()
+
+    // --------------------------------------------------------------- lrclib
+
+    private fun fromLrclib(artist: String, title: String, track: Track): Lyrics {
         val direct = runCatching {
-            val q = buildString {
+            val url = buildString {
                 append("https://lrclib.net/api/get?artist_name=").append(enc(artist))
                 append("&track_name=").append(enc(title))
                 if (track.album.isNotBlank()) append("&album_name=").append(enc(track.album))
                 if (track.durationMs > 0) append("&duration=").append(track.durationMs / 1000)
             }
-            fetch(q)
+            fetch(url)
         }.getOrNull()
 
         val body = direct ?: runCatching {
-            fetch("https://lrclib.net/api/search?q=" + enc("$artist $title"))
-                ?.let { text ->
-                    val arr = json.parseToJsonElement(text) as? JsonArray
-                    (arr?.firstOrNull() as? JsonObject)?.toString()
-                }
+            fetch("https://lrclib.net/api/search?q=" + enc("$artist $title"))?.let { text ->
+                val arr = json.parseToJsonElement(text) as? JsonArray
+                (arr?.firstOrNull() as? JsonObject)?.toString()
+            }
         }.getOrNull()
 
-        if (body.isNullOrBlank()) return@withContext Lyrics()
-
-        val obj = runCatching { json.parseToJsonElement(body) as? JsonObject }.getOrNull()
-            ?: return@withContext Lyrics()
+        if (body.isNullOrBlank()) return Lyrics()
+        val obj = runCatching { json.parseToJsonElement(body) as? JsonObject }.getOrNull() ?: return Lyrics()
         val synced = (obj["syncedLyrics"] as? JsonPrimitive)?.contentOrNull
         val plain = (obj["plainLyrics"] as? JsonPrimitive)?.contentOrNull
-        Lyrics(
+        return Lyrics(
             lines = if (synced.isNullOrBlank()) emptyList() else parseLrc(synced),
             plain = plain,
+            provider = "LRCLIB",
         )
     }
 
+    // ----------------------------------------------------------- lyrics.ovh
+
+    private fun fromOvh(artist: String, title: String): Lyrics {
+        val raw = runCatching {
+            fetch("https://api.lyrics.ovh/v1/" + enc(artist) + "/" + enc(title))
+        }.getOrNull() ?: return Lyrics()
+        val obj = runCatching { json.parseToJsonElement(raw) as? JsonObject }.getOrNull() ?: return Lyrics()
+        val text = (obj["lyrics"] as? JsonPrimitive)?.contentOrNull ?: return Lyrics()
+        if (text.isBlank()) return Lyrics()
+        return Lyrics(lines = emptyList(), plain = text.trim(), provider = "lyrics.ovh")
+    }
+
+    // ------------------------------------------------------------- utilities
+
     private fun fetch(url: String): String? {
         val conn = URL(url).openConnection() as HttpURLConnection
-        conn.connectTimeout = 12000
-        conn.readTimeout = 12000
+        conn.connectTimeout = 10_000
+        conn.readTimeout = 12_000
         conn.setRequestProperty("User-Agent", UA)
         conn.setRequestProperty("Accept", "application/json")
         return try {

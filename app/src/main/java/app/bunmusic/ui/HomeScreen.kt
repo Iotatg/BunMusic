@@ -19,13 +19,13 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -45,37 +45,50 @@ import app.bunmusic.core.SerifFamily
 import app.bunmusic.core.SoraFamily
 import app.bunmusic.data.Catalog
 import app.bunmusic.data.Collection
+import app.bunmusic.data.Mood
 import app.bunmusic.data.Shelf
+import app.bunmusic.data.Store
 import app.bunmusic.data.Track
 import app.bunmusic.data.YtMusic
 import app.bunmusic.player.PlayerState
-import kotlinx.coroutines.delay
 
 @Composable
 fun HomeScreen(
     state: PlayerState,
+    downloadedIds: Set<String>,
     onOpenSearch: () -> Unit,
+    onOpenExplore: () -> Unit,
     onOpenCollection: (Collection) -> Unit,
+    onOpenMood: (Mood) -> Unit,
     onPlay: (List<Track>, Int) -> Unit,
     onOpenPlayer: () -> Unit,
+    onMore: (Track) -> Unit,
+    onOpenSettings: () -> Unit,
 ) {
     var shelves by remember { mutableStateOf<List<Shelf>>(emptyList()) }
+    var moods by remember { mutableStateOf<List<Mood>>(emptyList()) }
     var loading by remember { mutableStateOf(true) }
     var failed by remember { mutableStateOf(false) }
+    var attempt by remember { mutableIntStateOf(0) }
+    val recents = remember(state.track?.id) { Store.recent(6) }
 
-    LaunchedEffect(Unit) {
-        val result = runCatching { YtMusic.home() }
-        result.onSuccess { shelves = it }.onFailure { failed = true }
+    LaunchedEffect(attempt) {
+        loading = true
+        failed = false
+        runCatching { YtMusic.home() }
+            .onSuccess { shelves = it }
+            .onFailure { failed = true }
+        runCatching { YtMusic.explore() }.onSuccess { moods = it.moods.take(8) }
         loading = false
     }
 
     LazyColumn(
         Modifier.fillMaxSize().statusBarsPadding(),
-        contentPadding = PaddingValues(bottom = 28.dp),
+        contentPadding = PaddingValues(bottom = 24.dp),
     ) {
         item {
             Row(
-                Modifier.fillMaxWidth().padding(start = 20.dp, end = 20.dp, top = 10.dp, bottom = 4.dp),
+                Modifier.fillMaxWidth().padding(start = 20.dp, end = 14.dp, top = 10.dp, bottom = 2.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(
@@ -87,17 +100,12 @@ fun HomeScreen(
                     letterSpacing = 3.sp,
                 )
                 Spacer(Modifier.weight(1f))
-                Box(
-                    Modifier.size(34.dp).clip(CircleShape).background(Ink.Card).clickable { },
-                    contentAlignment = Alignment.Center,
-                ) {
-                    ArtImage(null, "art/avatar.png", Modifier.fillMaxSize(), CircleShape)
-                }
+                IconBtn(G.Gear, Ink.Muted, 38.dp, 18.dp, onOpenSettings)
             }
         }
 
         item {
-            Column(Modifier.padding(horizontal = 20.dp, vertical = 14.dp)) {
+            Column(Modifier.padding(horizontal = 20.dp, vertical = 10.dp)) {
                 Display(greeting(), 33)
                 Spacer(Modifier.height(4.dp))
                 Text(
@@ -109,11 +117,9 @@ fun HomeScreen(
             }
         }
 
-        item {
-            SearchPill(onClick = onOpenSearch, modifier = Modifier.padding(horizontal = 20.dp))
-        }
+        item { SearchPill(onClick = onOpenSearch, modifier = Modifier.padding(horizontal = 20.dp)) }
 
-        item { Spacer(Modifier.height(20.dp)) }
+        item { Spacer(Modifier.height(18.dp)) }
 
         item {
             HeroCard(
@@ -123,21 +129,47 @@ fun HomeScreen(
             )
         }
 
-        item { SectionHeader("Made for you", "See all") }
+        if (moods.isNotEmpty()) {
+            item { SectionHeader("Moods", "Explore", onOpenExplore) }
+            item {
+                LazyRow(
+                    contentPadding = PaddingValues(horizontal = 20.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    items(moods) { m ->
+                        Chip(m.title, leading = G.Sparkle) { onOpenMood(m) }
+                    }
+                }
+            }
+        }
 
+        if (recents.isNotEmpty()) {
+            item { SectionHeader("Recently played") }
+            item {
+                LazyRow(
+                    contentPadding = PaddingValues(horizontal = 20.dp),
+                    horizontalArrangement = Arrangement.spacedBy(14.dp),
+                ) {
+                    items(recents) { t ->
+                        RecentTile(t, downloaded = downloadedIds.contains(t.id)) {
+                            onPlay(recents, recents.indexOf(t))
+                        }
+                    }
+                }
+            }
+        }
+
+        item { SectionHeader("Made for you") }
         item {
             LazyRow(
                 contentPadding = PaddingValues(horizontal = 20.dp),
                 horizontalArrangement = Arrangement.spacedBy(14.dp),
             ) {
-                items(Catalog.collections) { c ->
-                    SquareCard(c, onClick = { onOpenCollection(c) })
-                }
+                items(Catalog.collections) { c -> SquareCard(c, onClick = { onOpenCollection(c) }) }
             }
         }
 
         item { SectionHeader("Offline, always") }
-
         item {
             Column(Modifier.padding(horizontal = 8.dp)) {
                 Catalog.tracks.take(3).forEachIndexed { i, t ->
@@ -145,7 +177,9 @@ fun HomeScreen(
                         track = t,
                         playing = state.isPlaying,
                         isCurrent = state.track?.id == t.id,
+                        downloaded = true,
                         onPlay = { onPlay(Catalog.tracks, i) },
+                        onMore = { onMore(t) },
                     )
                 }
             }
@@ -153,26 +187,32 @@ fun HomeScreen(
 
         if (loading) {
             item {
-                Column(Modifier.padding(top = 24.dp)) {
-                    LoadingRow()
+                Column(Modifier.padding(top = 20.dp)) {
+                    repeat(3) { ShimmerRow() }
                 }
             }
         } else if (failed) {
             item {
                 Panel(Modifier.padding(20.dp).fillMaxWidth()) {
                     Column(Modifier.padding(18.dp)) {
-                        Text("YouTube Music unreachable", color = Ink.Text, fontSize = 14.sp, fontFamily = SoraFamily, fontWeight = FontWeight.Medium)
+                        Text(
+                            "YouTube Music unreachable",
+                            color = Ink.Text, fontSize = 14.sp, fontFamily = SoraFamily, fontWeight = FontWeight.Medium,
+                        )
                         Spacer(Modifier.height(4.dp))
-                        Text("Check your connection — the offline tracks above still play.", color = Ink.Muted, fontSize = 12.sp, fontFamily = SoraFamily)
+                        Text(
+                            "Check your connection — the offline tracks above still play.",
+                            color = Ink.Muted, fontSize = 12.sp, fontFamily = SoraFamily,
+                        )
+                        Spacer(Modifier.height(12.dp))
+                        GhostBtn("Try again", G.Refresh) { attempt += 1 }
                     }
                 }
             }
         }
 
         shelves.forEach { shelf ->
-            item {
-                SectionHeader(shelf.title)
-            }
+            item { SectionHeader(shelf.title) }
             if (shelf.tracks.isNotEmpty()) {
                 item {
                     Column(Modifier.padding(horizontal = 8.dp)) {
@@ -181,7 +221,9 @@ fun HomeScreen(
                                 track = t,
                                 playing = state.isPlaying,
                                 isCurrent = state.track?.id == t.id,
+                                downloaded = downloadedIds.contains(t.id),
                                 onPlay = { onPlay(shelf.tracks, i) },
+                                onMore = { onMore(t) },
                             )
                         }
                     }
@@ -321,18 +363,44 @@ private fun HeroCard(track: Track, playing: Boolean, onPlay: () -> Unit) {
 }
 
 @Composable
-private fun LoadingRow() {
-    Row(
-        Modifier.fillMaxWidth().padding(horizontal = 20.dp),
-        horizontalArrangement = Arrangement.spacedBy(14.dp),
-    ) {
-        repeat(3) {
-            Box(
-                Modifier
-                    .size(124.dp)
-                    .clip(CircleShape)
-                    .background(Brush.linearGradient(listOf(Ink.Card, Ink.Raised)))
+private fun RecentTile(track: Track, downloaded: Boolean, onClick: () -> Unit) {
+    Column(Modifier.width(96.dp).clickable { onClick() }) {
+        Box {
+            ArtImage(
+                url = track.artUrl,
+                asset = track.artAsset,
+                modifier = Modifier.size(96.dp),
+                shape = RoundedCornerShape(18.dp),
             )
+            if (downloaded) {
+                Box(
+                    Modifier
+                        .align(Alignment.BottomEnd)
+                        .padding(6.dp)
+                        .size(18.dp)
+                        .clip(CircleShape)
+                        .background(Ink.Mint),
+                    contentAlignment = Alignment.Center,
+                ) { Glyph(G.Check, Ink.Void, 10.dp) }
+            }
         }
+        Spacer(Modifier.height(8.dp))
+        Text(
+            track.title,
+            color = Ink.Text,
+            fontSize = 12.sp,
+            fontFamily = SoraFamily,
+            fontWeight = FontWeight.Medium,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+        Text(
+            track.artist,
+            color = Ink.Faint,
+            fontSize = 10.5.sp,
+            fontFamily = SoraFamily,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
     }
 }

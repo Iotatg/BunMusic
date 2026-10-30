@@ -23,7 +23,8 @@ import androidx.compose.ui.unit.dp
 enum class G {
     Play, Pause, Next, Prev, Search, Home, Library, Shuffle, Repeat, RepeatOne,
     Heart, HeartFill, Queue, Back, Forward, More, Plus, Close, Mic, Download,
-    Youtube, Clock, Check, Trash, Filter, Wave, Sparkle, Disc, List, Share, Offline
+    Youtube, Clock, Check, Trash, Filter, Wave, Sparkle, Disc, List, Share, Offline,
+    Compass, Chart, Gear, Moon, Grid, Flame, User, Drag, Speed, PlayCircle, Refresh
 }
 
 @Composable
@@ -221,6 +222,84 @@ private fun DrawScope.drawGlyph(g: G, c: Color, sw: Float) {
         G.Offline -> {
             drawCircle(c, 8.4f, Offset(12f, 12f), style = s)
             line(5.4f, 18.6f, 18.6f, 5.4f)
+        }
+        G.Compass -> {
+            drawCircle(c, 8.4f, Offset(12f, 12f), style = s)
+            fill(15.4f, 8.6f, 13.2f, 13.2f, 8.6f, 15.4f, 10.8f, 10.8f)
+        }
+        G.Chart -> {
+            drawRoundRect(c, Offset(4.4f, 12.4f), Size(3.2f, 7f), androidx.compose.ui.geometry.CornerRadius(1.2f))
+            drawRoundRect(c, Offset(10.4f, 7.2f), Size(3.2f, 12.2f), androidx.compose.ui.geometry.CornerRadius(1.2f))
+            drawRoundRect(c, Offset(16.4f, 10f), Size(3.2f, 9.4f), androidx.compose.ui.geometry.CornerRadius(1.2f))
+        }
+        G.Gear -> {
+            drawCircle(c, 8.3f, Offset(12f, 12f), style = s)
+            drawCircle(c, 3.1f, Offset(12f, 12f), style = s)
+            line(12f, 1.9f, 12f, 4.3f)
+            line(12f, 19.7f, 12f, 22.1f)
+            line(1.9f, 12f, 4.3f, 12f)
+            line(19.7f, 12f, 22.1f, 12f)
+        }
+        G.Moon -> {
+            val p = Path()
+            p.moveTo(15.6f, 3.1f)
+            p.cubicTo(9f, 4.6f, 5.5f, 9.7f, 6.8f, 14.7f)
+            p.cubicTo(8.1f, 19.5f, 13.1f, 21.6f, 18.1f, 19.5f)
+            p.cubicTo(12.6f, 18.3f, 9.5f, 13.3f, 11.2f, 8.5f)
+            p.cubicTo(12f, 6.1f, 13.7f, 4.3f, 15.6f, 3.1f)
+            p.close()
+            drawPath(p, c, style = s)
+        }
+        G.Grid -> {
+            val r = androidx.compose.ui.geometry.CornerRadius(2f)
+            drawRoundRect(c, Offset(3.6f, 3.6f), Size(7f, 7f), r, style = s)
+            drawRoundRect(c, Offset(13.4f, 3.6f), Size(7f, 7f), r, style = s)
+            drawRoundRect(c, Offset(3.6f, 13.4f), Size(7f, 7f), r, style = s)
+            drawRoundRect(c, Offset(13.4f, 13.4f), Size(7f, 7f), r, style = s)
+        }
+        G.Flame -> {
+            val p = Path()
+            p.moveTo(12f, 2.6f)
+            p.cubicTo(15.6f, 7.4f, 18.4f, 9.6f, 18.4f, 13.6f)
+            p.cubicTo(18.4f, 17.6f, 15.4f, 20.7f, 12f, 20.7f)
+            p.cubicTo(8.6f, 20.7f, 5.6f, 17.6f, 5.6f, 13.6f)
+            p.cubicTo(5.6f, 10.6f, 7.6f, 8.6f, 9f, 6.4f)
+            p.cubicTo(9.4f, 8.6f, 10.6f, 9.7f, 11.4f, 9.7f)
+            p.cubicTo(12.5f, 9.7f, 12.8f, 8.4f, 12f, 2.6f)
+            p.close()
+            drawPath(p, c, style = s)
+        }
+        G.User -> {
+            drawCircle(c, 3.5f, Offset(12f, 8.2f), style = s)
+            val p = Path()
+            p.moveTo(4.9f, 20.6f)
+            p.cubicTo(4.9f, 16.2f, 8f, 13.7f, 12f, 13.7f)
+            p.cubicTo(16f, 13.7f, 19.1f, 16.2f, 19.1f, 20.6f)
+            drawPath(p, c, style = s)
+        }
+        G.Drag -> {
+            line(5.4f, 9.2f, 18.6f, 9.2f)
+            line(5.4f, 14.8f, 18.6f, 14.8f)
+        }
+        G.Speed -> {
+            drawArc(
+                c, 165f, 210f, false,
+                topLeft = Offset(3.6f, 5.6f), size = Size(16.8f, 16.8f), style = s,
+            )
+            line(12f, 13.6f, 16.2f, 8.4f)
+            drawCircle(c, 1.3f, Offset(12f, 13.6f))
+        }
+        G.Refresh -> {
+            drawArc(
+                c, -40f, 280f, false,
+                topLeft = Offset(4.2f, 4.2f), size = Size(15.6f, 15.6f), style = s,
+            )
+            line(18.4f, 3.4f, 18.4f, 7.6f)
+            line(18.4f, 7.6f, 14.2f, 7.6f)
+        }
+        G.PlayCircle -> {
+            drawCircle(c, 8.6f, Offset(12f, 12f), style = s)
+            fill(10.2f, 8.2f, 16.4f, 12f, 10.2f, 15.8f)
         }
     }
 }

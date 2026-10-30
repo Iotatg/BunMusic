@@ -70,6 +70,12 @@ fun fmtTime(ms: Long): String {
     return "$m:" + s.toString().padStart(2, '0')
 }
 
+fun fmtDuration(ms: Long): String {
+    if (ms <= 0) return "0 min"
+    val minutes = ms / 60_000
+    return if (minutes < 60) "$minutes min" else "${minutes / 60} hr ${minutes % 60} min"
+}
+
 @Composable
 fun rememberAssetBitmap(path: String?): androidx.compose.ui.graphics.ImageBitmap? {
     val context = LocalContext.current
@@ -108,9 +114,7 @@ fun ArtImage(
             else -> Box(
                 Modifier
                     .fillMaxSize()
-                    .background(
-                        Brush.linearGradient(listOf(Ink.Card, Ink.Line))
-                    ),
+                    .background(Brush.linearGradient(listOf(Ink.Card, Ink.Line))),
                 contentAlignment = Alignment.Center,
             ) {
                 Glyph(G.Disc, Ink.Faint, 22.dp)
@@ -173,15 +177,32 @@ fun Display(text: String, size: Int = 34, color: Color = Ink.Text) {
     )
 }
 
+@Composable
+fun ScreenTitle(title: String, subtitle: String? = null, trailing: @Composable (() -> Unit)? = null) {
+    Row(
+        Modifier.fillMaxWidth().padding(start = 20.dp, end = 20.dp, top = 14.dp, bottom = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(Modifier.weight(1f)) {
+            Display(title, 32)
+            if (subtitle != null) {
+                Spacer(Modifier.height(4.dp))
+                Text(subtitle, color = Ink.Muted, fontSize = 12.sp, fontFamily = SoraFamily)
+            }
+        }
+        trailing?.invoke()
+    }
+}
+
 // -------------------------------------------------------------------- pieces
 
 @Composable
-fun CircleCard(collection: Collection, onClick: () -> Unit) {
-    Column(Modifier.width(124.dp).clickable { onClick() }) {
+fun CircleCard(collection: Collection, onClick: () -> Unit, width: Dp = 124.dp) {
+    Column(Modifier.width(width).clickable { onClick() }) {
         ArtImage(
             url = collection.artUrl,
             asset = collection.artAsset,
-            modifier = Modifier.size(124.dp),
+            modifier = Modifier.size(width),
             shape = CircleShape,
         )
         Spacer(Modifier.height(10.dp))
@@ -245,7 +266,10 @@ fun TrackRow(
     index: Int = -1,
     playing: Boolean = false,
     isCurrent: Boolean = false,
+    liked: Boolean = false,
+    downloaded: Boolean = false,
     onPlay: () -> Unit,
+    onLike: (() -> Unit)? = null,
     onMore: (() -> Unit)? = null,
 ) {
     Row(
@@ -256,6 +280,16 @@ fun TrackRow(
             .padding(horizontal = 12.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
+        if (index >= 0) {
+            Text(
+                "$index",
+                color = if (isCurrent) Ink.Lime else Ink.Faint,
+                fontSize = 11.sp,
+                fontFamily = SoraFamily,
+                modifier = Modifier.width(18.dp),
+            )
+            Spacer(Modifier.width(6.dp))
+        }
         Box(contentAlignment = Alignment.Center) {
             ArtImage(
                 url = track.artUrl,
@@ -282,9 +316,9 @@ fun TrackRow(
                 overflow = TextOverflow.Ellipsis,
             )
             Row(verticalAlignment = Alignment.CenterVertically) {
-                if (track.isLocal) {
+                if (track.isLocal || downloaded) {
                     Text(
-                        "OFFLINE",
+                        if (track.isLocal) "OFFLINE" else "SAVED",
                         color = Ink.Mint,
                         fontSize = 8.sp,
                         fontFamily = SoraFamily,
@@ -309,8 +343,19 @@ fun TrackRow(
         if (track.durationMs > 0) {
             Text(fmtTime(track.durationMs), color = Ink.Faint, fontSize = 11.sp, fontFamily = SoraFamily)
         }
+        if (onLike != null) {
+            Box(
+                Modifier.size(34.dp).clip(CircleShape).clickable { onLike() },
+                contentAlignment = Alignment.Center,
+            ) {
+                Glyph(
+                    if (liked) G.HeartFill else G.Heart,
+                    if (liked) Ink.Rose else Ink.Faint,
+                    16.dp,
+                )
+            }
+        }
         if (onMore != null) {
-            Spacer(Modifier.width(6.dp))
             Box(
                 Modifier.size(32.dp).clip(CircleShape).clickable { onMore() },
                 contentAlignment = Alignment.Center,
@@ -320,7 +365,7 @@ fun TrackRow(
 }
 
 @Composable
-fun EqualizerBars(color: Color) {
+fun EqualizerBars(color: Color, barHeight: Dp = 18.dp) {
     val t = rememberInfiniteTransition(label = "eq")
     val heights = (0..2).map { i ->
         val v by t.animateFloat(
@@ -335,7 +380,7 @@ fun EqualizerBars(color: Color) {
         v
     }
     Row(
-        Modifier.height(18.dp),
+        Modifier.height(barHeight),
         horizontalArrangement = Arrangement.spacedBy(2.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -343,10 +388,161 @@ fun EqualizerBars(color: Color) {
             Box(
                 Modifier
                     .width(2.5.dp)
-                    .height((18 * h).dp)
+                    .height(barHeight * h)
                     .clip(RoundedCornerShape(2.dp))
                     .background(color)
             )
+        }
+    }
+}
+
+// -------------------------------------------------------------------- inputs
+
+@Composable
+fun Chip(
+    text: String,
+    selected: Boolean = false,
+    leading: G? = null,
+    onClick: () -> Unit,
+) {
+    Row(
+        Modifier
+            .clip(RoundedCornerShape(11.dp))
+            .background(if (selected) Ink.Lime else Ink.Card)
+            .clickable { onClick() }
+            .padding(horizontal = 14.dp, vertical = 9.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        if (leading != null) {
+            Glyph(leading, if (selected) Ink.OnAccent else Ink.Muted, 13.dp)
+            Spacer(Modifier.width(6.dp))
+        }
+        Text(
+            text,
+            color = if (selected) Ink.OnAccent else Ink.Muted,
+            fontSize = 12.sp,
+            fontFamily = SoraFamily,
+            fontWeight = FontWeight.Medium,
+        )
+    }
+}
+
+@Composable
+fun IconBtn(glyph: G, tint: Color = Ink.Text, size: Dp = 40.dp, glyphSize: Dp = 18.dp, onClick: () -> Unit) {
+    Box(
+        Modifier.size(size).clip(CircleShape).clickable { onClick() },
+        contentAlignment = Alignment.Center,
+    ) { Glyph(glyph, tint, glyphSize) }
+}
+
+@Composable
+fun FilledBtn(
+    text: String,
+    glyph: G? = null,
+    color: Color = Ink.Lime,
+    contentColor: Color = Ink.OnAccent,
+    onClick: () -> Unit,
+) {
+    Row(
+        Modifier
+            .clip(CircleShape)
+            .background(color)
+            .clickable { onClick() }
+            .padding(horizontal = 18.dp, vertical = 11.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        if (glyph != null) {
+            Glyph(glyph, contentColor, 14.dp)
+            Spacer(Modifier.width(7.dp))
+        }
+        Text(text, color = contentColor, fontSize = 12.5.sp, fontFamily = SoraFamily, fontWeight = FontWeight.SemiBold)
+    }
+}
+
+@Composable
+fun GhostBtn(text: String, glyph: G? = null, onClick: () -> Unit) {
+    Row(
+        Modifier
+            .clip(CircleShape)
+            .background(Color.White.copy(alpha = 0.06f))
+            .border(1.dp, Color.White.copy(alpha = 0.08f), CircleShape)
+            .clickable { onClick() }
+            .padding(horizontal = 16.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        if (glyph != null) {
+            Glyph(glyph, Ink.Text, 14.dp)
+            Spacer(Modifier.width(7.dp))
+        }
+        Text(text, color = Ink.Text, fontSize = 12.sp, fontFamily = SoraFamily, fontWeight = FontWeight.Medium)
+    }
+}
+
+// --------------------------------------------------------------- empty states
+
+@Composable
+fun EmptyState(glyph: G, title: String, body: String, action: String? = null, onAction: (() -> Unit)? = null) {
+    Column(
+        Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 48.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Box(
+            Modifier.size(58.dp).clip(CircleShape).background(Ink.Card),
+            contentAlignment = Alignment.Center,
+        ) { Glyph(glyph, Ink.Faint, 24.dp) }
+        Spacer(Modifier.height(14.dp))
+        Text(title, color = Ink.Text, fontSize = 15.sp, fontFamily = SoraFamily, fontWeight = FontWeight.Medium)
+        Spacer(Modifier.height(5.dp))
+        Text(
+            body,
+            color = Ink.Muted,
+            fontSize = 12.sp,
+            fontFamily = SoraFamily,
+            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+            lineHeight = 18.sp,
+        )
+        if (action != null && onAction != null) {
+            Spacer(Modifier.height(16.dp))
+            FilledBtn(action, G.Plus, onClick = onAction)
+        }
+    }
+}
+
+// ----------------------------------------------------------------- shimmer
+
+@Composable
+fun shimmerBrush(): Brush {
+    val t = rememberInfiniteTransition(label = "shimmer")
+    val x by t.animateFloat(
+        initialValue = -420f,
+        targetValue = 900f,
+        animationSpec = infiniteRepeatable(tween(1500), RepeatMode.Restart),
+        label = "x",
+    )
+    return Brush.linearGradient(
+        colors = listOf(Ink.Card, Ink.Raised, Ink.Card),
+        start = androidx.compose.ui.geometry.Offset(x, 0f),
+        end = androidx.compose.ui.geometry.Offset(x + 420f, 260f),
+    )
+}
+
+@Composable
+fun ShimmerBox(modifier: Modifier, shape: Shape = RoundedCornerShape(14.dp)) {
+    Box(modifier.clip(shape).background(shimmerBrush()))
+}
+
+@Composable
+fun ShimmerRow() {
+    Row(
+        Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        ShimmerBox(Modifier.size(48.dp), RoundedCornerShape(13.dp))
+        Spacer(Modifier.width(12.dp))
+        Column(Modifier.weight(1f)) {
+            ShimmerBox(Modifier.fillMaxWidth(0.62f).height(12.dp), RoundedCornerShape(6.dp))
+            Spacer(Modifier.height(8.dp))
+            ShimmerBox(Modifier.fillMaxWidth(0.38f).height(10.dp), RoundedCornerShape(5.dp))
         }
     }
 }
@@ -443,6 +639,7 @@ fun SeekBar(
     durationMs: Long,
     onSeek: (Long) -> Unit,
     modifier: Modifier = Modifier,
+    activeColor: Color = Ink.Lime,
 ) {
     val value = if (durationMs > 0) (positionMs.toFloat() / durationMs).coerceIn(0f, 1f) else 0f
     var dragging by remember { mutableStateOf(false) }
@@ -458,8 +655,8 @@ fun SeekBar(
         },
         modifier = modifier.fillMaxWidth().height(28.dp),
         colors = SliderDefaults.colors(
-            thumbColor = Ink.Lime,
-            activeTrackColor = Ink.Lime,
+            thumbColor = activeColor,
+            activeTrackColor = activeColor,
             inactiveTrackColor = Color.White.copy(alpha = 0.12f),
         ),
     )

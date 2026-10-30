@@ -1,12 +1,14 @@
 # BunMusic
 
 A dark, quiet music player for Android — built from scratch in Kotlin + Jetpack Compose.
-Six original tracks ship inside the APK, and YouTube Music is wired in for everything else.
+Six original tracks ship inside the APK, YouTube Music is wired in for everything else,
+and anything you like can be saved offline.
 
 ```
 package   app.bunmusic
-version   1.0.0 (1)
+version   1.0.1 (2)
 minSdk    26  ·  target/compile 37
+author    Iota Coder · iota14934@gmail.com
 ```
 
 ---
@@ -23,8 +25,12 @@ A hand-written InnerTube client (`data/YtMusic.kt`) talks to `music.youtube.com`
 | Call | Endpoint | Result |
 |---|---|---|
 | `search(q)` | `/youtubei/v1/search` | songs, albums, artists, playlists — classified from the result's own type token |
-| `home()` | `/youtubei/v1/browse` (`FEmusic_home`) | the real "Quick picks" + editorial carousels |
-| `collection(id)` | `/youtubei/v1/browse` | album / artist / playlist pages with full track lists |
+| `suggestions(q)` | `suggestqueries-clients6` | type-ahead while you type |
+| `home()` | `browse · FEmusic_home` | real "Quick picks" + editorial carousels |
+| `explore()` | `browse · FEmusic_explore` | new albums, 32 mood tiles, trending list |
+| `charts()` | `browse · FEmusic_charts` | top artists, top videos, trending playlists |
+| `browseShelves(id, params)` | `browse · any` | mood / genre pages |
+| `collection(id)` | `browse` | album / artist / playlist pages with full track lists |
 
 Stream URLs are resolved by `data/YtStream.kt`, which tries the NewPipe-style extractor
 first (handles signature deciphering) and then falls back through four InnerTube clients
@@ -32,16 +38,27 @@ first (handles signature deciphering) and then falls back through four InnerTube
 
 **Playback**
 Media3 ExoPlayer behind a `MediaSessionService` — background playback, lock-screen and
-notification controls, audio focus, becoming-noisy handling. Queue, shuffle, three repeat
-modes, seek, next/previous, and automatic advance.
+notification controls, audio focus, becoming-noisy handling. Queue with remove / clear /
+reorder, shuffle, three repeat modes, seek, speed (0.5×–2×), sleep timer (5–60 min or
+end-of-track), automatic advance.
+
+**Downloads**
+Any track can be saved to app-private storage. The player prefers the local file over the
+network automatically, downloads show progress, and the Downloads screen totals the space.
 
 **Lyrics**
-Synced, from [LRCLIB](https://lrclib.net) — the current line is highlighted and the sheet
-auto-scrolls while the track plays. Falls back to plain text when only unsynced lyrics exist.
+Multi-provider and fail-soft: LRCLIB exact match (synced LRC) → LRCLIB search →
+[lyrics.ovh](https://lyrics.ovh) plain text. The current line is highlighted and the sheet
+auto-scrolls; the player also shows a one-line lyric peek under the artwork.
 
 **Library**
-Likes and recently-played persist in `SharedPreferences`; playlists, liked and recent are
-three tabs in one screen.
+Likes, playlists, history and listening stats persist in `SharedPreferences`. Playlists can
+be created, renamed, reordered and deleted. The Library has four tabs — Playlists, Liked,
+Recent, Downloaded — plus shortcuts to Downloads and Stats.
+
+**Stats**
+Listening time, play count, active days, a seven-day bar chart, and ranked bars for top
+artists and top tracks. Counted on device only.
 
 ---
 
@@ -59,9 +76,10 @@ The visual language is deliberate and entirely custom — no Material template, 
 | `Ink.Text` | `#F4F1E9` | primary type |
 
 - **Type** — [Sora](https://fonts.google.com/specimen/Sora) for UI, [Instrument Serif](https://fonts.google.com/specimen/Instrument+Serif) for titles and lyrics.
-- **Icons** — every glyph in `core/Glyphs.kt` is drawn with Canvas paths on a 24×24 grid. 31 icons, zero dependencies.
-- **Player** — circular artwork that rotates only while playing, radial lavender glow, 74 dp lime transport button.
-- **Mini player** — glassy pill with a 2.5 dp progress hairline, sitting above the nav bar.
+- **Icons** — every glyph in `core/Glyphs.kt` is drawn with Canvas paths on a 24×24 grid. 41 icons, zero dependencies.
+- **Ambient colour** — each track gets a stable hue derived from its id (`core/Ambient.kt`), used for the player wash, seek bar and mood tiles.
+- **Player styles** — three layouts: rotating **Disc**, grooved **Vinyl** with a tone arm, and full-bleed **Card**.
+- **Motion** — depth-aware screen transitions, spring-free eased fades, shimmer skeletons while loading, a floating glass nav pill with a lime indicator.
 
 ---
 
@@ -73,25 +91,33 @@ app/src/main/java/app/bunmusic/
 ├── MainActivity.kt           single activity, edge-to-edge
 ├── core/
 │   ├── Theme.kt              palette, typography, Material 3 scheme
-│   └── Glyphs.kt             hand-drawn icon set
+│   ├── Glyphs.kt             hand-drawn icon set
+│   └── Ambient.kt            per-track colour derivation
 ├── data/
-│   ├── Models.kt             Track / Collection / Shelf / Lyrics
+│   ├── Models.kt             Track / Collection / Shelf / Lyrics / Playlist / Mood
 │   ├── Catalog.kt            the six bundled tracks + playlists
-│   ├── YtMusic.kt            InnerTube client (search, home, browse)
+│   ├── YtMusic.kt            InnerTube client (search, home, explore, charts, browse)
 │   ├── YtStream.kt           stream resolution (extractor + 4 clients)
-│   ├── LyricsApi.kt          LRCLIB + LRC parser
-│   └── Store.kt              likes & recents
+│   ├── LyricsApi.kt          LRCLIB + lyrics.ovh, LRC parser, cache
+│   ├── Store.kt              likes, playlists, history, stats, search history
+│   ├── Downloads.kt          offline download manager
+│   └── Prefs.kt              quality, player style, glow, crossfade…
 ├── player/
-│   ├── Playback.kt           ExoPlayer singleton + queue state
+│   ├── Playback.kt           ExoPlayer singleton + queue, speed, sleep timer
 │   └── PlaybackService.kt    MediaSessionService
 └── ui/
-    ├── Root.kt               routes, bottom bar, mini player
-    ├── Components.kt         artwork, rows, cards, seek bar
+    ├── Root.kt               routes, animated transitions, glass nav, mini player
+    ├── Components.kt         artwork, rows, cards, chips, shimmer, seek bar
     ├── HomeScreen.kt
-    ├── SearchScreen.kt
-    ├── LibraryScreen.kt
-    ├── DetailScreen.kt       album / artist / playlist
-    └── PlayerScreen.kt       full player, queue sheet, lyrics sheet
+    ├── ExploreScreen.kt      moods, new releases, charts entry, mood pages
+    ├── SearchScreen.kt       suggestions, history, filters
+    ├── LibraryScreen.kt      playlists / liked / recent / downloads
+    ├── PlaylistScreen.kt     local playlist editing
+    ├── DetailScreen.kt       album / artist / playlist / charts
+    ├── StatsScreen.kt        stats + downloads screens
+    ├── SettingsScreen.kt     playback, appearance, storage, about
+    ├── Sheets.kt             track actions, playlist picker, sleep timer
+    └── PlayerScreen.kt       full player, 3 styles, queue, lyrics, speed
 ```
 
 ---
@@ -104,9 +130,8 @@ export ANDROID_HOME=/path/to/android-sdk
 ./gradlew :app:testDebugUnitTest    # live checks against YouTube Music + LRCLIB
 ```
 
-The unit tests hit the real endpoints, so they need network access. They verify that search
-returns songs, the home feed returns shelves, an album page returns tracks, and that stream
-resolution either succeeds or fails with a clear, catchable error.
+The unit tests hit the real endpoints, so they need network access. They verify search,
+home, album pages, Explore, Charts and mood pages.
 
 ---
 
@@ -115,8 +140,10 @@ resolution either succeeds or fails with a clear, catchable error.
 - **Streaming depends on the network you are on.** From a data-centre IP, YouTube answers
   `Sign in to confirm you're not a bot` for every client. On a normal phone connection the
   extractor path works; when it doesn't, the player shows the reason instead of hanging.
-- **No offline downloads** of YouTube tracks. Only the six bundled tracks are offline.
-- **No account sync.** Likes and history live on the device.
+- **Not implemented yet:** Discord Rich Presence, Last.fm scrobbling, song recognition,
+  synced group listening, account login, equaliser, word-by-word lyrics, Android Auto and
+  the home-screen widget. They are on the list, not in this build.
+- **No account sync.** Likes, playlists and history live on the device.
 - **Debug builds** install as `app.bunmusic.debug`, so they can sit next to the release build.
 
 ---
@@ -124,7 +151,7 @@ resolution either succeeds or fails with a clear, catchable error.
 ## Credits
 
 - Stream extraction: [BravePipeExtractor](https://github.com/maxrave-dev/BravePipeExtractor) (Apache-2.0), used as a library.
-- Lyrics: [LRCLIB](https://lrclib.net).
+- Lyrics: [LRCLIB](https://lrclib.net) and [lyrics.ovh](https://lyrics.ovh).
 - Fonts: Sora and Instrument Serif (SIL Open Font License).
 - Bundled audio and artwork were generated for this project — no third-party samples.
 
