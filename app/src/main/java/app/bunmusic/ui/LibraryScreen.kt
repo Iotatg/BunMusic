@@ -43,7 +43,6 @@ import app.bunmusic.core.G
 import app.bunmusic.core.Glyph
 import app.bunmusic.core.Ink
 import app.bunmusic.core.SoraFamily
-import app.bunmusic.data.Catalog
 import app.bunmusic.data.Collection
 import app.bunmusic.data.Downloads
 import app.bunmusic.data.Playlist
@@ -75,7 +74,7 @@ fun LibraryScreen(
         item {
             ScreenTitle(
                 "Library",
-                "${Catalog.tracks.size} offline · ${liked.size} liked · ${playlists.size} playlists",
+                "${downloads.size} saved · ${liked.size} liked · ${playlists.size} playlists",
                 trailing = {
                     IconBtn(G.Chart, Ink.Muted, 38.dp, 18.dp, onOpenStats)
                 },
@@ -90,11 +89,9 @@ fun LibraryScreen(
                 )
                 Spacer(Modifier.width(10.dp))
                 ShortcutCard(
-                    "Offline", "${Catalog.tracks.size} bundled", G.Offline, Ink.Lavender,
-                    Modifier.weight(1f),
-                ) {
-                    onOpenCollection(Catalog.collections.first())
-                }
+                    "Stats", "Time, top artists", G.Chart, Ink.Lavender,
+                    Modifier.weight(1f), onOpenStats,
+                )
             }
         }
 
@@ -149,18 +146,6 @@ fun LibraryScreen(
                 }
             }
 
-            item { SectionHeader("Bundled collections") }
-            items(Catalog.collections.chunked(2)) { pair ->
-                Row(
-                    Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 8.dp),
-                    horizontalArrangement = Arrangement.spacedBy(16.dp),
-                ) {
-                    pair.forEach { c ->
-                        Box(Modifier.weight(1f)) { SquareCard(c, onClick = { onOpenCollection(c) }, width = 160.dp) }
-                    }
-                    if (pair.size == 1) Spacer(Modifier.weight(1f))
-                }
-            }
         }
 
         if (tab == 1) {

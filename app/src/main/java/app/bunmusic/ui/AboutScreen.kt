@@ -47,7 +47,7 @@ fun AboutScreen(onBack: () -> Unit) {
                 Display("BunMusic", 32)
                 Spacer(Modifier.height(4.dp))
                 Text(
-                    "1.0.3 · build 4 · ${Skin.current.title} bun",
+                    "1.0.4 · build 5 · ${Skin.current.title} bun",
                     color = Ink.Muted, fontSize = 12.sp, fontFamily = SoraFamily,
                 )
             }
@@ -56,7 +56,10 @@ fun AboutScreen(onBack: () -> Unit) {
         item { GroupTitle("What's new") }
         item {
             AboutCard {
-                Change("Buns", "A whole-app skin system, switched from Settings and applied by restart")
+                Change("Bun switch fixed", "The choice is now written to disk before the restart, so it survives")
+                Change("No bundled audio", "The six demo tracks are gone — 3.6 MB lighter, streaming only")
+                Change("Stream cache", "Anything you play is cached as it buffers; LRU, 512 MB by default, clearable")
+                Change("Image cache", "Cover art has its own 220 MB ceiling and its own clear button")
                 Change("Charcoal", "A second bun: paper white, charcoal ink, Inter, waveform seek bar")
                 Change("Hotlist", "A ranked chart tab, straight from YouTube's top songs")
                 Change("Queue editing", "Drag to reorder, and save the queue as a playlist")
@@ -69,7 +72,7 @@ fun AboutScreen(onBack: () -> Unit) {
         item { GroupTitle("Build") }
         item {
             AboutCard {
-                Fact("Version", "1.0.3 (4)")
+                Fact("Version", "1.0.4 (5)")
                 Fact("Package", "app.bunmusic")
                 Fact("Min SDK", "26 · Android 8.0")
                 Fact("Target SDK", "37")

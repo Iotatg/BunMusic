@@ -52,6 +52,8 @@ object Prefs {
         val haptics: Boolean = true,
         /** Shift applied to synced lyrics, milliseconds. */
         val lyricsOffsetMs: Int = 0,
+        /** Stream cache ceiling in MB: 0 = off, -1 = unlimited. */
+        val cacheLimitMb: Int = 512,
     )
 
     private lateinit var sp: SharedPreferences
@@ -86,6 +88,7 @@ object Prefs {
             skin = sp.getString("skin", d.skin) ?: d.skin,
             haptics = sp.getBoolean("haptics", d.haptics),
             lyricsOffsetMs = sp.getInt("lyricsOffset", d.lyricsOffsetMs),
+            cacheLimitMb = sp.getInt("cacheLimit", d.cacheLimitMb),
         )
     }
 
@@ -113,6 +116,7 @@ object Prefs {
             .putString("skin", next.skin)
             .putBoolean("haptics", next.haptics)
             .putInt("lyricsOffset", next.lyricsOffsetMs)
+            .putInt("cacheLimit", next.cacheLimitMb)
             .apply()
     }
 }

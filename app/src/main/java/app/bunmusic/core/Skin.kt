@@ -5,6 +5,7 @@ import android.app.AlarmManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
+import android.content.SharedPreferences
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -151,9 +152,29 @@ object Skin {
 
     val light: Boolean get() = p.light
 
+    /**
+     * The bun is stored in its own tiny preferences file, written with [commit]
+     * rather than [SharedPreferences.Editor.apply].
+     *
+     * That detail is the whole reason switching used to fail: `apply()` hands the
+     * write to a background thread, and we kill the process a moment later, so the
+     * choice never reached the disk and the next launch read the old bun back.
+     * `commit()` blocks until the bytes are written.
+     */
+    private const val FILE = "bun_skin"
+    private const val KEY = "skin"
+
+    private fun store(context: Context): SharedPreferences =
+        context.getSharedPreferences(FILE, Context.MODE_PRIVATE)
+
     fun load(context: Context) {
         Prefs.init(context)
-        current = BunSkin.of(Prefs.settings.value.skin)
+        val stored = store(context).getString(KEY, null) ?: Prefs.settings.value.skin
+        current = BunSkin.of(stored)
+        // keep the two stores honest if one of them was written by an older build
+        if (stored != Prefs.settings.value.skin) {
+            Prefs.update { it.copy(skin = stored) }
+        }
     }
 
     /**
@@ -162,8 +183,13 @@ object Skin {
      * a cold state — no stale colours, no half-swapped typography.
      */
     fun apply(context: Context, skin: BunSkin) {
+        val written = store(context).edit().putString(KEY, skin.id).commit()
         Prefs.update { it.copy(skin = skin.id) }
         current = skin
+        if (!written) {
+            // Disk refused the write — restarting would only reload the old bun.
+            return
+        }
         restart(context)
     }
 
@@ -178,11 +204,21 @@ object Skin {
             intent,
             PendingIntent.FLAG_CANCEL_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
-        runCatching {
+        // Long enough that the kill below always lands before the relaunch, short
+        // enough that it feels like a tap. If the alarm cannot be scheduled, launch
+        // directly instead of leaving the listener staring at a dead screen.
+        val scheduled = runCatching {
             val alarms = app.getSystemService(Context.ALARM_SERVICE) as AlarmManager
-            alarms.set(AlarmManager.RTC, System.currentTimeMillis() + 150, pending)
-        }
+            alarms.set(AlarmManager.RTC, System.currentTimeMillis() + 400, pending)
+            true
+        }.getOrDefault(false)
+
         (context as? Activity)?.finishAffinity()
-        android.os.Process.killProcess(android.os.Process.myPid())
+        if (scheduled) {
+            android.os.Process.killProcess(android.os.Process.myPid())
+        } else {
+            runCatching { app.startActivity(intent) }
+            android.os.Process.killProcess(android.os.Process.myPid())
+        }
     }
 }

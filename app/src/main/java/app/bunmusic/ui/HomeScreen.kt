@@ -43,7 +43,6 @@ import app.bunmusic.core.Glyph
 import app.bunmusic.core.Ink
 import app.bunmusic.core.SerifFamily
 import app.bunmusic.core.SoraFamily
-import app.bunmusic.data.Catalog
 import app.bunmusic.data.Collection
 import app.bunmusic.data.Mood
 import app.bunmusic.data.Shelf
@@ -109,7 +108,7 @@ fun HomeScreen(
                 Display(greeting(), 33)
                 Spacer(Modifier.height(4.dp))
                 Text(
-                    "Six originals offline, plus everything on YouTube Music.",
+                    "Everything on YouTube Music — nothing bundled, nothing wasted.",
                     color = Ink.Muted,
                     fontSize = 12.5.sp,
                     fontFamily = SoraFamily,
@@ -122,11 +121,12 @@ fun HomeScreen(
         item { Spacer(Modifier.height(18.dp)) }
 
         item {
-            HeroCard(
-                track = state.track ?: Catalog.hero,
-                playing = state.isPlaying,
-                onPlay = { onOpenPlayer() },
-            )
+            val hero = state.track ?: recents.firstOrNull()
+            if (hero != null) {
+                HeroCard(track = hero, playing = state.isPlaying, onPlay = { onOpenPlayer() })
+            } else {
+                StartCard(onOpenSearch = onOpenSearch)
+            }
         }
 
         if (moods.isNotEmpty()) {
@@ -155,32 +155,6 @@ fun HomeScreen(
                             onPlay(recents, recents.indexOf(t))
                         }
                     }
-                }
-            }
-        }
-
-        item { SectionHeader("Made for you") }
-        item {
-            LazyRow(
-                contentPadding = PaddingValues(horizontal = 20.dp),
-                horizontalArrangement = Arrangement.spacedBy(14.dp),
-            ) {
-                items(Catalog.collections) { c -> SquareCard(c, onClick = { onOpenCollection(c) }) }
-            }
-        }
-
-        item { SectionHeader("Offline, always") }
-        item {
-            Column(Modifier.padding(horizontal = 8.dp)) {
-                Catalog.tracks.take(3).forEachIndexed { i, t ->
-                    TrackRow(
-                        track = t,
-                        playing = state.isPlaying,
-                        isCurrent = state.track?.id == t.id,
-                        downloaded = true,
-                        onPlay = { onPlay(Catalog.tracks, i) },
-                        onMore = { onMore(t) },
-                    )
                 }
             }
         }
@@ -277,6 +251,42 @@ private fun SearchPill(onClick: () -> Unit, modifier: Modifier = Modifier) {
         ) {
             Text("YT", color = Ink.Lime, fontSize = 9.sp, fontFamily = SoraFamily, fontWeight = FontWeight.Bold)
         }
+    }
+}
+
+/**
+ * What the home screen shows before anything has been played: no fake shelf, no
+ * bundled demo track — just the way in.
+ */
+@Composable
+private fun StartCard(onOpenSearch: () -> Unit) {
+    Column(
+        Modifier
+            .padding(horizontal = 20.dp)
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(28.dp))
+            .background(Ink.Card)
+            .clickable { onOpenSearch() }
+            .padding(22.dp),
+    ) {
+        Text(
+            "Nothing playing yet",
+            color = Ink.Text,
+            fontSize = 22.sp,
+            fontFamily = SerifFamily,
+            lineHeight = 26.sp,
+        )
+        Spacer(Modifier.height(6.dp))
+        Text(
+            "Search for a song, an artist or a mood. Anything you play is kept here, and " +
+                "what you play twice is already cached.",
+            color = Ink.Muted,
+            fontSize = 12.sp,
+            fontFamily = SoraFamily,
+            lineHeight = 18.sp,
+        )
+        Spacer(Modifier.height(16.dp))
+        FilledBtn("Find something", G.Search, onClick = onOpenSearch)
     }
 }
 

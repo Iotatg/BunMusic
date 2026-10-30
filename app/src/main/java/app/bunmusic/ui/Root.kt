@@ -180,10 +180,7 @@ private fun Shell(guest: Boolean, onLeaveGuest: () -> Unit) {
                             onOpenCollection = openCollection,
                             onOpenMood = { m -> push(Route.MoodPage(m.title, m.browseId, m.params)) },
                             onPlay = { list, i -> Playback.play(list, i) },
-                            onOpenPlayer = {
-                                if (!state.hasTrack) Playback.play(app.bunmusic.data.Catalog.tracks, 0)
-                                playerOpen = true
-                            },
+                            onOpenPlayer = { if (state.hasTrack) playerOpen = true },
                             onMore = { sheetTrack = it },
                             onOpenSettings = { push(Route.Settings) },
                         )

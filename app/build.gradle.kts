@@ -11,8 +11,8 @@ android {
         applicationId = "app.bunmusic"
         minSdk = 26
         targetSdk = 37
-        versionCode = 4
-        versionName = "1.0.3"
+        versionCode = 5
+        versionName = "1.0.4"
         vectorDrawables.useSupportLibrary = true
     }
 
@@ -87,6 +87,7 @@ dependencies {
     implementation("androidx.media3:media3-exoplayer:1.11.1")
     implementation("androidx.media3:media3-session:1.11.1")
     implementation("androidx.media3:media3-datasource-okhttp:1.11.1")
+    implementation("androidx.media3:media3-database:1.11.1")
 
     // Google Sign-In (Play services account picker)
     implementation("com.google.android.gms:play-services-auth:21.2.0")

@@ -8,6 +8,7 @@ import androidx.media3.common.MediaMetadata
 import androidx.media3.common.PlaybackParameters
 import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
+import app.bunmusic.data.Cache
 import app.bunmusic.data.Downloads
 import app.bunmusic.data.Eq
 import app.bunmusic.data.Prefs
@@ -78,14 +79,11 @@ object Playback {
         appContext = context.applicationContext
         YtStream.warmUp()
 
-        val dataSource = androidx.media3.datasource.DefaultHttpDataSource.Factory()
-            .setUserAgent("Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Mobile Safari/537.36")
-            .setConnectTimeoutMs(15000)
-            .setReadTimeoutMs(25000)
-            .setAllowCrossProtocolRedirects(true)
-
         val p = ExoPlayer.Builder(appContext)
-            .setMediaSourceFactory(androidx.media3.exoplayer.source.DefaultMediaSourceFactory(dataSource))
+            // Network reads pass through the stream cache; local files do not (see load()).
+            .setMediaSourceFactory(
+                androidx.media3.exoplayer.source.DefaultMediaSourceFactory(Cache.deferredFactory())
+            )
             .setHandleAudioBecomingNoisy(true)
             .build().apply {
                 setAudioAttributes(
@@ -421,7 +419,21 @@ object Playback {
                         .build()
                 )
                 .build()
-            p.setMediaItem(item)
+            // A downloaded track is read straight off disk — routing it through the
+            // cache would store the same bytes twice for no benefit.
+            if (local != null || track.isLocal) {
+                p.setMediaSource(
+                    androidx.media3.exoplayer.source.ProgressiveMediaSource
+                        .Factory(androidx.media3.datasource.DefaultDataSource.Factory(appContext))
+                        .createMediaSource(item)
+                )
+            } else {
+                p.setMediaSource(
+                    androidx.media3.exoplayer.source.ProgressiveMediaSource
+                        .Factory(Cache.deferredFactory())
+                        .createMediaSource(item)
+                )
+            }
             p.prepare()
             bindEffects(p)
             if (autoplay) p.play()

@@ -42,7 +42,6 @@ import app.bunmusic.core.Glyph
 import app.bunmusic.core.Ink
 import app.bunmusic.core.SerifFamily
 import app.bunmusic.core.SoraFamily
-import app.bunmusic.data.Catalog
 import app.bunmusic.data.Collection
 import app.bunmusic.data.CollectionKind
 import app.bunmusic.data.Shelf
@@ -220,8 +219,7 @@ fun DetailScreen(
         loading = true
         failed = false
         if (browseId == null) {
-            val local = Catalog.collectionById(title)
-            tracks = Catalog.tracksFor(local?.id ?: "")
+            // Nothing to fetch: this page is a shell (e.g. a section header).
             loading = false
             return@LaunchedEffect
         }

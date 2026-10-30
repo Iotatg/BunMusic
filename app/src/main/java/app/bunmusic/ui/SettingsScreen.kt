@@ -27,7 +27,9 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
@@ -46,10 +48,12 @@ import app.bunmusic.core.Skin
 import app.bunmusic.core.SoraFamily
 import app.bunmusic.data.Auth
 import app.bunmusic.data.Backup
+import app.bunmusic.data.Cache
 import app.bunmusic.data.Downloads
 import app.bunmusic.data.Eq
 import app.bunmusic.data.Prefs
 import app.bunmusic.data.Store
+import app.bunmusic.player.Playback
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -73,6 +77,13 @@ fun SettingsScreen(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var googleSheet by remember { mutableStateOf(false) }
+    var cacheTick by remember { mutableIntStateOf(0) }
+    val streamBytes by produceState(0L, cacheTick) {
+        value = withContext(Dispatchers.IO) { Cache.streamBytes() }
+    }
+    val imageBytes by produceState(0L, cacheTick) {
+        value = withContext(Dispatchers.IO) { Cache.imageBytes() }
+    }
 
     val exportLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.CreateDocument("application/json")
@@ -127,7 +138,7 @@ fun SettingsScreen(
                 Display("Settings", 30)
                 Spacer(Modifier.height(4.dp))
                 Text(
-                    "BunMusic 1.0.3 · Iota Coder",
+                    "BunMusic 1.0.4 · Iota Coder",
                     color = Ink.Muted, fontSize = 12.sp, fontFamily = SoraFamily,
                 )
             }
@@ -285,6 +296,54 @@ fun SettingsScreen(
         item { GroupLabel("Storage") }
         item {
             SettingsCard {
+                ChoiceRow(
+                    "Stream cache",
+                    when (settings.cacheLimitMb) {
+                        0 -> "Off — every play re-downloads"
+                        -1 -> "Unlimited · ${fmtBytes(streamBytes)} used"
+                        else -> "Up to ${settings.cacheLimitMb} MB · ${fmtBytes(streamBytes)} used"
+                    },
+                ) {
+                    listOf(0, 256, 512, 1024, -1).forEach { mb ->
+                        Chip(
+                            when (mb) {
+                                0 -> "Off"
+                                -1 -> "Max"
+                                else -> if (mb >= 1024) "1 GB" else "$mb MB"
+                            },
+                            selected = settings.cacheLimitMb == mb,
+                        ) {
+                            Prefs.update { it.copy(cacheLimitMb = mb) }
+                            Cache.onLimitChanged(playbackActive = Playback.state.value.hasTrack)
+                            cacheTick++
+                        }
+                    }
+                }
+                Divider()
+                NavRow(
+                    "Clear stream cache",
+                    if (streamBytes == 0L) "Empty" else "${fmtBytes(streamBytes)} of audio",
+                    G.Trash,
+                ) {
+                    // A cache cannot be deleted from under a decoder: stop first,
+                    // then clear, and say so rather than silently cutting the music.
+                    val wasPlaying = Playback.state.value.hasTrack
+                    if (wasPlaying) Playback.stop()
+                    Cache.clearStream()
+                    cacheTick++
+                    onToast(if (wasPlaying) "Playback stopped · cache cleared" else "Stream cache cleared")
+                }
+                Divider()
+                NavRow(
+                    "Clear image cache",
+                    if (imageBytes == 0L) "Empty" else "${fmtBytes(imageBytes)} of cover art",
+                    G.Trash,
+                ) {
+                    Cache.clearImages()
+                    cacheTick++
+                    onToast("Image cache cleared")
+                }
+                Divider()
                 NavRow(
                     "Downloads",
                     "${downloads.size} tracks · ${fmtBytes(downloads.sumOf { it.bytes })}",
@@ -362,7 +421,7 @@ fun SettingsScreen(
         item { GroupLabel("About") }
         item {
             SettingsCard {
-                NavRow("About BunMusic", "1.0.3 (build 4) · what changed", G.Sparkle) { onOpenAbout() }
+                NavRow("About BunMusic", "1.0.4 (build 5) · what changed", G.Sparkle) { onOpenAbout() }
                 Divider()
                 NavRow("Built by", "Iota Coder · iota14934@gmail.com", G.User) { }
                 Divider()

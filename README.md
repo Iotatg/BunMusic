@@ -2,12 +2,12 @@
 
 A quiet music player for Android — built from scratch in Kotlin + Jetpack Compose.
 Two skins, "buns", and you pick which one the app wears.
-Six original tracks ship inside the APK, YouTube Music is wired in for everything else,
-and anything you like can be saved offline.
+Nothing is bundled: every track comes from YouTube Music, and anything you like can be
+saved offline.
 
 ```
 package   app.bunmusic
-version   1.0.3 (4)
+version   1.0.4 (5)
 minSdk    26  ·  target/compile 37
 author    Iota Coder · iota14934@gmail.com
 ```
@@ -48,9 +48,21 @@ link an email to a phone account, sign out, or delete the account and everything
 > package name and SHA-1, then takes the client ID at runtime. No ID, no fake login — the app
 > says so plainly.
 
-**Offline, always**
-Six instrumental pieces and their cover art are bundled in `assets/`. They play with no
-network, no login, no ads — the app is useful the second it is installed.
+**Cache, not clutter**
+Two disk caches, kept apart on purpose:
+
+| Cache | Where | Ceiling | Cleared by |
+|---|---|---|---|
+| Stream | `filesDir/stream` | 256 MB – 1 GB, or off / unlimited | Settings → Storage, or LRU |
+| Cover art | `cacheDir/art` | 220 MB | Settings → Storage |
+
+Anything played from the network is written as it buffers, so a replay, a scrub back or the
+same song tomorrow costs no data. The ceiling is a least-recently-used evictor, so a full
+cache drops the oldest audio rather than refusing the new track.
+
+Downloads are **not** a cache: they live in their own folder with no evictor, because "saved"
+has to mean saved — and the player reads them straight off disk instead of copying the same
+bytes into the cache.
 
 **YouTube Music, wired in**
 A hand-written InnerTube client (`data/YtMusic.kt`) talks to `music.youtube.com` directly:
@@ -149,7 +161,7 @@ app/src/main/java/app/bunmusic/
 │   └── Ambient.kt            per-track colour derivation
 ├── data/
 │   ├── Models.kt             Track / Collection / Shelf / Lyrics / Playlist / Mood
-│   ├── Catalog.kt            the six bundled tracks + playlists
+│   ├── Cache.kt              stream cache (LRU) + cover-art cache
 │   ├── YtMusic.kt            InnerTube client (search, home, explore, charts, radio)
 │   ├── YtStream.kt           stream resolution (extractor + 4 clients)
 │   ├── LyricsApi.kt          LRCLIB + lyrics.ovh, LRC parser, cache
@@ -216,6 +228,10 @@ home, album pages, Explore, Charts, mood pages and the automix radio queue.
 
 ## Changelog
 
+**1.0.4** — bun switch fixed (the choice is committed to disk before the restart), bundled
+demo audio removed (3.6 MB lighter), stream cache with an LRU ceiling and a size readout,
+cover-art cache with its own ceiling, both clearable from Storage.
+
 **1.0.3** — the Buns skin system with a second full bun (Charcoal), Hotlist chart tab,
 drag-to-reorder queue with "save queue as playlist", lyrics offset, haptics, About screen,
 Inter bundled, every hard-coded colour folded into the palette.
@@ -226,7 +242,7 @@ voice search, 11 new hand-drawn icons.
 
 **1.0.1** — Explore, Charts, mood pages, sleep timer, playback speed, queue editing, stats.
 
-**1.0.0** — first end-to-end build: bundled catalog, YouTube search, downloads, lyrics.
+**1.0.0** — first end-to-end build: bundled demo catalog, YouTube search, downloads, lyrics.
 
 ---
 
@@ -235,7 +251,8 @@ voice search, 11 new hand-drawn icons.
 - Stream extraction: [BravePipeExtractor](https://github.com/maxrave-dev/BravePipeExtractor) (Apache-2.0), used as a library.
 - Lyrics: [LRCLIB](https://lrclib.net) and [lyrics.ovh](https://lyrics.ovh).
 - Fonts: Sora and Instrument Serif (SIL Open Font License).
-- Bundled audio and artwork were generated for this project — no third-party samples.
+- The 1.0.0 demo tracks were original recordings made for this project; they were removed in
+  1.0.4 so the APK ships no audio at all.
 
 BunMusic is an independent project by **Iota Coder**. It is not affiliated with, endorsed by,
 or connected to YouTube or Google.
