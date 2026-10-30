@@ -30,6 +30,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -89,7 +90,7 @@ private val Route.depth: Int
     }
 
 @Composable
-fun Root() {
+fun Root(openPlayerOnStart: Boolean = false) {
     val account by Auth.account.collectAsState()
     var guest by remember { mutableStateOf(Auth.guest) }
 
@@ -101,15 +102,17 @@ fun Root() {
         return
     }
 
-    Shell(guest = guest, onLeaveGuest = { guest = false })
+    Shell(guest = guest, onLeaveGuest = { guest = false }, openPlayerOnStart = openPlayerOnStart)
 }
 
 @Composable
-private fun Shell(guest: Boolean, onLeaveGuest: () -> Unit) {
+private fun Shell(guest: Boolean, onLeaveGuest: () -> Unit, openPlayerOnStart: Boolean = false) {
     val state by Playback.state.collectAsState()
     val downloads by Downloads.entries.collectAsState()
     var stack by remember { mutableStateOf<List<Route>>(listOf(Route.Home)) }
     var playerOpen by remember { mutableStateOf(false) }
+    // A tap on the home-screen widget drops the user straight into the player.
+    LaunchedEffect(openPlayerOnStart) { if (openPlayerOnStart) playerOpen = true }
     var sheetTrack by remember { mutableStateOf<Track?>(null) }
     var toast by remember { mutableStateOf<String?>(null) }
 

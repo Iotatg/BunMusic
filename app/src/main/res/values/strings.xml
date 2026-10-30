@@ -2,4 +2,6 @@
 <resources>
     <string name="app_name">BunMusic</string>
     <string name="channel_playback">Playback</string>
+    <string name="widget_label">BunMusic now playing</string>
+    <string name="widget_description">Control playback without opening the app.</string>
 </resources>

@@ -84,6 +84,12 @@ fun SettingsScreen(
     val imageBytes by produceState(0L, cacheTick) {
         value = withContext(Dispatchers.IO) { Cache.imageBytes() }
     }
+    val offlineCount by produceState(0, cacheTick) {
+        value = withContext(Dispatchers.IO) {
+            Cache.refreshIndex()
+            Cache.offlineCount()
+        }
+    }
 
     val exportLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.CreateDocument("application/json")
@@ -318,6 +324,29 @@ fun SettingsScreen(
                             cacheTick++
                         }
                     }
+                }
+                Divider()
+                ToggleRow(
+                    "Cache songs as they play",
+                    if (settings.cacheLimitMb == 0) {
+                        "Turn the stream cache on first"
+                    } else {
+                        "$offlineCount songs playable offline · each track is kept once it starts"
+                    },
+                    settings.prefetchAhead && settings.cacheLimitMb != 0,
+                ) { v ->
+                    if (settings.cacheLimitMb == 0 && v) {
+                        Prefs.update { it.copy(cacheLimitMb = 512, prefetchAhead = true) }
+                        Cache.onLimitChanged(playbackActive = Playback.state.value.hasTrack)
+                    } else {
+                        Prefs.update { it.copy(prefetchAhead = v) }
+                    }
+                    cacheTick++
+                }
+                Divider()
+                ToggleRow("Skip silent gaps", "Jumps over silence inside a track", settings.skipSilence) { v ->
+                    Prefs.update { it.copy(skipSilence = v) }
+                    Playback.applySkipSilence(v)
                 }
                 Divider()
                 NavRow(

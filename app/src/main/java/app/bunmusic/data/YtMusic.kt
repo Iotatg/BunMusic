@@ -509,7 +509,7 @@ object YtMusic {
             } else if (e is JsonArray) for (v in e) walk(v)
         }
         if (o != null) walk(o)
-        return found.distinct()
+        return found.map { hq(it) }.distinct()
     }
 
     private fun findString(e: JsonElement?, key: String): String? {
@@ -543,5 +543,26 @@ object YtMusic {
             return null
         }
         return walk(root)
+    }
+}
+
+/**
+ * YouTube serves the same artwork at many sizes, and the API's list often tops
+ * out at 60 px or 120 px. Both hosts accept any `w`/`h` you ask for and quietly
+ * clamp to the largest original, so asking for a big one is free — and it is the
+ * difference between a blurry thumbnail and a sharp cover on a 1080p screen.
+ */
+fun hq(url: String): String {
+    if (url.isBlank()) return url
+    return when {
+        // i.ytimg.com/vi/<id>/hqdefault.jpg → maxresdefault.jpg
+        url.contains("/vi/") && !url.contains('=') -> url
+            .replace("hqdefault", "maxresdefault")
+            .replace("sddefault", "maxresdefault")
+            .replace("mqdefault", "maxresdefault")
+            .replace("default.jpg", "maxresdefault.jpg")
+        // ...=w60-h60-l90-rj → ...=w1080-h1080-l90-rj
+        url.contains("=w") -> url.substringBefore("=w") + "=w1080-h1080-l90-rj"
+        else -> url
     }
 }

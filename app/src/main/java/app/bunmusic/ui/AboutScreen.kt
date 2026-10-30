@@ -47,7 +47,7 @@ fun AboutScreen(onBack: () -> Unit) {
                 Display("BunMusic", 32)
                 Spacer(Modifier.height(4.dp))
                 Text(
-                    "1.0.4 · build 5 · ${Skin.current.title} bun",
+                    "1.0.5 · build 6 · ${Skin.current.title} bun",
                     color = Ink.Muted, fontSize = 12.sp, fontFamily = SoraFamily,
                 )
             }
@@ -56,23 +56,23 @@ fun AboutScreen(onBack: () -> Unit) {
         item { GroupTitle("What's new") }
         item {
             AboutCard {
-                Change("Bun switch fixed", "The choice is now written to disk before the restart, so it survives")
-                Change("No bundled audio", "The six demo tracks are gone — 3.6 MB lighter, streaming only")
-                Change("Stream cache", "Anything you play is cached as it buffers; LRU, 512 MB by default, clearable")
-                Change("Image cache", "Cover art has its own 220 MB ceiling and its own clear button")
-                Change("Charcoal", "A second bun: paper white, charcoal ink, Inter, waveform seek bar")
-                Change("Hotlist", "A ranked chart tab, straight from YouTube's top songs")
-                Change("Queue editing", "Drag to reorder, and save the queue as a playlist")
-                Change("Lyrics offset", "Nudge synced lyrics ±2 s when a track is off")
-                Change("Haptics", "A tick on like and play, switchable off")
-                Change("About", "This page — version, build, device")
+                Change("Caching actually works now", "The cache is keyed on the song, not the URL — YouTube signs a new URL every time, so the old key never matched")
+                Change("Plays with the internet off", "A finished song is read straight off disk; the signed URL is never opened again")
+                Change("Whole songs, not half", "Each track is pulled to the end after it starts, and the next two are warmed up behind it")
+                Change("No more stuttering", "Bigger buffer, earlier start, quick resume after a stall, and network held awake while playing")
+                Change("CACHED badge", "Every row tells you whether it will play on a plane")
+                Change("Home-screen widget", "A now-playing bar with artwork, progress, and prev/play/next")
+                Change("High-resolution artwork", "Covers are asked for at 1080 px instead of the 60 px the API hands out")
+                Change("Sleep timer fades", "The last ten seconds ease out instead of cutting mid-note")
+                Change("Smarter shuffle", "Never two songs by the same artist back to back")
+                Change("Skip silent gaps", "Jumps over dead air inside a track")
             }
         }
 
         item { GroupTitle("Build") }
         item {
             AboutCard {
-                Fact("Version", "1.0.4 (5)")
+                Fact("Version", "1.0.5 (6)")
                 Fact("Package", "app.bunmusic")
                 Fact("Min SDK", "26 · Android 8.0")
                 Fact("Target SDK", "37")

@@ -73,6 +73,11 @@ object Playback {
     private var loadJob: Job? = null
     private var radioJob: Job? = null
     private var eqSession: Int = -1
+    /** Guards against a failing item bouncing between error and retry forever. */
+    private var retrying = false
+
+    /** How long the sleep timer takes to fade out. */
+    private val FADE_MS = 10_000L
 
     fun init(context: Context) {
         if (_player != null) return
@@ -80,11 +85,25 @@ object Playback {
         YtStream.warmUp()
 
         val p = ExoPlayer.Builder(appContext)
+            // Tuned for a phone on a weak connection: buffer a lot, start early, and
+            // do not give up on a slow socket while audio is already flowing.
+            .setLoadControl(
+                androidx.media3.exoplayer.DefaultLoadControl.Builder()
+                    .setBufferDurationsMs(
+                        20_000,   // min buffer
+                        120_000,  // max buffer
+                        2_500,    // buffer needed to start
+                        6_000,    // buffer needed to resume after a stall
+                    )
+                    .setTargetBufferBytes(48 * 1024 * 1024)
+                    .build()
+            )
             // Network reads pass through the stream cache; local files do not (see load()).
             .setMediaSourceFactory(
                 androidx.media3.exoplayer.source.DefaultMediaSourceFactory(Cache.deferredFactory())
             )
             .setHandleAudioBecomingNoisy(true)
+            .setWakeMode(C.WAKE_MODE_NETWORK)
             .build().apply {
                 setAudioAttributes(
                     AudioAttributes.Builder()
@@ -95,12 +114,37 @@ object Playback {
                 )
                 setWakeMode(C.WAKE_MODE_NETWORK)
                 setPlaybackParameters(PlaybackParameters(_state.value.speed))
+                skipSilenceEnabled = Prefs.settings.value.skipSilence
             }
 
         p.addListener(object : Player.Listener {
             override fun onIsPlayingChanged(isPlaying: Boolean) {
                 publish()
                 if (isPlaying) startTicker() else stopTicker()
+            }
+
+            /**
+             * A cached track is played from a placeholder URI, because the bytes are
+             * already on disk and the signed URL that produced them has expired. If
+             * the cache was trimmed underneath us, that placeholder has nowhere to go
+             * — so re-resolve once and carry on instead of showing an error.
+             */
+            override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
+                val s = _state.value
+                val track = s.track ?: return
+                if (retrying || track.isLocal) {
+                    _state.value = s.copy(isPlaying = false, buffering = false, error = "This track could not be played")
+                    return
+                }
+                if (!Cache.hasOffline(track.videoId) && Cache.completeKey(track.videoId) == null) {
+                    _state.value = s.copy(isPlaying = false, buffering = false, error = friendlyError(error))
+                    return
+                }
+                retrying = true
+                scope.launch {
+                    runCatching { load(index, autoplay = true) }
+                    retrying = false
+                }
             }
 
             override fun onPlaybackStateChanged(playbackState: Int) {
@@ -121,6 +165,7 @@ object Playback {
             }
         })
         _player = p
+        app.bunmusic.widget.Bar.attach(appContext)
         publish()
     }
 
@@ -139,9 +184,12 @@ object Playback {
     /** Play a list immediately but shuffled. */
     fun shufflePlay(tracks: List<Track>) {
         if (tracks.isEmpty()) return
-        queue = tracks.shuffled()
+        // Keep the list in its original order and let rebuildShuffle() decide the
+        // playing order — that way the queue sheet still reads like the playlist,
+        // and the shuffle can avoid repeating an artist.
+        queue = tracks
         index = 0
-        shuffleOrder = queue.indices.toList()
+        rebuildShuffle()
         _state.value = _state.value.copy(shuffle = true)
         load(0, autoplay = true)
     }
@@ -230,6 +278,10 @@ object Playback {
         }
         index = prevIdx
         load(index, autoplay = true)
+    }
+
+    fun applySkipSilence(on: Boolean) {
+        runCatching { _player?.skipSilenceEnabled = on }
     }
 
     fun seekTo(ms: Long) {
@@ -339,7 +391,7 @@ object Playback {
 
     fun sleepIn(minutes: Int) {
         if (minutes <= 0) {
-            _state.value = _state.value.copy(sleepEndsAt = 0L)
+            cancelSleep()
             return
         }
         _state.value = _state.value.copy(sleepEndsAt = System.currentTimeMillis() + minutes * 60_000L)
@@ -351,6 +403,8 @@ object Playback {
 
     fun cancelSleep() {
         _state.value = _state.value.copy(sleepEndsAt = 0L)
+        // A timer that was already fading must not leave the music quiet.
+        runCatching { _player?.volume = 1f }
     }
 
     // ----------------------------------------------------------------- speed
@@ -388,26 +442,54 @@ object Playback {
 
         loadJob = scope.launch {
             val local = localUri(track)
-            if (local == null && !track.isLocal && Prefs.settings.value.offlineOnly) {
+            if (local == null && !track.isLocal && Prefs.settings.value.offlineOnly && !Cache.isComplete(track.videoId)) {
                 _state.value = _state.value.copy(
                     buffering = false,
                     isPlaying = false,
-                    error = "Offline mode is on — download this track to play it",
+                    error = "Offline mode is on — this track is not cached or downloaded yet",
                 )
                 return@launch
             }
-            val uri = try {
-                local ?: if (track.isLocal) track.uri() else YtStream.audioUrl(track.videoId)
-            } catch (t: Throwable) {
-                _state.value = _state.value.copy(
-                    buffering = false,
-                    isPlaying = false,
-                    error = t.message ?: "Playback failed",
-                )
-                return@launch
+
+            // Three ways in, in order of cost:
+            //  1. a downloaded file — always local
+            //  2. a fully cached stream — no network at all, so it works on a plane
+            //  3. resolve a fresh URL, play it through the cache, then pull the rest
+            var info: app.bunmusic.data.StreamInfo? = null
+            var cacheKey: String? = null
+            val uri: String = when {
+                local != null -> local
+                track.isLocal -> track.uri()
+                Cache.isComplete(track.videoId) -> {
+                    val entry = Cache.cached(track.videoId)!!
+                    cacheKey = "yt:${track.videoId}:${entry.itag}"
+                    // The URL is irrelevant when the bytes are on disk; the cache is
+                    // keyed on videoId+itag, so even an expired one never opens.
+                    "https://bunmusic.local/cache/${track.videoId}/${entry.itag}"
+                }
+                else -> try {
+                    val resolved = YtStream.resolve(track.videoId, Prefs.settings.value.quality)
+                    info = resolved
+                    cacheKey = resolved.key
+                    resolved.url
+                } catch (t: Throwable) {
+                    val cached = Cache.cached(track.videoId)
+                    _state.value = _state.value.copy(
+                        buffering = false,
+                        isPlaying = false,
+                        error = when {
+                            t.message?.contains("Sign in", true) == true ->
+                                "YouTube wants a sign-in for this one. Try another track."
+                            cached != null -> "This track was only partly cached — connect once to finish it"
+                            else -> t.message ?: "Playback failed"
+                        },
+                    )
+                    return@launch
+                }
             }
+
             val p = _player ?: return@launch
-            val item = MediaItem.Builder()
+            val builder = MediaItem.Builder()
                 .setUri(uri)
                 .setMediaId(track.id)
                 .setMediaMetadata(
@@ -415,10 +497,13 @@ object Playback {
                         .setTitle(track.title)
                         .setArtist(track.artist)
                         .setAlbumTitle(track.album)
-                        .setArtworkUri(track.artUrl?.let { android.net.Uri.parse(it) })
+                        .setArtworkUri(track.artUrl?.let { android.net.Uri.parse(app.bunmusic.data.hq(it)) })
                         .build()
                 )
-                .build()
+            // The cache key must survive the URL changing, or every play is a miss.
+            cacheKey?.let { builder.setCustomCacheKey(it) }
+            val item = builder.build()
+
             // A downloaded track is read straight off disk — routing it through the
             // cache would store the same bytes twice for no benefit.
             if (local != null || track.isLocal) {
@@ -439,7 +524,45 @@ object Playback {
             if (autoplay) p.play()
             _state.value = _state.value.copy(buffering = false, track = track)
             publish()
+
+            // Keep the whole song, not just the part that played. This is what makes
+            // the second play offline-capable.
+            if (info != null && !Prefs.settings.value.offlineOnly) {
+                Cache.prefetch(info!!)
+            }
+            // ...and quietly pull the next couple down as well, so the end of this
+            // song does not have to wait on a resolve.
+            if (Prefs.settings.value.prefetchAhead && !Prefs.settings.value.offlineOnly) {
+                prefetchAhead(i)
+            }
         }
+    }
+
+    /**
+     * Warm the cache for what comes next. Two tracks is the sweet spot: enough to
+     * hide a slow handover, not so much that it competes with the song you are
+     * actually listening to on a thin connection.
+     */
+    private fun prefetchAhead(from: Int) {
+        val upcoming = queue.drop(from + 1).take(2).filter { !it.isLocal && it.videoId.isNotBlank() }
+        if (upcoming.isEmpty()) return
+        scope.launch {
+            for (track in upcoming) {
+                if (Cache.isComplete(track.videoId)) continue
+                runCatching {
+                    Cache.prefetch(YtStream.resolve(track.videoId, Prefs.settings.value.quality))
+                }
+            }
+        }
+    }
+
+    private fun friendlyError(e: androidx.media3.common.PlaybackException): String = when (e.errorCode) {
+        androidx.media3.common.PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_FAILED,
+        androidx.media3.common.PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_TIMEOUT,
+        -> "No connection — this track is not cached yet"
+        androidx.media3.common.PlaybackException.ERROR_CODE_IO_BAD_HTTP_STATUS -> "YouTube refused the stream. Try again in a moment."
+        androidx.media3.common.PlaybackException.ERROR_CODE_IO_FILE_NOT_FOUND -> "The cached copy went away. Play it once online to rebuild it."
+        else -> "Playback failed"
     }
 
     /** The audio session only exists once something has been prepared. */
@@ -456,8 +579,29 @@ object Playback {
         return file.toURI().toString()
     }
 
+    /**
+     * Shuffle that behaves itself: it starts on the song you are already on, and it
+     * never puts two tracks by the same artist back to back when it has a choice.
+     * `indices.shuffled()` does neither, and the difference is audible.
+     */
     private fun rebuildShuffle() {
-        shuffleOrder = if (queue.isEmpty()) emptyList() else queue.indices.shuffled()
+        if (queue.isEmpty()) {
+            shuffleOrder = emptyList()
+            return
+        }
+        val start = index.takeIf { it in queue.indices } ?: 0
+        val pool = queue.indices.filter { it != start }.toMutableList()
+        val order = ArrayList<Int>(queue.size)
+        order.add(start)
+        var lastArtist = queue[start].artist.trim().lowercase()
+        while (pool.isNotEmpty()) {
+            val pickIndex = pool.indexOfFirst { queue[it].artist.trim().lowercase() != lastArtist }
+                .takeIf { it >= 0 } ?: 0
+            val pick = pool.removeAt(pickIndex)
+            order.add(pick)
+            lastArtist = queue[pick].artist.trim().lowercase()
+        }
+        shuffleOrder = order
     }
 
     private fun remainingMs(): Long {
@@ -478,6 +622,9 @@ object Playback {
             queue = queue,
             index = index,
         )
+        // Keep the home-screen bar in step. It throttles internally, so calling it
+        // twice a second is cheap.
+        app.bunmusic.widget.Bar.onPlaybackState()
     }
 
     private fun startTicker() {
@@ -486,9 +633,18 @@ object Playback {
             while (true) {
                 publish()
                 val s = _state.value
-                if (s.sleepEndsAt > 0 && System.currentTimeMillis() >= s.sleepEndsAt) {
-                    _player?.pause()
-                    _state.value = _state.value.copy(sleepEndsAt = 0L)
+                if (s.sleepEndsAt > 0) {
+                    val left = s.sleepEndsAt - System.currentTimeMillis()
+                    if (left <= 0) {
+                        _player?.pause()
+                        runCatching { _player?.volume = 1f }
+                        _state.value = _state.value.copy(sleepEndsAt = 0L)
+                    } else if (left <= FADE_MS) {
+                        // Ease the last ten seconds down instead of clipping the song
+                        // mid-note — the whole point of a sleep timer is that you do
+                        // not notice it.
+                        runCatching { _player?.volume = (left.toFloat() / FADE_MS).coerceIn(0f, 1f) }
+                    }
                 }
                 delay(500)
             }

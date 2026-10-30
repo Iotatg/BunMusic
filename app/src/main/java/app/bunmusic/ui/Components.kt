@@ -61,6 +61,7 @@ import app.bunmusic.core.SerifFamily
 import app.bunmusic.core.Skin
 import app.bunmusic.core.SoraFamily
 import app.bunmusic.data.Collection
+import app.bunmusic.data.Cache
 import app.bunmusic.data.Track
 import app.bunmusic.player.PlayerState
 import coil3.compose.AsyncImage
@@ -313,6 +314,7 @@ private fun MidnightTrackRow(
     onLike: (() -> Unit)?,
     onMore: (() -> Unit)?,
 ) {
+    val cached = Cache.hasOffline(track.videoId)
     Row(
         Modifier
             .fillMaxWidth()
@@ -357,9 +359,13 @@ private fun MidnightTrackRow(
                 overflow = TextOverflow.Ellipsis,
             )
             Row(verticalAlignment = Alignment.CenterVertically) {
-                if (track.isLocal || downloaded) {
+                if (track.isLocal || downloaded || cached) {
                     Text(
-                        if (track.isLocal) "OFFLINE" else "SAVED",
+                        when {
+                            track.isLocal -> "OFFLINE"
+                            downloaded -> "SAVED"
+                            else -> "CACHED"
+                        },
                         color = Ink.Mint,
                         fontSize = 8.sp,
                         fontFamily = SoraFamily,
@@ -417,6 +423,7 @@ private fun CharcoalTrackRow(
     onLike: (() -> Unit)?,
     onMore: (() -> Unit)?,
 ) {
+    val cached = Cache.hasOffline(track.videoId)
     Row(
         Modifier
             .fillMaxWidth()
@@ -453,7 +460,7 @@ private fun CharcoalTrackRow(
                 buildString {
                     append(track.artist.ifBlank { "Unknown artist" })
                     if (track.durationMs > 0) append("  ·  ${fmtTime(track.durationMs)}")
-                    if (track.isLocal || downloaded) append("  ·  offline")
+                    if (track.isLocal || downloaded) append("  ·  offline") else if (cached) append("  ·  cached")
                 },
                 color = Ink.Muted,
                 fontSize = 12.sp,

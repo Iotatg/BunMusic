@@ -41,5 +41,22 @@
             </intent-filter>
         </service>
 
+        <receiver
+            android:name=".widget.PlayerWidget"
+            android:exported="true"
+            android:label="@string/widget_label">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="app.bunmusic.widget.TOGGLE" />
+                <action android:name="app.bunmusic.widget.NEXT" />
+                <action android:name="app.bunmusic.widget.PREV" />
+                <action android:name="app.bunmusic.widget.REFRESH" />
+                <action android:name="android.intent.action.CONFIGURATION_CHANGED" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info" />
+        </receiver>
+
     </application>
 </manifest>

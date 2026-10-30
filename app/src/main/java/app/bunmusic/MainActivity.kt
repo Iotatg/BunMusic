@@ -46,7 +46,7 @@ class MainActivity : ComponentActivity() {
         }
         setContent {
             BunTheme {
-                Root()
+                Root(openPlayerOnStart = intent?.getBooleanExtra("open_player", false) == true)
             }
         }
     }

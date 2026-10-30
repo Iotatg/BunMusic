@@ -21,11 +21,35 @@ import java.net.URL
 import java.util.concurrent.ConcurrentHashMap
 
 /**
+ * One resolved audio stream.
+ *
+ * [key] is the cache identity and deliberately excludes the URL: YouTube hands
+ * out a freshly signed URL on every resolve, so keying a cache on the URL
+ * guarantees a miss the next time the same song is played. `videoId + itag` is
+ * the content itself, and that never changes.
+ */
+data class StreamInfo(
+    val videoId: String,
+    val url: String,
+    val itag: Int,
+    val mime: String,
+    val bitrate: Long,
+    val lengthBytes: Long,
+    val resolvedAt: Long = System.currentTimeMillis(),
+) {
+    val key: String get() = "yt:$videoId:$itag"
+
+    /** Signed URLs die after about six hours; the bytes in the cache do not. */
+    val stale: Boolean get() = System.currentTimeMillis() - resolvedAt > 5 * 60 * 60 * 1000L
+}
+
+/**
  * Resolves a playable audio URL for a YouTube video id.
  *
  * Two independent strategies so a single block never kills playback:
- *  1. the NewPipe-style extractor (handles signature deciphering properly)
- *  2. the InnerTube player endpoint with a TV/VR client (returns plain URLs)
+ *  1. the InnerTube player endpoint with a TV/VR client (plain URLs, exact itag
+ *     and content length — everything the cache needs)
+ *  2. the NewPipe-style extractor (handles signature deciphering properly)
  */
 object YtStream {
 
@@ -33,7 +57,7 @@ object YtStream {
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36"
 
     private val json = Json { ignoreUnknownKeys = true; isLenient = true }
-    private val cache = ConcurrentHashMap<String, Pair<String, Long>>()
+    private val cache = ConcurrentHashMap<String, Pair<StreamInfo, Long>>()
     private var initialised = false
 
     fun warmUp() {
@@ -45,29 +69,61 @@ object YtStream {
         }
     }
 
-    suspend fun audioUrl(videoId: String): String = withContext(Dispatchers.IO) {
-        val hit = cache[videoId]
-        if (hit != null && System.currentTimeMillis() - hit.second < 25 * 60 * 1000L) return@withContext hit.first
+    suspend fun audioUrl(videoId: String): String = resolve(videoId).url
 
-        warmUp()
+    suspend fun resolve(videoId: String, quality: Prefs.Quality = Prefs.Quality.HIGH): StreamInfo =
+        withContext(Dispatchers.IO) {
+            cache[videoId]?.let { (info, at) ->
+                if (System.currentTimeMillis() - at < 25 * 60 * 1000L && !info.stale) return@withContext info
+            }
+            warmUp()
 
-        var last: Throwable? = null
-        try {
-            val url = viaExtractor(videoId)
-            cache[videoId] = url to System.currentTimeMillis()
-            return@withContext url
-        } catch (t: Throwable) {
-            last = t
+            var last: Throwable? = null
+            try {
+                val info = viaInnerTube(videoId, quality)
+                cache[videoId] = info to System.currentTimeMillis()
+                return@withContext info
+            } catch (t: Throwable) {
+                last = t
+            }
+            try {
+                val info = viaExtractor(videoId, quality)
+                cache[videoId] = info to System.currentTimeMillis()
+                return@withContext info
+            } catch (t: Throwable) {
+                last = t
+            }
+            throw IllegalStateException("Could not resolve stream: ${last?.message}", last)
         }
-        try {
-            val url = viaInnerTube(videoId)
-            cache[videoId] = url to System.currentTimeMillis()
-            return@withContext url
-        } catch (t: Throwable) {
-            last = t
-        }
-        throw IllegalStateException("Could not resolve stream: ${last?.message}", last)
+
+    /** Forget a resolved URL — used when a stream 403s because it went stale. */
+    fun forget(videoId: String) {
+        cache.remove(videoId)
     }
+
+    // ------------------------------------------------------------- selection
+
+    /**
+     * Pick a format for the requested quality. Opus at the same bitrate beats
+     * AAC, so it gets a small nudge; otherwise this is a straight distance
+     * match, which keeps a "Low" listener off a 256 kbps stream on mobile data.
+     */
+    private fun pick(candidates: List<Pair<JsonObject, Long>>, quality: Prefs.Quality): Pair<JsonObject, Long>? {
+        if (candidates.isEmpty()) return null
+        val target = quality.bitrate
+        return when (quality) {
+            Prefs.Quality.HIGH -> candidates.maxByOrNull { (f, br) ->
+                br + if (mimeOf(f).contains("opus", true)) 20_000L else 0L
+            }
+            Prefs.Quality.LOW -> candidates.filter { it.second <= 96_000L }.minByOrNull { it.second }
+                ?: candidates.minByOrNull { it.second }
+            Prefs.Quality.NORMAL -> candidates.minByOrNull { kotlin.math.abs(it.second - target) }
+        }
+    }
+
+    private fun mimeOf(f: JsonObject) = (f["mimeType"] as? JsonPrimitive)?.contentOrNull.orEmpty()
+
+    // ---------------------------------------------------------------- clients
 
     private data class Client(
         val name: String,
@@ -110,25 +166,11 @@ object YtStream {
         Client("MWEB", "2.20241009.01.00", emptyMap(), UA),
     )
 
-    private fun viaExtractor(videoId: String): String {
-        val service = NewPipe.getService(0)
-        val link = YoutubeStreamLinkHandlerFactory.getInstance().fromId(videoId)
-        val extractor = YoutubeStreamExtractor(service, link)
-        extractor.fetchPage()
-        val audios = extractor.audioStreams.filter { it.content?.isNotBlank() == true }
-        if (audios.isEmpty()) error("no audio streams")
-        val best = audios.maxByOrNull { s ->
-            val m4a = if (s.format?.name?.contains("M4A", true) == true) 1_000_000 else 0
-            m4a + s.averageBitrate
-        } ?: error("no audio streams")
-        return best.content ?: error("empty stream url")
-    }
-
-    private fun viaInnerTube(videoId: String): String {
+    private fun viaInnerTube(videoId: String, quality: Prefs.Quality): StreamInfo {
         var lastError: Throwable? = null
         for (client in clients) {
             try {
-                return viaClient(videoId, client)
+                return viaClient(videoId, client, quality)
             } catch (t: Throwable) {
                 lastError = t
             }
@@ -136,7 +178,7 @@ object YtStream {
         throw lastError ?: IllegalStateException("no client produced a stream")
     }
 
-    private fun viaClient(videoId: String, client: Client): String {
+    private fun viaClient(videoId: String, client: Client, quality: Prefs.Quality): StreamInfo {
         val payload = buildJsonObject {
             putJsonObject("context") {
                 putJsonObject("client") {
@@ -178,16 +220,47 @@ object YtStream {
         }
         val formats = (root["streamingData"] as? JsonObject)?.get("adaptiveFormats") as? JsonArray
             ?: error("${client.name}: no adaptive formats")
-        val candidates = formats.mapNotNull { it as? JsonObject }.filter { f ->
-            val mime = (f["mimeType"] as? JsonPrimitive)?.contentOrNull ?: ""
-            mime.startsWith("audio") && (f["url"] as? JsonPrimitive)?.contentOrNull != null
-        }
-        if (candidates.isEmpty()) error("${client.name}: no audio url")
-        val best = candidates.maxByOrNull { f ->
-            ((f["bitrate"] as? JsonPrimitive)?.contentOrNull?.toLongOrNull() ?: 0L) +
-                if (((f["mimeType"] as? JsonPrimitive)?.contentOrNull ?: "").contains("mp4")) 1_000_000L else 0L
-        } ?: error("${client.name}: no audio format")
-        return (best["url"] as? JsonPrimitive)?.contentOrNull ?: error("${client.name}: empty url")
+
+        val candidates = formats.mapNotNull { it as? JsonObject }
+            .filter { f ->
+                val mime = mimeOf(f)
+                mime.startsWith("audio") && (f["url"] as? JsonPrimitive)?.contentOrNull != null
+            }
+            .map { f -> f to ((f["bitrate"] as? JsonPrimitive)?.contentOrNull?.toLongOrNull() ?: 0L) }
+
+        val chosen = pick(candidates, quality) ?: error("${client.name}: no audio format")
+        val f = chosen.first
+        return StreamInfo(
+            videoId = videoId,
+            url = (f["url"] as? JsonPrimitive)?.contentOrNull ?: error("${client.name}: empty url"),
+            itag = (f["itag"] as? JsonPrimitive)?.contentOrNull?.toIntOrNull() ?: 0,
+            mime = mimeOf(f).substringBefore(";"),
+            bitrate = chosen.second,
+            lengthBytes = (f["contentLength"] as? JsonPrimitive)?.contentOrNull?.toLongOrNull() ?: -1L,
+        )
+    }
+
+    private fun viaExtractor(videoId: String, quality: Prefs.Quality): StreamInfo {
+        val service = NewPipe.getService(0)
+        val link = YoutubeStreamLinkHandlerFactory.getInstance().fromId(videoId)
+        val extractor = YoutubeStreamExtractor(service, link)
+        extractor.fetchPage()
+        val audios = extractor.audioStreams.filter { it.content?.isNotBlank() == true }
+        if (audios.isEmpty()) error("no audio streams")
+        val target = quality.bitrate
+        val best = when (quality) {
+            Prefs.Quality.HIGH -> audios.maxByOrNull { it.averageBitrate }
+            Prefs.Quality.LOW -> audios.minByOrNull { it.averageBitrate }
+            Prefs.Quality.NORMAL -> audios.minByOrNull { kotlin.math.abs(it.averageBitrate - target) }
+        } ?: error("no audio streams")
+        return StreamInfo(
+            videoId = videoId,
+            url = best.content ?: error("empty stream url"),
+            itag = best.itagItem?.id ?: 0,
+            mime = best.format?.mimeType ?: "audio/mp4",
+            bitrate = best.averageBitrate.toLong(),
+            lengthBytes = -1L,
+        )
     }
 
     private class NetDownloader : Downloader() {

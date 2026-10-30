@@ -54,6 +54,10 @@ object Prefs {
         val lyricsOffsetMs: Int = 0,
         /** Stream cache ceiling in MB: 0 = off, -1 = unlimited. */
         val cacheLimitMb: Int = 512,
+        /** Pull the next couple of songs into the cache while this one plays. */
+        val prefetchAhead: Boolean = true,
+        /** Skip silent gaps inside a track instead of playing silence. */
+        val skipSilence: Boolean = false,
     )
 
     private lateinit var sp: SharedPreferences
@@ -89,6 +93,8 @@ object Prefs {
             haptics = sp.getBoolean("haptics", d.haptics),
             lyricsOffsetMs = sp.getInt("lyricsOffset", d.lyricsOffsetMs),
             cacheLimitMb = sp.getInt("cacheLimit", d.cacheLimitMb),
+            prefetchAhead = sp.getBoolean("prefetchAhead", d.prefetchAhead),
+            skipSilence = sp.getBoolean("skipSilence", d.skipSilence),
         )
     }
 
@@ -117,6 +123,8 @@ object Prefs {
             .putBoolean("haptics", next.haptics)
             .putInt("lyricsOffset", next.lyricsOffsetMs)
             .putInt("cacheLimit", next.cacheLimitMb)
+            .putBoolean("prefetchAhead", next.prefetchAhead)
+            .putBoolean("skipSilence", next.skipSilence)
             .apply()
     }
 }
