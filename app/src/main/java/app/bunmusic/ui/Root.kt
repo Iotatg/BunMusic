@@ -17,6 +17,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -146,8 +147,11 @@ private fun Shell(guest: Boolean, onLeaveGuest: () -> Unit, openPlayerOnStart: B
                 if (Ink.isLight) {
                     Brush.verticalGradient(listOf(Ink.Base, Ink.Base))
                 } else {
+                    // The top glow used to be a hard-coded Midnight purple, which
+                    // tinted every future dark bun. It reads the bun's own mini
+                    // player tone now.
                     Brush.verticalGradient(
-                        0f to Color(0xFF14101C),
+                        0f to Ink.MiniBg,
                         0.35f to Ink.Void,
                         1f to Ink.Void,
                     )
@@ -442,7 +446,7 @@ private fun DarkNav(current: Route, onSelect: (Route) -> Unit, modifier: Modifie
                     Text(
                         t.label,
                         color = if (selected) Ink.Text else Ink.Faint,
-                        fontSize = 9.5.sp,
+                        fontSize = 10.sp,
                         fontFamily = SoraFamily,
                         fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
                     )
@@ -494,7 +498,7 @@ private fun LightNav(current: Route, onSelect: (Route) -> Unit, modifier: Modifi
                 Text(
                     t.label,
                     color = if (selected) Ink.Text else Ink.Faint,
-                    fontSize = 10.sp,
+                    fontSize = 11.sp,
                     fontFamily = SoraFamily,
                     fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
                 )
@@ -506,14 +510,24 @@ private fun LightNav(current: Route, onSelect: (Route) -> Unit, modifier: Modifi
 @Composable
 fun CountBadge(count: Int) {
     if (count <= 0) return
+    // A fixed 18 dp circle clipped anything past two digits, and even "10" was
+    // pressed against the edge. It grows with its label now and caps the number.
     Box(
         Modifier
-            .size(18.dp)
+            .height(18.dp)
+            .defaultMinSize(minWidth = 18.dp)
             .clip(CircleShape)
-            .background(Ink.Lime),
+            .background(Ink.Lime)
+            .padding(horizontal = 5.dp),
         contentAlignment = Alignment.Center,
     ) {
-        Text("$count", color = Ink.OnAccent, fontSize = 9.sp, fontFamily = SoraFamily, fontWeight = FontWeight.Bold)
+        Text(
+            if (count > 99) "99+" else "$count",
+            color = Ink.OnAccent,
+            fontSize = 10.sp,
+            fontFamily = SoraFamily,
+            fontWeight = FontWeight.Bold,
+        )
     }
 }
 

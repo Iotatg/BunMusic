@@ -10,25 +10,25 @@
     <!-- Charcoal's window, applied through its launcher alias so the cold-start
          frame is already paper-white instead of flashing the dark bun first. -->
     <style name="Theme.BunMusic.Light" parent="Theme.BunMusic">
-        <item name="android:statusBarColor">#FFFFFF</item>
-        <item name="android:navigationBarColor">#FFFFFF</item>
-        <item name="android:windowBackground">#FFFFFF</item>
+        <item name="android:statusBarColor">#F7F8FA</item>
+        <item name="android:navigationBarColor">#F7F8FA</item>
+        <item name="android:windowBackground">#F7F8FA</item>
         <item name="android:windowLightStatusBar">true</item>
     </style>
 
     <!-- Cloud's window: the chalk page, not paper white, so the cold-start frame
          already matches the bun the user picked. -->
     <style name="Theme.BunMusic.Cloud" parent="Theme.BunMusic.Light">
-        <item name="android:statusBarColor">#F6F8FD</item>
-        <item name="android:navigationBarColor">#F6F8FD</item>
-        <item name="android:windowBackground">#F6F8FD</item>
+        <item name="android:statusBarColor">#F3F6FC</item>
+        <item name="android:navigationBarColor">#F3F6FC</item>
+        <item name="android:windowBackground">#F3F6FC</item>
     </style>
 
     <!-- Pink Bun's window: blush paper, so the cold-start frame is already warm
          before Compose draws the first screen. -->
     <style name="Theme.BunMusic.Pink" parent="Theme.BunMusic.Light">
-        <item name="android:statusBarColor">#FFF6F9</item>
-        <item name="android:navigationBarColor">#FFF6F9</item>
-        <item name="android:windowBackground">#FFF6F9</item>
+        <item name="android:statusBarColor">#FDF2F6</item>
+        <item name="android:navigationBarColor">#FDF2F6</item>
+        <item name="android:windowBackground">#FDF2F6</item>
     </style>
 </resources>

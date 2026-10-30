@@ -325,7 +325,7 @@ private fun ProviderChip(acc: Auth.Account) {
     ) {
         Glyph(pair.first, Ink.Muted, 12.dp)
         Spacer(Modifier.width(6.dp))
-        Text(pair.second, color = Ink.Muted, fontSize = 10.5.sp, fontFamily = SoraFamily, fontWeight = FontWeight.Medium)
+        Text(pair.second, color = Ink.Muted, fontSize = 11.sp, fontFamily = SoraFamily, fontWeight = FontWeight.Medium)
     }
 }
 
@@ -340,7 +340,7 @@ private fun VerifiedChip() {
     ) {
         Glyph(G.Check, Ink.Mint, 11.dp, 2.6.dp)
         Spacer(Modifier.width(5.dp))
-        Text("Verified", color = Ink.Mint, fontSize = 10.5.sp, fontFamily = SoraFamily, fontWeight = FontWeight.Medium)
+        Text("Verified", color = Ink.Mint, fontSize = 11.sp, fontFamily = SoraFamily, fontWeight = FontWeight.Medium)
     }
 }
 
@@ -358,10 +358,10 @@ private fun StatTile(label: String, value: String, modifier: Modifier = Modifier
         Text(
             label,
             color = Ink.Faint,
-            fontSize = 8.sp,
+            fontSize = 10.sp,
             fontFamily = SoraFamily,
             fontWeight = FontWeight.SemiBold,
-            letterSpacing = 1.sp,
+            letterSpacing = 0.9.sp,
         )
     }
 }
@@ -371,10 +371,10 @@ private fun ProfileGroupLabel(text: String) {
     Text(
         text.uppercase(),
         color = Ink.Faint,
-        fontSize = 9.5.sp,
+        fontSize = 10.sp,
         fontFamily = SoraFamily,
         fontWeight = FontWeight.SemiBold,
-        letterSpacing = 1.4.sp,
+        letterSpacing = 0.9.sp,
         modifier = Modifier.padding(start = 24.dp, top = 20.dp, bottom = 8.dp),
     )
 }

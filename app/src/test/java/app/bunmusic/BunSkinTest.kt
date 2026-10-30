@@ -37,20 +37,42 @@ class BunSkinTest {
     }
 
     /**
-     * Body text has to clear AAA; a button label only has to clear AA. Cloud's
-     * accent is the electric blue from the artwork (#2E6BFF), and a blue that
-     * vivid cannot reach 7:1 against white without turning navy — 4.5:1 is the
-     * honest bar for a filled pill with 12.5 sp semibold on it.
+     * Every tone that carries words has to clear WCAG AA — 4.5:1 — on the page
+     * *and* on a card, because both are used as text backgrounds.
+     *
+     * This test used to allow muted at 3.5:1 and did not check faint at all.
+     * Faint is the caption tone (timestamps, section overlines, hints) and it sat
+     * at 2.0–2.9:1 in all four buns: legible in a mockup, invisible in daylight.
+     * That is the bug this guards against.
      */
     @Test
     fun everyBunKeepsItsTextReadable() {
         BunSkin.entries.forEach { bun ->
             val p = Skin.paletteOf(bun)
             assertTrue("$bun body text", contrast(p.text, p.base) > 12f)
-            assertTrue("$bun muted text", contrast(p.muted, p.base) > 3.5f)
-            assertTrue("$bun button label", contrast(p.onAccent, p.accent) > 4.5f)
+            assertTrue("$bun body text on card", contrast(p.text, p.card) > 12f)
+            assertTrue("$bun muted text", contrast(p.muted, p.base) >= 4.5f)
+            assertTrue("$bun muted text on card", contrast(p.muted, p.card) >= 4.5f)
+            assertTrue("$bun caption text", contrast(p.faint, p.base) >= 4.5f)
+            assertTrue("$bun caption text on card", contrast(p.faint, p.card) >= 4.5f)
+            assertTrue("$bun accent as text", contrast(p.accent, p.base) >= 4.5f)
+            assertTrue("$bun button label", contrast(p.onAccent, p.accent) >= 4.5f)
+            assertTrue("$bun nav pill", contrast(p.navActiveInk, over(p.navActiveBg, p.navBg)) >= 4.5f)
             assertTrue("$bun mini player", contrast(p.miniText, p.miniBg) > 7f)
-            assertTrue("$bun hero ink", contrast(p.heroInk, p.hero.first()) > 3f)
+            assertTrue("$bun hero ink", contrast(over(p.heroInk, p.hero.first()), p.hero.first()) >= 4.5f)
+            assertTrue("$bun hero sub", contrast(over(p.heroSub, p.hero.first()), p.hero.first()) >= 4.5f)
+            assertTrue("$bun hero button", contrast(p.heroBtnInk, p.heroBtn) >= 4.5f)
+        }
+    }
+
+    /** A pure-white page is the harshest light surface there is, and it erases cards. */
+    @Test
+    fun noBunShipsAPureWhitePage() {
+        BunSkin.entries.filter { Skin.paletteOf(it).light }.forEach { bun ->
+            val p = Skin.paletteOf(bun)
+            assertNotEquals("$bun page", 0xFFFFFFFF.toInt(), p.base.value.toLong().toInt())
+            // A card has to be distinguishable from the page it sits on.
+            assertTrue("$bun card edge", contrast(p.card, p.base) > 1.03f)
         }
     }
 
@@ -77,6 +99,14 @@ class BunSkinTest {
         assertEquals(BunSkin.entries.size, backgrounds.toSet().size)
         aliases.forEach { assertTrue(it.startsWith(".")) }
     }
+
+    /** Alpha-composite a foreground over an opaque backdrop, the way it renders. */
+    private fun over(fg: androidx.compose.ui.graphics.Color, bg: androidx.compose.ui.graphics.Color) =
+        androidx.compose.ui.graphics.Color(
+            red = fg.red * fg.alpha + bg.red * (1 - fg.alpha),
+            green = fg.green * fg.alpha + bg.green * (1 - fg.alpha),
+            blue = fg.blue * fg.alpha + bg.blue * (1 - fg.alpha),
+        )
 
     private fun channel(v: Float): Float =
         if (v <= 0.03928f) v / 12.92f else ((v + 0.055f) / 1.055f).pow(2.4f)

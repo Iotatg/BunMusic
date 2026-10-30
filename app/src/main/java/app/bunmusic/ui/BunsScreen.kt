@@ -191,7 +191,7 @@ private fun BunCard(bun: BunSkin, active: Boolean, onPick: () -> Unit) {
                         .background(p.accent)
                         .padding(horizontal = 9.dp, vertical = 5.dp),
                 ) {
-                    Text("WEARING", color = p.onAccent, fontSize = 8.5.sp, fontFamily = SoraFamily, fontWeight = FontWeight.Bold, letterSpacing = 0.8.sp)
+                    Text("WEARING", color = p.onAccent, fontSize = 10.sp, fontFamily = SoraFamily, fontWeight = FontWeight.Bold, letterSpacing = 0.8.sp)
                 }
             }
         }
@@ -201,16 +201,16 @@ private fun BunCard(bun: BunSkin, active: Boolean, onPick: () -> Unit) {
         Spacer(Modifier.height(12.dp))
 
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Swatch(p.void, hex(p.void))
-            Swatch(p.text, hex(p.text))
-            Swatch(p.muted, hex(p.muted))
-            Swatch(p.accent, hex(p.accent))
+            Swatch(p.void, hex(p.void), p.faint)
+            Swatch(p.text, hex(p.text), p.faint)
+            Swatch(p.muted, hex(p.muted), p.faint)
+            Swatch(p.accent, hex(p.accent), p.faint)
         }
         Spacer(Modifier.height(8.dp))
         Text(
             bun.typeLabel,
             color = p.faint,
-            fontSize = 10.sp,
+            fontSize = 11.sp,
             fontFamily = SoraFamily,
         )
     }
@@ -219,7 +219,7 @@ private fun BunCard(bun: BunSkin, active: Boolean, onPick: () -> Unit) {
 private fun hex(c: Color): String = "%06X".format(c.toArgb() and 0xFFFFFF)
 
 @Composable
-private fun Swatch(color: Color, hex: String) {
+private fun Swatch(color: Color, hex: String, ink: Color) {
     Column(Modifier.width(52.dp)) {
         Box(
             Modifier
@@ -230,7 +230,11 @@ private fun Swatch(color: Color, hex: String) {
                 .border(1.dp, Color.Gray.copy(alpha = 0.18f), RoundedCornerShape(8.dp)),
         )
         Spacer(Modifier.height(4.dp))
-        Text(hex, color = Ink.Faint, fontSize = 8.sp, fontFamily = SoraFamily)
+        // The card belongs to the bun being previewed, not to the current one:
+        // reading Ink.Faint here painted the current bun's caption colour onto a
+        // foreign background, which is unreadable when previewing Midnight from
+        // a light bun.
+        Text(hex, color = ink, fontSize = 10.sp, fontFamily = SoraFamily)
     }
 }
 

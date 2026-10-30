@@ -105,8 +105,8 @@ fun PlaylistScreen(
                         Column(Modifier.weight(1f)) {
                             Text(
                                 "PLAYLIST",
-                                color = Ink.Lime, fontSize = 9.sp, fontFamily = SoraFamily,
-                                fontWeight = FontWeight.Bold, letterSpacing = 1.4.sp,
+                                color = Ink.Lime, fontSize = 10.sp, fontFamily = SoraFamily,
+                                fontWeight = FontWeight.Bold, letterSpacing = 0.9.sp,
                             )
                             Spacer(Modifier.height(6.dp))
                             Text(

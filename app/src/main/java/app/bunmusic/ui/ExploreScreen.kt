@@ -24,6 +24,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -58,9 +59,18 @@ fun ExploreScreen(
 ) {
     var page by remember { mutableStateOf(ExplorePage()) }
     var loading by remember { mutableStateOf(true) }
+    var failed by remember { mutableStateOf(false) }
+    var attempt by remember { mutableIntStateOf(0) }
 
-    LaunchedEffect(Unit) {
-        runCatching { YtMusic.explore() }.onSuccess { page = it }
+    // A failed fetch used to leave `loading = false` and an empty page: the
+    // screen looked like a deliberately sparse layout with no way back. The
+    // failure is its own state now, with a retry that re-runs the fetch.
+    LaunchedEffect(attempt) {
+        loading = true
+        failed = false
+        runCatching { YtMusic.explore() }
+            .onSuccess { page = it }
+            .onFailure { failed = true }
         loading = false
     }
 
@@ -79,6 +89,18 @@ fun ExploreScreen(
         if (loading) {
             item {
                 Column(Modifier.padding(top = 8.dp)) { repeat(4) { ShimmerRow() } }
+            }
+        }
+
+        if (failed && !loading) {
+            item {
+                EmptyState(
+                    glyph = G.Wave,
+                    title = "Couldn't load Explore",
+                    body = "The catalogue didn't answer. Check your connection and try again — nothing you saved is affected.",
+                    action = "Try again",
+                    onAction = { attempt++ },
+                )
             }
         }
 

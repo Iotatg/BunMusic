@@ -55,9 +55,18 @@ object Ink {
     val isLight: Boolean get() = Skin.p.light
 }
 
+/**
+ * Three weights, three jobs: Regular reads, SemiBold emphasizes, Bold announces.
+ *
+ * Medium used to be mapped onto the semibold file, so `FontWeight.Medium` and
+ * `FontWeight.SemiBold` rendered identically — every label came out equally
+ * heavy and the hierarchy collapsed into one tone. Sora ships no 500 cut, so
+ * Medium resolves to Regular; that is the honest mapping and it restores a real
+ * middle step.
+ */
 private val Sora = FontFamily(
     Font(R.font.sora_regular, FontWeight.Normal),
-    Font(R.font.sora_semibold, FontWeight.Medium),
+    Font(R.font.sora_regular, FontWeight.Medium),
     Font(R.font.sora_semibold, FontWeight.SemiBold),
     Font(R.font.sora_bold, FontWeight.Bold),
 )

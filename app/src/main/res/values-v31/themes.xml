@@ -12,9 +12,9 @@
     </style>
 
     <style name="Theme.BunMusic.Light" parent="Theme.BunMusic">
-        <item name="android:statusBarColor">#FFFFFF</item>
-        <item name="android:navigationBarColor">#FFFFFF</item>
-        <item name="android:windowBackground">#FFFFFF</item>
+        <item name="android:statusBarColor">#F7F8FA</item>
+        <item name="android:navigationBarColor">#F7F8FA</item>
+        <item name="android:windowBackground">#F7F8FA</item>
         <item name="android:windowLightStatusBar">true</item>
         <item name="android:windowSplashScreenBackground">#FFFFFF</item>
         <item name="android:windowSplashScreenAnimatedIcon">@mipmap/ic_launcher_charcoal_foreground</item>
@@ -23,19 +23,19 @@
     <!-- Cloud's splash: the bun in headphones on the chalk page, not the black
          disc on white that it would otherwise inherit from Light. -->
     <style name="Theme.BunMusic.Cloud" parent="Theme.BunMusic.Light">
-        <item name="android:statusBarColor">#F6F8FD</item>
-        <item name="android:navigationBarColor">#F6F8FD</item>
-        <item name="android:windowBackground">#F6F8FD</item>
-        <item name="android:windowSplashScreenBackground">#F6F8FD</item>
+        <item name="android:statusBarColor">#F3F6FC</item>
+        <item name="android:navigationBarColor">#F3F6FC</item>
+        <item name="android:windowBackground">#F3F6FC</item>
+        <item name="android:windowSplashScreenBackground">#F3F6FC</item>
         <item name="android:windowSplashScreenAnimatedIcon">@mipmap/ic_launcher_cloud_foreground</item>
     </style>
 
     <!-- Pink's splash: the bun with the music note, on blush paper. -->
     <style name="Theme.BunMusic.Pink" parent="Theme.BunMusic.Light">
-        <item name="android:statusBarColor">#FFF6F9</item>
-        <item name="android:navigationBarColor">#FFF6F9</item>
-        <item name="android:windowBackground">#FFF6F9</item>
-        <item name="android:windowSplashScreenBackground">#FFF6F9</item>
+        <item name="android:statusBarColor">#FDF2F6</item>
+        <item name="android:navigationBarColor">#FDF2F6</item>
+        <item name="android:windowBackground">#FDF2F6</item>
+        <item name="android:windowSplashScreenBackground">#FDF2F6</item>
         <item name="android:windowSplashScreenAnimatedIcon">@mipmap/ic_launcher_pink_foreground</item>
     </style>
 </resources>

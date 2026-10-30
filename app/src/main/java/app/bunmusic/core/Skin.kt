@@ -117,8 +117,10 @@ private val Midnight = BunPalette(
     card = Color(0xFF1C1823),
     line = Color(0xFF2A2533),
     text = Color(0xFFF4F1E9),
-    muted = Color(0xFF938DA0),
-    faint = Color(0xFF5E596B),
+    muted = Color(0xFFA8A2B4),
+    // Captions sit on this tone at 11 sp, so it has to clear 4.5:1 on both the
+    // page and the card. It was #5E596B — 2.9:1, invisible in daylight.
+    faint = Color(0xFF878199),
     accent = Color(0xFFD8F65C),
     onAccent = Color(0xFF11130A),
     lavender = Color(0xFFC6BEF2),
@@ -142,21 +144,23 @@ private val Midnight = BunPalette(
 )
 
 private val Charcoal = BunPalette(
-    void = Color(0xFFFFFFFF),
-    base = Color(0xFFFFFFFF),
-    raised = Color(0xFFFAFBFC),
-    card = Color(0xFFF3F5F8),
-    line = Color(0xFFE7EAEF),
-    text = Color(0xFF171C26),
-    muted = Color(0xFF6C7689),
-    faint = Color(0xFFA4AAB7),
+    // Not #FFFFFF: a pure-white page next to a pure-white card has no edge, and
+    // pure white is the harshest surface a light theme can ship.
+    void = Color(0xFFEFF1F5),
+    base = Color(0xFFF7F8FA),
+    raised = Color(0xFFFFFFFF),
+    card = Color(0xFFFFFFFF),
+    line = Color(0xFFE6E9EE),
+    text = Color(0xFF14181F),
+    muted = Color(0xFF4F5967),
+    faint = Color(0xFF5C6675),
     accent = Color(0xFF171C26),
     onAccent = Color(0xFFFFFFFF),
     lavender = Color(0xFF6C7689),
     rose = Color(0xFFD95C6A),
     mint = Color(0xFF2E9E77),
     hairline = Color(0xFFE9EBF0),
-    field = Color(0xFFF1F3F6),
+    field = Color(0xFFEFF1F5),
     sheet = Color(0xFFFFFFFF),
     navBg = Color(0xFFFFFFFF),
     navActiveBg = Color(0xFF171C26),
@@ -180,15 +184,18 @@ private val Charcoal = BunPalette(
  * player, and a hero card that is a blue gradient rather than a black block.
  */
 private val Cloud = BunPalette(
-    void = Color(0xFFEEF2FA),
-    base = Color(0xFFF6F8FD),
+    void = Color(0xFFE9EFFA),
+    base = Color(0xFFF3F6FC),
     raised = Color(0xFFFFFFFF),
     card = Color(0xFFFFFFFF),
     line = Color(0xFFE3EAF7),
     text = Color(0xFF0E1A33),
-    muted = Color(0xFF66769A),
-    faint = Color(0xFFA6B2CB),
-    accent = Color(0xFF2E6BFF),
+    muted = Color(0xFF4F5F84),
+    faint = Color(0xFF5A6A8C),
+    // #2E6BFF is the artwork's blue, but as 11 sp text on chalk it is 4.24:1.
+    // This is the same hue taken two steps down; fills and the hero gradient
+    // keep the brighter original.
+    accent = Color(0xFF2560EC),
     onAccent = Color(0xFFFFFFFF),
     lavender = Color(0xFF6E8CFF),
     rose = Color(0xFFFF5C7C),
@@ -202,9 +209,13 @@ private val Cloud = BunPalette(
     miniBg = Color(0xFF13234A),
     miniText = Color(0xFFFFFFFF),
     shadow = Color(0x1F2E6BFF),
-    hero = listOf(Color(0xFF2E6BFF), Color(0xFF5B8DFF), Color(0xFF86B4FF)),
+    // The card used to fade to #86B4FF, where white text lands at 2.2:1 and an
+    // 80 % white subtitle at 3.4:1. The gradient now stays inside the range
+    // white can survive, and the subtitle is opaque — alpha on a gradient is
+    // the fastest way to lose contrast you thought you had.
+    hero = listOf(Color(0xFF2459E8), Color(0xFF2E6BFF), Color(0xFF4B82FF)),
     heroInk = Color(0xFFFFFFFF),
-    heroSub = Color(0xCCFFFFFF),
+    heroSub = Color(0xFFFFFFFF),
     heroBtn = Color(0xFFFFFFFF),
     heroBtnInk = Color(0xFF2E6BFF),
     light = true,
@@ -218,15 +229,15 @@ private val Cloud = BunPalette(
  * because white button labels sit on it: at the brighter shade they fail AA.
  */
 private val Pink = BunPalette(
-    void = Color(0xFFFFE9F0),
-    base = Color(0xFFFFF6F9),
+    void = Color(0xFFFBE9F0),
+    base = Color(0xFFFDF2F6),
     raised = Color(0xFFFFFFFF),
     card = Color(0xFFFFFFFF),
     line = Color(0xFFF7DDE6),
     text = Color(0xFF3B1B27),
-    muted = Color(0xFFA36F80),
-    faint = Color(0xFFC9A2AF),
-    accent = Color(0xFFD63366),
+    muted = Color(0xFF7F5061),
+    faint = Color(0xFF8A5A6B),
+    accent = Color(0xFFC92C5D),
     onAccent = Color(0xFFFFFFFF),
     lavender = Color(0xFFFF9FBB),
     rose = Color(0xFFE84678),

@@ -499,10 +499,10 @@ private fun GroupLabel(text: String) {
     Text(
         text.uppercase(),
         color = Ink.Faint,
-        fontSize = 9.5.sp,
+        fontSize = 10.sp,
         fontFamily = SoraFamily,
         fontWeight = FontWeight.SemiBold,
-        letterSpacing = 1.4.sp,
+        letterSpacing = 0.9.sp,
         modifier = Modifier.padding(start = 24.dp, top = 22.dp, bottom = 8.dp),
     )
 }

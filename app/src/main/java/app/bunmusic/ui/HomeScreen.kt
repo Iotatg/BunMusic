@@ -96,7 +96,7 @@ fun HomeScreen(
                     fontSize = 13.sp,
                     fontFamily = SoraFamily,
                     fontWeight = FontWeight.Bold,
-                    letterSpacing = 3.sp,
+                    letterSpacing = 1.8.sp,
                 )
                 Spacer(Modifier.weight(1f))
                 IconBtn(G.Gear, Ink.Muted, 38.dp, 18.dp, onOpenSettings)
@@ -251,7 +251,7 @@ private fun SearchPill(onClick: () -> Unit, modifier: Modifier = Modifier) {
             Modifier.clip(RoundedCornerShape(8.dp)).background(Ink.Lime.copy(alpha = 0.14f))
                 .padding(horizontal = 7.dp, vertical = 3.dp)
         ) {
-            Text("YT", color = Ink.Lime, fontSize = 9.sp, fontFamily = SoraFamily, fontWeight = FontWeight.Bold)
+            Text("YT", color = Ink.Lime, fontSize = 10.sp, fontFamily = SoraFamily, fontWeight = FontWeight.Bold)
         }
     }
 }
@@ -316,10 +316,10 @@ private fun HeroCard(track: Track, playing: Boolean, onPlay: () -> Unit) {
                     Text(
                         if (playing) "PLAYING NOW" else "PICK UP WHERE YOU LEFT",
                         color = Ink.HeroInk,
-                        fontSize = 8.5.sp,
+                        fontSize = 10.sp,
                         fontFamily = SoraFamily,
                         fontWeight = FontWeight.Bold,
-                        letterSpacing = 1.sp,
+                        letterSpacing = 0.9.sp,
                     )
                 }
             }
@@ -407,7 +407,7 @@ private fun RecentTile(track: Track, downloaded: Boolean, onClick: () -> Unit) {
         Text(
             track.artist,
             color = Ink.Faint,
-            fontSize = 10.5.sp,
+            fontSize = 11.sp,
             fontFamily = SoraFamily,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,

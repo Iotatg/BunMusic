@@ -28,6 +28,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Slider
+import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -402,9 +403,12 @@ private fun MidnightTrackRow(
                             else -> "CACHED"
                         },
                         color = Ink.Mint,
-                        fontSize = 8.sp,
+                        fontSize = 10.sp,
                         fontFamily = SoraFamily,
                         fontWeight = FontWeight.SemiBold,
+                        // ALL CAPS always carries positive tracking; without it the
+                        // badge reads as a cramped smear at this size.
+                        letterSpacing = 0.7.sp,
                         modifier = Modifier
                             .clip(RoundedCornerShape(4.dp))
                             .background(Ink.Mint.copy(alpha = 0.14f))
@@ -427,7 +431,7 @@ private fun MidnightTrackRow(
         }
         if (onLike != null) {
             Box(
-                Modifier.size(34.dp).clip(CircleShape).clickable { onLike() },
+                Modifier.tapTarget().size(34.dp).clip(CircleShape).clickable { onLike() },
                 contentAlignment = Alignment.Center,
             ) {
                 Glyph(
@@ -439,7 +443,7 @@ private fun MidnightTrackRow(
         }
         if (onMore != null) {
             Box(
-                Modifier.size(32.dp).clip(CircleShape).clickable { onMore() },
+                Modifier.tapTarget().size(32.dp).clip(CircleShape).clickable { onMore() },
                 contentAlignment = Alignment.Center,
             ) { Glyph(G.More, Ink.Faint, 16.dp) }
         }
@@ -506,7 +510,7 @@ private fun CharcoalTrackRow(
         }
         if (onLike != null) {
             Box(
-                Modifier.size(30.dp).clip(CircleShape).clickable { onLike() },
+                Modifier.tapTarget().size(30.dp).clip(CircleShape).clickable { onLike() },
                 contentAlignment = Alignment.Center,
             ) {
                 Glyph(if (liked) G.HeartFill else G.Heart, if (liked) Ink.Rose else Ink.Faint, 15.dp)
@@ -514,7 +518,7 @@ private fun CharcoalTrackRow(
         }
         if (onMore != null) {
             Box(
-                Modifier.size(30.dp).clip(CircleShape).clickable { onMore() },
+                Modifier.tapTarget().size(30.dp).clip(CircleShape).clickable { onMore() },
                 contentAlignment = Alignment.Center,
             ) { Glyph(G.More, Ink.Faint, 15.dp) }
         }
@@ -672,6 +676,19 @@ fun GhostBtn(text: String, glyph: G? = null, onClick: () -> Unit) {
     }
 }
 
+/**
+ * Material's 48 dp minimum touch target, for icon buttons drawn smaller.
+ *
+ * Every icon button here draws at 30–40 dp, which is what the reference layouts
+ * look like — but the *hit* area was 30–40 dp too, and a 30 dp target fails
+ * WCAG 2.5.8 and is genuinely hard to hit one-handed. The glyph keeps its size;
+ * the box around it reserves 48 dp for the finger.
+ *
+ * Must be the OUTERMOST modifier in the chain. `Modifier.size(30.dp)` fixes the
+ * constraints, so a `tapTarget()` applied after it has nothing left to expand.
+ */
+fun Modifier.tapTarget(): Modifier = this.minimumInteractiveComponentSize()
+
 // --------------------------------------------------------------- empty states
 
 @Composable
@@ -806,7 +823,7 @@ private fun CharcoalMiniPlayer(
             )
         }
         Box(
-            Modifier.size(34.dp).clip(CircleShape).clickable { onToggle() },
+            Modifier.tapTarget().size(34.dp).clip(CircleShape).clickable { onToggle() },
             contentAlignment = Alignment.Center,
         ) { Glyph(if (state.isPlaying) G.HeartFill else G.Heart, Ink.MiniText.copy(alpha = 0.9f), 18.dp) }
         Spacer(Modifier.width(6.dp))
@@ -845,7 +862,7 @@ private fun MidnightMiniPlayer(
             .fillMaxWidth()
             .padding(horizontal = 14.dp, vertical = 6.dp)
             .clip(RoundedCornerShape(20.dp))
-            .background(Brush.linearGradient(listOf(Ink.MiniBg, Color(0xFF191521))))
+            .background(Brush.linearGradient(listOf(Ink.MiniBg, Ink.Void)))
             .border(1.dp, Color.White.copy(alpha = 0.07f), RoundedCornerShape(20.dp))
             .clickable { onOpen() }
     ) {
@@ -880,13 +897,13 @@ private fun MidnightMiniPlayer(
                 )
             }
             Box(
-                Modifier.size(36.dp).clip(CircleShape).clickable { onToggle() },
+                Modifier.tapTarget().size(36.dp).clip(CircleShape).clickable { onToggle() },
                 contentAlignment = Alignment.Center,
             ) {
                 Glyph(if (state.isPlaying) G.Pause else G.Play, Ink.Text, 18.dp)
             }
             Box(
-                Modifier.size(36.dp).clip(CircleShape).clickable { onNext() },
+                Modifier.tapTarget().size(36.dp).clip(CircleShape).clickable { onNext() },
                 contentAlignment = Alignment.Center,
             ) { Glyph(G.Next, Ink.Text, 18.dp) }
         }
@@ -988,6 +1005,15 @@ fun WaveSeekBar(
                     local = (change.position.x / size.width.toFloat()).coerceIn(0f, 1f)
                 }
             }
+            // Drag alone meant a tap on the waveform did nothing at all — the
+            // line seek bar always supported both, so the two buns disagreed on
+            // how the same control behaves.
+            .pointerInput(durationMs) {
+                detectTapGestures { offset ->
+                    onSeek(((offset.x / size.width.toFloat()).coerceIn(0f, 1f) * durationMs).toLong())
+                    Haptics.tick()
+                }
+            }
     ) {
         widthPx = size.width
         val bars = 56
@@ -1087,12 +1113,13 @@ fun LineSeekBar(
 }
 
 @Composable
-fun BackBar(title: String, onBack: () -> Unit, trailing: @Composable (() -> Unit)? = null) {    Row(
+fun BackBar(title: String, onBack: () -> Unit, trailing: @Composable (() -> Unit)? = null) {
+    Row(
         Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Box(
-            Modifier.size(40.dp).clip(CircleShape).clickable { onBack() },
+            Modifier.tapTarget().size(40.dp).clip(CircleShape).clickable { onBack() },
             contentAlignment = Alignment.Center,
         ) { Glyph(G.Back, Ink.Text, 20.dp, if (Ink.isLight) 2.2.dp else 1.6.dp) }
         Text(

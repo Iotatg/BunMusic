@@ -47,7 +47,7 @@ fun AboutScreen(onBack: () -> Unit) {
                 Display("BunMusic", 32)
                 Spacer(Modifier.height(4.dp))
                 Text(
-                    "1.0.9 · build 10 · ${Skin.current.title} bun",
+                    "1.0.10 · build 11 · ${Skin.current.title} bun",
                     color = Ink.Muted, fontSize = 12.sp, fontFamily = SoraFamily,
                 )
             }
@@ -56,6 +56,14 @@ fun AboutScreen(onBack: () -> Unit) {
         item { GroupTitle("What's new") }
         item {
             AboutCard {
+                Change("Captions you can actually read", "The caption grey sat at 2.0–2.9:1 in all four buns — under the 4.5:1 floor. Every bun's three text tones were recomputed and now pass, on the page and on a card")
+                Change("No pure-white page", "Charcoal painted #FFFFFF behind #FFFFFF cards. The page is a soft grey now, so a card has an edge")
+                Change("Blue and rose you can read on", "Cloud's blue and Pink's rose were 4.2:1 as text. Both are one step deeper; the fills and hero gradients keep the brighter originals")
+                Change("Fingers, not needles", "Row actions were 30–40 dp tap targets. The drawn size is unchanged; the hit area is 48 dp")
+                Change("Tap the waveform", "Charcoal and Pink could only scrub by dragging. A tap now seeks, like Cloud's line")
+                Change("Explore admits failure", "A failed fetch used to leave a near-empty screen. It says what happened and offers a retry")
+                Change("One weight for each job", "Medium was mapped onto the semibold file, so Medium and SemiBold were the same weight. Regular / SemiBold / Bold now")
+                Change("Small type, lifted", "Nothing renders below 10 sp, and every all-caps label carries real tracking")
                 Change("Settings no longer crashes", "1.0.7 handed the adaptive-icon XML to Compose, which cannot paint it. The Buns row now composes the icon's two layers, so Settings opens on every launcher and every Android version")
                 Change("A fourth bun: Pink Bun", "Blush paper, rose ink, Sora throughout — the bun with the music note, from the pink study")
                 Change("Rose where it counts", "Hero card, play disc, nav pill, chips and the home-screen widget all follow the bun's rose")
@@ -83,7 +91,7 @@ fun AboutScreen(onBack: () -> Unit) {
         item { GroupTitle("Build") }
         item {
             AboutCard {
-                Fact("Version", "1.0.9 (10)")
+                Fact("Version", "1.0.10 (11)")
                 Fact("Package", "app.bunmusic")
                 Fact("Min SDK", "26 · Android 8.0")
                 Fact("Target SDK", "37")
@@ -134,10 +142,10 @@ private fun GroupTitle(text: String) {
     Text(
         text.uppercase(),
         color = Ink.Faint,
-        fontSize = 9.5.sp,
+        fontSize = 10.sp,
         fontFamily = SoraFamily,
         fontWeight = FontWeight.SemiBold,
-        letterSpacing = 1.4.sp,
+        letterSpacing = 0.9.sp,
         modifier = Modifier.padding(start = 24.dp, top = 22.dp, bottom = 8.dp),
     )
 }

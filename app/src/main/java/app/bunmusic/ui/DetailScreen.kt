@@ -74,12 +74,12 @@ private fun CharcoalDetailHeader(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Box(
-                Modifier.size(40.dp).clip(CircleShape).clickable { onBack() },
+                Modifier.tapTarget().size(40.dp).clip(CircleShape).clickable { onBack() },
                 contentAlignment = Alignment.Center,
             ) { Glyph(G.Back, Ink.Text, 21.dp, 2.2.dp) }
             Spacer(Modifier.weight(1f))
             Box(
-                Modifier.size(40.dp).clip(CircleShape).clickable { onMore() },
+                Modifier.tapTarget().size(40.dp).clip(CircleShape).clickable { onMore() },
                 contentAlignment = Alignment.Center,
             ) { Glyph(G.Search, Ink.Text, 20.dp, 2.dp) }
         }
@@ -292,10 +292,10 @@ fun DetailScreen(
                                     else -> "PLAYLIST"
                                 },
                                 color = Ink.Lime,
-                                fontSize = 9.sp,
+                                fontSize = 10.sp,
                                 fontFamily = SoraFamily,
                                 fontWeight = FontWeight.Bold,
-                                letterSpacing = 1.4.sp,
+                                letterSpacing = 0.9.sp,
                             )
                             Spacer(Modifier.height(6.dp))
                             Text(

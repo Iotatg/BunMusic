@@ -7,7 +7,7 @@ saved offline.
 
 ```
 package   app.bunmusic
-version   1.0.9 (10)
+version   1.0.10 (11)
 minSdk    26  ·  target/compile 37
 author    Iota Coder · iota14934@gmail.com
 ```
@@ -229,6 +229,24 @@ home, album pages, Explore, Charts, mood pages and the automix radio queue.
 ---
 
 ## Changelog
+
+**1.0.10** — a craft pass over all four buns, measured rather than eyeballed.
+
+- **Captions were unreadable.** The `faint` tone sat at 2.0–2.9:1 in every bun
+  while carrying timestamps, section overlines and hints. All three text tones
+  per bun were recomputed; body, secondary and caption now clear 4.5:1 on the
+  page *and* on a card, and a unit test enforces it.
+- **No pure-white page.** Charcoal painted `#FFFFFF` behind `#FFFFFF` cards, so
+  a card had no edge. The page is a soft grey now, matching Cloud and Pink.
+- **Accent as text.** Cloud's blue and Pink's rose were 4.2:1 at 11 sp. Both are
+  one step deeper; fills and hero gradients keep the brighter originals.
+- **Touch targets.** Row actions were 30–40 dp hit areas. The glyph is unchanged;
+  the box reserves 48 dp.
+- **Tap the waveform.** Charcoal and Pink could only scrub by dragging.
+- **Explore admits failure** instead of rendering a near-empty page.
+- **Three real weights.** `Medium` was mapped onto the semibold file, so Medium
+  and SemiBold were the same weight; hierarchy had collapsed into one tone.
+- **Type floor.** Nothing renders below 10 sp; all-caps labels carry 0.06–0.1 em.
 
 **1.0.9** — Settings opens again. 1.0.7 handed the adaptive-icon XML to `painterResource`,
 which resolves to an `AdaptiveIconDrawable` that Compose cannot paint; the Buns row now

@@ -162,7 +162,7 @@ fun PlayerScreen(state: PlayerState, onClose: () -> Unit, onMore: () -> Unit) {
                     Text(
                         "PLAYING FROM",
                         color = Ink.Faint,
-                        fontSize = 8.5.sp,
+                        fontSize = 10.sp,
                         fontFamily = SoraFamily,
                         letterSpacing = 1.4.sp,
                         fontWeight = FontWeight.SemiBold,
@@ -224,9 +224,10 @@ fun PlayerScreen(state: PlayerState, onClose: () -> Unit, onMore: () -> Unit) {
                             Text(
                                 "OFFLINE",
                                 color = Ink.Mint,
-                                fontSize = 8.sp,
+                                fontSize = 10.sp,
                                 fontFamily = SoraFamily,
                                 fontWeight = FontWeight.SemiBold,
+                                letterSpacing = 0.7.sp,
                                 modifier = Modifier
                                     .clip(RoundedCornerShape(4.dp))
                                     .background(Ink.Mint.copy(alpha = 0.14f))
@@ -268,16 +269,16 @@ fun PlayerScreen(state: PlayerState, onClose: () -> Unit, onMore: () -> Unit) {
                     activeColor = tint,
                 )
                 Row(Modifier.fillMaxWidth()) {
-                    Text(fmtTime(state.positionMs), color = Ink.Faint, fontSize = 10.5.sp, fontFamily = SoraFamily)
+                    Text(fmtTime(state.positionMs), color = Ink.Faint, fontSize = 11.sp, fontFamily = SoraFamily)
                     Spacer(Modifier.weight(1f))
-                    Text(fmtTime(state.durationMs), color = Ink.Faint, fontSize = 10.5.sp, fontFamily = SoraFamily)
+                    Text(fmtTime(state.durationMs), color = Ink.Faint, fontSize = 11.sp, fontFamily = SoraFamily)
                 }
                 if (state.error != null) {
                     Spacer(Modifier.height(6.dp))
                     Text(
                         state.error ?: "",
                         color = Ink.Rose,
-                        fontSize = 10.5.sp,
+                        fontSize = 11.sp,
                         fontFamily = SoraFamily,
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis,
@@ -516,7 +517,7 @@ private fun ColumnScope.CharcoalPlayer(
             Text(
                 state.error ?: "",
                 color = Ink.Rose,
-                fontSize = 10.5.sp,
+                fontSize = 11.sp,
                 fontFamily = SoraFamily,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
@@ -731,7 +732,7 @@ private fun SecondaryAction(label: String, glyph: G, active: Boolean, onClick: (
         Text(
             label,
             color = if (active) Ink.Lime else Ink.Faint,
-            fontSize = 9.5.sp,
+            fontSize = 10.sp,
             fontFamily = SoraFamily,
             letterSpacing = 0.4.sp,
         )

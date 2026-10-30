@@ -195,10 +195,10 @@ fun AuthScreen(onGuest: () -> Unit) {
                 Text(
                     "WELCOME BACK",
                     color = Ink.Faint,
-                    fontSize = 9.sp,
+                    fontSize = 10.sp,
                     fontFamily = SoraFamily,
                     fontWeight = FontWeight.SemiBold,
-                    letterSpacing = 1.3.sp,
+                    letterSpacing = 0.9.sp,
                 )
                 Spacer(Modifier.height(10.dp))
                 accounts.take(3).forEach { acc ->
@@ -285,6 +285,7 @@ fun AuthScreen(onGuest: () -> Unit) {
                             trailing = {
                                 Box(
                                     Modifier
+                                        .tapTarget()
                                         .size(34.dp)
                                         .clip(CircleShape)
                                         .clickable { showPassword = !showPassword },
@@ -502,7 +503,7 @@ fun AuthScreen(onGuest: () -> Unit) {
                 Text(
                     "or",
                     color = Ink.Faint,
-                    fontSize = 10.sp,
+                    fontSize = 11.sp,
                     fontFamily = SoraFamily,
                     modifier = Modifier.padding(horizontal = 12.dp),
                 )
@@ -532,7 +533,7 @@ fun AuthScreen(onGuest: () -> Unit) {
                 "By continuing you agree to keep the music yours — no ads, no tracking, " +
                     "and nothing leaves this device unless you back it up.",
                 color = Ink.Faint,
-                fontSize = 10.sp,
+                fontSize = 11.sp,
                 fontFamily = SoraFamily,
                 lineHeight = 15.sp,
             )
@@ -630,10 +631,10 @@ fun AuthField(
         Text(
             label,
             color = Ink.Faint,
-            fontSize = 9.sp,
+            fontSize = 10.sp,
             fontFamily = SoraFamily,
             fontWeight = FontWeight.SemiBold,
-            letterSpacing = 1.2.sp,
+            letterSpacing = 0.9.sp,
             modifier = Modifier.padding(start = 4.dp, bottom = 7.dp),
         )
         Row(
@@ -789,10 +790,10 @@ fun GoogleSetupSheet(
             Text(
                 "STEP 1 · REGISTER THIS SIGNATURE",
                 color = Ink.Faint,
-                fontSize = 9.sp,
+                fontSize = 10.sp,
                 fontFamily = SoraFamily,
                 fontWeight = FontWeight.SemiBold,
-                letterSpacing = 1.2.sp,
+                letterSpacing = 0.9.sp,
             )
             Spacer(Modifier.height(6.dp))
             Row(
@@ -806,7 +807,7 @@ fun GoogleSetupSheet(
                 Text(
                     "app.bunmusic\nSHA-1 $sha1",
                     color = Ink.Text,
-                    fontSize = 10.5.sp,
+                    fontSize = 11.sp,
                     fontFamily = SoraFamily,
                     lineHeight = 16.sp,
                     modifier = Modifier.weight(1f),
@@ -817,10 +818,10 @@ fun GoogleSetupSheet(
             Text(
                 "STEP 2 · PASTE THE CLIENT ID",
                 color = Ink.Faint,
-                fontSize = 9.sp,
+                fontSize = 10.sp,
                 fontFamily = SoraFamily,
                 fontWeight = FontWeight.SemiBold,
-                letterSpacing = 1.2.sp,
+                letterSpacing = 0.9.sp,
             )
             Spacer(Modifier.height(6.dp))
             androidx.compose.material3.OutlinedTextField(

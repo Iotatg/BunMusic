@@ -77,10 +77,10 @@ fun HotlistScreen(
                 Text(
                     "HOTLIST",
                     color = Ink.Faint,
-                    fontSize = 9.5.sp,
+                    fontSize = 10.sp,
                     fontFamily = SoraFamily,
                     fontWeight = FontWeight.SemiBold,
-                    letterSpacing = 1.6.sp,
+                    letterSpacing = 0.9.sp,
                 )
                 Spacer(Modifier.height(6.dp))
                 Text(

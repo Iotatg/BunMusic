@@ -110,7 +110,7 @@ private fun StatTile(label: String, value: String, modifier: Modifier = Modifier
             .background(if (Ink.isLight) Brush.linearGradient(listOf(Ink.Field, Ink.Card)) else Brush.linearGradient(listOf(Color(0xFF1F1A2A), Color(0xFF171320))))
             .padding(14.dp),
     ) {
-        Text(label.uppercase(), color = Ink.Faint, fontSize = 8.5.sp, fontFamily = SoraFamily, letterSpacing = 1.1.sp)
+        Text(label.uppercase(), color = Ink.Faint, fontSize = 10.sp, fontFamily = SoraFamily, letterSpacing = 0.9.sp)
         Spacer(Modifier.height(6.dp))
         Text(value, color = Ink.Text, fontSize = 18.sp, fontFamily = SoraFamily, fontWeight = FontWeight.SemiBold)
     }
@@ -147,7 +147,7 @@ private fun WeekBars(week: List<Int>) {
                         .background(if (v > 0) Ink.Lime.copy(alpha = 0.85f) else Ink.Hairline)
                 )
                 Spacer(Modifier.height(6.dp))
-                Text(labels.getOrElse(i) { "" }, color = Ink.Faint, fontSize = 9.sp, fontFamily = SoraFamily)
+                Text(labels.getOrElse(i) { "" }, color = Ink.Faint, fontSize = 10.sp, fontFamily = SoraFamily)
             }
         }
     }
@@ -184,7 +184,7 @@ private fun BarRow(label: String, count: Int, fraction: Float, tint: Color) {
             )
         }
         Spacer(Modifier.width(10.dp))
-        Text("$count", color = Ink.Faint, fontSize = 10.5.sp, fontFamily = SoraFamily)
+        Text("$count", color = Ink.Faint, fontSize = 11.sp, fontFamily = SoraFamily)
     }
 }
 

@@ -91,6 +91,7 @@ fun EqualizerScreen(onBack: () -> Unit) {
                 ) {
                     Box(
                         Modifier
+                            .tapTarget()
                             .size(38.dp)
                             .clip(CircleShape)
                             .background(if (eq.enabled) Ink.Lime else Ink.Hairline),
@@ -149,10 +150,10 @@ fun EqualizerScreen(onBack: () -> Unit) {
                 Text(
                     "PRESETS",
                     color = Ink.Faint,
-                    fontSize = 9.sp,
+                    fontSize = 10.sp,
                     fontFamily = SoraFamily,
                     fontWeight = FontWeight.SemiBold,
-                    letterSpacing = 1.3.sp,
+                    letterSpacing = 0.9.sp,
                 )
             }
         }
@@ -319,7 +320,7 @@ private fun BandColumn(
         Text(
             String.format("%+.0f", local),
             color = if (local == 0f) Ink.Faint else Ink.Lime,
-            fontSize = 9.sp,
+            fontSize = 10.sp,
             fontFamily = SoraFamily,
             fontWeight = FontWeight.Medium,
         )
@@ -345,7 +346,7 @@ private fun BandColumn(
         Text(
             label,
             color = Ink.Muted,
-            fontSize = 9.5.sp,
+            fontSize = 10.sp,
             fontFamily = SoraFamily,
             fontWeight = FontWeight.Medium,
             textAlign = TextAlign.Center,

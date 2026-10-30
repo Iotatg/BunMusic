@@ -249,7 +249,7 @@ private fun ShortcutCard(
         Spacer(Modifier.width(10.dp))
         Column {
             Text(title, color = Ink.Text, fontSize = 12.5.sp, fontFamily = SoraFamily, fontWeight = FontWeight.Medium)
-            Text(subtitle, color = Ink.Faint, fontSize = 10.5.sp, fontFamily = SoraFamily)
+            Text(subtitle, color = Ink.Faint, fontSize = 11.sp, fontFamily = SoraFamily)
         }
     }
 }
