@@ -1,5 +1,6 @@
 package app.bunmusic.ui
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -33,6 +34,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -41,6 +43,7 @@ import app.bunmusic.core.BunSkin
 import app.bunmusic.core.G
 import app.bunmusic.core.Glyph
 import app.bunmusic.core.Haptics
+import app.bunmusic.core.Icons
 import app.bunmusic.core.Ink
 import app.bunmusic.core.Skin
 import app.bunmusic.core.SoraFamily
@@ -70,7 +73,8 @@ fun BunsScreen(onBack: () -> Unit) {
                 Spacer(Modifier.height(6.dp))
                 Text(
                     "A bun is the whole surface: colour, type, corners, how a list " +
-                        "is drawn. Switching one restarts BunMusic.",
+                        "is drawn, and the icon on your home screen. Switching one " +
+                        "restarts BunMusic.",
                     color = Ink.Muted,
                     fontSize = 12.5.sp,
                     fontFamily = SoraFamily,
@@ -119,8 +123,9 @@ fun BunsScreen(onBack: () -> Unit) {
             },
             text = {
                 Text(
-                    "BunMusic will close and reopen so the new bun starts clean. " +
-                        "Your library, downloads and account stay exactly as they are.",
+                    "BunMusic will close and reopen so the new bun starts clean, " +
+                        "and the launcher icon changes with it. Your library, " +
+                        "downloads and account stay exactly as they are.",
                     fontFamily = SoraFamily,
                     fontSize = 12.5.sp,
                     lineHeight = 19.sp,
@@ -162,6 +167,16 @@ private fun BunCard(bun: BunSkin, active: Boolean, onPick: () -> Unit) {
             .padding(14.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
+            // The bun's own launcher icon. Switching buns really does put this on
+            // the home screen, so showing it here is not decoration.
+            Image(
+                painter = painterResource(Icons.launcherOf(bun)),
+                contentDescription = null,
+                modifier = Modifier
+                    .size(46.dp)
+                    .clip(RoundedCornerShape(14.dp)),
+            )
+            Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {
                 Text(
                     bun.title,

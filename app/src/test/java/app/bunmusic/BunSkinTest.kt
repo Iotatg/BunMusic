@@ -1,6 +1,7 @@
 package app.bunmusic
 
 import app.bunmusic.core.BunSkin
+import app.bunmusic.core.Icons
 import app.bunmusic.core.Skin
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -43,6 +44,16 @@ class BunSkinTest {
         assertEquals(BunSkin.MIDNIGHT, BunSkin.of("CHARCOAL-NOT-REAL"))
         assertEquals(BunSkin.MIDNIGHT, BunSkin.of(null))
         assertEquals(BunSkin.CHARCOAL, BunSkin.of("CHARCOAL"))
+    }
+
+    /** Two buns sharing an alias or an icon would leave one of them unlaunchable. */
+    @Test
+    fun everyBunHasItsOwnLauncherEntry() {
+        val aliases = BunSkin.entries.map { Icons.aliasOf(it) }
+        val icons = BunSkin.entries.map { Icons.launcherOf(it) }
+        assertEquals(BunSkin.entries.size, aliases.toSet().size)
+        assertEquals(BunSkin.entries.size, icons.toSet().size)
+        aliases.forEach { assertTrue(it.startsWith(".")) }
     }
 
     private fun channel(v: Float): Float =

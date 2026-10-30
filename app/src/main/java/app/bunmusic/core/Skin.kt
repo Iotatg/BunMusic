@@ -3,6 +3,7 @@ package app.bunmusic.core
 import android.app.Activity
 import android.app.AlarmManager
 import android.app.PendingIntent
+import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.SharedPreferences
@@ -175,6 +176,10 @@ object Skin {
         if (stored != Prefs.settings.value.skin) {
             Prefs.update { it.copy(skin = stored) }
         }
+        // An app update resets both launcher aliases to their manifest defaults,
+        // so the icon is re-pointed here on every cold start rather than only on
+        // a switch. Cheap: it returns immediately when the right alias is on.
+        Icons.reconcile(context, current)
     }
 
     /**
@@ -190,13 +195,33 @@ object Skin {
             // Disk refused the write — restarting would only reload the old bun.
             return
         }
+        // The launcher icon has to be swapped before the relaunch, otherwise the
+        // new process comes back wearing the previous bun's face.
+        Icons.apply(context, skin)
+        // The home-screen widget is drawn by the launcher, not by us, so it has to
+        // be repainted now — nothing in the new process will touch it until the
+        // next track change.
+        runCatching { app.bunmusic.widget.Bar.pushAll(context.applicationContext) }
         restart(context)
     }
 
     private fun restart(context: Context) {
         val app = context.applicationContext
-        val intent = Intent(app, MainActivity::class.java).apply {
+        // Launch through the alias, not MainActivity: the alias is what carries the
+        // splash theme, and it is the component the launcher would have started.
+        val aliasIntent = Intent().apply {
+            component = ComponentName(app.packageName, app.packageName + Icons.aliasOf(current))
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
+        }
+        // If the component switch was refused the alias is disabled, and starting it
+        // would throw — leaving the listener on a dead screen. Fall back to the
+        // activity itself, which always exists.
+        val resolvable = runCatching {
+            app.packageManager.resolveActivity(aliasIntent, 0) != null
+        }.getOrDefault(false)
+        val intent = if (resolvable) aliasIntent else {
+            Intent(app, MainActivity::class.java)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
         }
         val pending = PendingIntent.getActivity(
             app,

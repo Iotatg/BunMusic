@@ -6,4 +6,13 @@
         <item name="android:windowBackground">#08070B</item>
         <item name="android:windowLightStatusBar">false</item>
     </style>
+
+    <!-- Charcoal's window, applied through its launcher alias so the cold-start
+         frame is already paper-white instead of flashing the dark bun first. -->
+    <style name="Theme.BunMusic.Light" parent="Theme.BunMusic">
+        <item name="android:statusBarColor">#FFFFFF</item>
+        <item name="android:navigationBarColor">#FFFFFF</item>
+        <item name="android:windowBackground">#FFFFFF</item>
+        <item name="android:windowLightStatusBar">true</item>
+    </style>
 </resources>

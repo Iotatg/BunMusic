@@ -58,8 +58,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.bunmusic.core.G
 import app.bunmusic.core.Glyph
+import app.bunmusic.core.Icons
 import app.bunmusic.core.Ink
 import app.bunmusic.core.SerifFamily
+import app.bunmusic.core.Skin
 import app.bunmusic.core.SoraFamily
 import app.bunmusic.data.Auth
 import app.bunmusic.data.GoogleAuth
@@ -157,7 +159,7 @@ fun AuthScreen(onGuest: () -> Unit) {
                 // The same artwork the launcher shows, so the first screen and the
                 // home screen agree about what this app looks like.
                 Image(
-                    painter = painterResource(app.bunmusic.R.mipmap.ic_launcher_foreground),
+                    painter = painterResource(Icons.launcherOf(Skin.current)),
                     contentDescription = null,
                     modifier = Modifier
                         .size(42.dp)

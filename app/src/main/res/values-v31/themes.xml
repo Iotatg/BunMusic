@@ -10,4 +10,13 @@
         <item name="android:windowSplashScreenBackground">#08070B</item>
         <item name="android:windowSplashScreenAnimatedIcon">@mipmap/ic_launcher_foreground</item>
     </style>
+
+    <style name="Theme.BunMusic.Light" parent="Theme.BunMusic">
+        <item name="android:statusBarColor">#FFFFFF</item>
+        <item name="android:navigationBarColor">#FFFFFF</item>
+        <item name="android:windowBackground">#FFFFFF</item>
+        <item name="android:windowLightStatusBar">true</item>
+        <item name="android:windowSplashScreenBackground">#FFFFFF</item>
+        <item name="android:windowSplashScreenAnimatedIcon">@mipmap/ic_launcher_charcoal_foreground</item>
+    </style>
 </resources>

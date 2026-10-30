@@ -3,6 +3,7 @@ package app.bunmusic.ui
 import android.content.Intent
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -38,11 +39,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.bunmusic.core.G
 import app.bunmusic.core.Glyph
+import app.bunmusic.core.Icons
 import app.bunmusic.core.Ink
 import app.bunmusic.core.Skin
 import app.bunmusic.core.SoraFamily
@@ -254,6 +257,7 @@ fun SettingsScreen(
                     "Buns",
                     "${Skin.current.title} · ${Skin.current.tagline}",
                     G.Grid,
+                    icon = Icons.launcherOf(Skin.current),
                 ) { onOpenBuns() }
                 Divider()
                 ChoiceRow("Player style", settings.playerStyle.label) {
@@ -556,15 +560,25 @@ private fun ChoiceRow(title: String, subtitle: String, chips: @Composable () -> 
 }
 
 @Composable
-private fun NavRow(title: String, subtitle: String, glyph: G, onClick: () -> Unit) {
+private fun NavRow(title: String, subtitle: String, glyph: G, icon: Int? = null, onClick: () -> Unit) {
     Row(
         Modifier.fillMaxWidth().clickable { onClick() }.padding(horizontal = 16.dp, vertical = 13.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Box(
-            Modifier.size(32.dp).clip(CircleShape).background(Ink.Hairline),
-            contentAlignment = Alignment.Center,
-        ) { Glyph(glyph, Ink.Muted, 15.dp) }
+        if (icon != null) {
+            // Show the real launcher icon rather than a stand-in glyph: it is what
+            // the home screen is actually wearing.
+            Image(
+                painter = painterResource(icon),
+                contentDescription = null,
+                modifier = Modifier.size(32.dp).clip(RoundedCornerShape(10.dp)),
+            )
+        } else {
+            Box(
+                Modifier.size(32.dp).clip(CircleShape).background(Ink.Hairline),
+                contentAlignment = Alignment.Center,
+            ) { Glyph(glyph, Ink.Muted, 15.dp) }
+        }
         Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f)) {
             Text(title, color = Ink.Text, fontSize = 13.5.sp, fontFamily = SoraFamily, fontWeight = FontWeight.Medium)
