@@ -242,6 +242,14 @@ fun buildCommands(host: CommandHost): List<Command> {
         Haptics.enabled = false
         host.toast("Haptics off")
     }
+    add(
+        "Appearance", "artcolour", "Colour from the cover", "Toggle", G.Disc,
+        "palette artwork tint",
+    ) {
+        val next = !Prefs.settings.value.artColour
+        Prefs.update { it.copy(artColour = next) }
+        host.toast(if (next) "Tint follows the artwork" else "Tint is stable per track")
+    }
 
     // ---------------------------------------------------------------- audio
     Prefs.Quality.entries.forEach { q ->
@@ -401,6 +409,39 @@ fun buildCommands(host: CommandHost): List<Command> {
     add("Data", "data.scrobble.off", "Turn scrobbling off", "", G.Cloud) {
         Scrobble.setEnabled(false)
         host.toast("Scrobbling off")
+    }
+
+    // -------------------------------------------------------------- downloads
+    add("Data", "data.dl.pause", "Pause downloads", "Stops after the current bytes", G.Pause, "queue stop") {
+        if (Downloads.queue.value.isEmpty()) {
+            host.toast("Nothing in the download queue")
+        } else {
+            Downloads.pauseAll()
+            host.toast("Downloads paused")
+        }
+    }
+    add("Data", "data.dl.resume", "Resume downloads", "Picks the queue back up", G.Play, "queue start") {
+        if (Downloads.queue.value.isEmpty()) {
+            host.toast("Nothing in the download queue")
+        } else {
+            Downloads.resumeAll()
+            host.toast("Downloads resumed")
+        }
+    }
+    add("Data", "data.dl.clear", "Cancel every download", "Empties the queue", G.Close, "queue cancel") {
+        val n = Downloads.queue.value.size
+        Downloads.queue.value.forEach { Downloads.cancel(it.track.id) }
+        host.toast(if (n == 0) "Queue was already empty" else "Cancelled $n")
+    }
+    add("Data", "data.dl.retry", "Retry failed downloads", "Tries them again", G.Refresh, "queue failed") {
+        val n = Downloads.failedCount()
+        Downloads.retryAllFailed()
+        host.toast(if (n == 0) "Nothing had failed" else "Retrying $n")
+    }
+    add("Data", "data.dl.wifi", "Wi-Fi only downloads", "Toggle", G.Cloud, "mobile data wifi") {
+        val next = !Prefs.settings.value.wifiOnly
+        Prefs.update { it.copy(wifiOnly = next) }
+        host.toast(if (next) "Downloads will wait for Wi-Fi" else "Downloads may use mobile data")
     }
 
     // --------------------------------------------------------------- system

@@ -403,8 +403,14 @@ fun LibraryScreen(
                 selected = emptySet()
             },
             onDownload = {
-                picks.forEach { t -> scope.launch { Downloads.download(t) } }
-                onToast("Downloading ${picks.size}")
+                val added = Downloads.enqueueAll(picks)
+                onToast(
+                    when {
+                        added == 0 -> "Already downloaded or queued"
+                        added < picks.size -> "Queued $added — the rest were already there"
+                        else -> "Queued $added for download"
+                    }
+                )
                 selecting = false
                 selected = emptySet()
             },

@@ -1,6 +1,8 @@
 package app.bunmusic.ui
 
 import android.content.Intent
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -30,6 +32,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.platform.LocalContext
 import kotlinx.coroutines.launch
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -42,6 +45,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.bunmusic.core.Ambient
+import app.bunmusic.core.ArtColors
 import app.bunmusic.core.G
 import app.bunmusic.core.Glyph
 import app.bunmusic.core.Ink
@@ -53,6 +57,7 @@ import app.bunmusic.data.Downloads
 import app.bunmusic.data.Collection
 import app.bunmusic.data.CollectionKind
 import app.bunmusic.data.Shelf
+import app.bunmusic.data.Prefs
 import app.bunmusic.data.Store
 import app.bunmusic.data.Track
 import app.bunmusic.data.YtMusic
@@ -252,7 +257,18 @@ fun DetailScreen(
         loading = false
     }
 
-    val tint = Ambient.colorFor(browseId ?: title)
+    // A collection header gets the colour of its own cover, the same way the
+    // player does — falling back to the id hash until the image decodes.
+    val fallbackTint = Ambient.colorFor(browseId ?: title)
+    val artColour = Prefs.settings.value.artColour
+    val artTint by produceState(fallbackTint, headerArt, artColour) {
+        value = if (artColour) {
+            ArtColors.forUrl(ctx, headerArt)?.primary ?: fallbackTint
+        } else {
+            fallbackTint
+        }
+    }
+    val tint by animateColorAsState(artTint, tween(700), label = "detailTint")
     val window = LocalBunWindow.current
     val gutter = window.gutter
 
@@ -373,9 +389,9 @@ fun DetailScreen(
                         Haptics.tick()
                     }
                     Chip("Download", false, G.Download) {
-                        scope.launch {
-                            tracks.take(50).forEach { Downloads.download(it) }
-                        }
+                        // One write to the queue instead of fifty suspending
+                        // downloads nobody can see. The Downloads screen shows them.
+                        val added = Downloads.enqueueAll(tracks.take(50))
                         Haptics.tick()
                     }
                     Chip("Share", false, G.Share) {

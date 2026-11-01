@@ -7,10 +7,26 @@ saved offline.
 
 ```
 package   app.bunmusic
-version   1.2.0 (15)
+version   1.3.0 (16)
 minSdk    26  ·  target/compile 37
 author    Iota Coder · iota14934@gmail.com
 ```
+
+---
+
+## 1.3.0 — the queue you can see
+
+Two chains were broken in 1.2.0 and both looked fine from the outside.
+
+| | |
+|---|---|
+| **Downloads are a queue** | two at a time, per-track progress, cancel, retry, pause all, and the list survives the process. It used to be one silent suspend function: fifty tracks, fifty connections, nothing on screen |
+| **Wi-Fi only, wired** | the preference existed since the first build with no reader and no switch. It gates the queue, and a held-back download says so |
+| **Colour from the cover** | a median cut over the real artwork instead of a hash of the track id, scored so the winner can carry white text, cross-faded in over 700 ms |
+| **131 commands** | six more, including every download state |
+
+Honest limit: pause and resume restart from zero — there is no byte-range resume,
+because a partial file with no matching server range is a lie.
 
 ---
 

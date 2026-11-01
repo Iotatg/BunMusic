@@ -1,5 +1,8 @@
 package app.bunmusic.ui
 
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.runtime.produceState
+import app.bunmusic.core.ArtColors
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.LinearEasing
@@ -102,7 +105,20 @@ fun PlayerScreen(
     // open the player and leave the listener to find the button themselves.
     LaunchedEffect(openQueueOnStart) { if (openQueueOnStart) showQueue = true }
 
-    val tint = Ambient.colorFor(track)
+    // The id-hash paints the first frame, because waiting for a network image to
+    // colour a background is worse than starting in the wrong colour. As soon as
+    // the cover decodes, its own colour replaces it — cross-faded, so the screen
+    // does not visibly jump two frames in.
+    val context = LocalContext.current
+    val fallbackTint = Ambient.colorFor(track)
+    val artTint by produceState(fallbackTint, track?.id, track?.artUrl, settings.artColour) {
+        value = if (settings.artColour) {
+            ArtColors.forTrack(context, track)?.primary ?: fallbackTint
+        } else {
+            fallbackTint
+        }
+    }
+    val tint by animateColorAsState(artTint, tween(700), label = "tint")
     val glowAlpha = when (settings.glow) {
         Prefs.Glow.OFF -> 0f
         Prefs.Glow.SOFT -> 0.30f

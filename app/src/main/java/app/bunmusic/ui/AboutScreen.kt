@@ -57,6 +57,11 @@ fun AboutScreen(onBack: () -> Unit) {
         item { GroupTitle("What's new") }
         item {
             AboutCard {
+                Change("Downloads you can watch", "Downloading used to be a silent suspend function: fifty tracks meant fifty connections, no progress, no way to stop one, and a failure that showed up as a toast you had already missed. It is a queue now — two at a time, a real progress bar per track, cancel, retry, and a speed read-out")
+                Change("The queue survives the app dying", "What you asked for is written to disk, so a download list interrupted by the system coming back does not vanish. The bytes are not resumed — a partial file with no matching server range is a lie — only the list")
+                Change("Wi-Fi only, finally wired", "The preference existed since the first build with no reader and no switch. It gates the queue now, and a download held back by it says \"Waiting for Wi-Fi\" instead of failing quietly")
+                Change("Colour from the cover", "The player used to hash the track's id into one of eight hues, which is why two songs with the same artwork came out green and orange. It now takes a median-cut palette from the image itself, scored so the winner can carry white text, and cross-fades into place so the first frame is not a flash of the wrong colour")
+                Change("A colour you can turn off", "If you liked the stable hash, Settings → Colour from the cover puts it back. Same switch in the command deck")
                 Change("Four widgets, not one", "A 4×2 card with cover, progress, elapsed/total, like, transport and queue; a 2×2 cover; a 4×1 strip; and a 4×4 queue whose rows jump to the track. The old widget was a single 4×1 bar with three buttons")
                 Change("The widget wears the bun", "Match the bun, or pin Midnight, Charcoal, Cloud, Pink, or smoked glass. Three corner shapes, and every element can be switched off per widget — long-press it to reconfigure")
                 Change("It resizes instead of clipping", "Below 118 dp the time row goes, below 96 dp the bar goes, below 200 dp wide the like and queue buttons go. Nothing is ever cut in half by a cell that is one row shorter than expected")

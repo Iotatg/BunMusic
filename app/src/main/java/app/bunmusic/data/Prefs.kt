@@ -62,6 +62,8 @@ object Prefs {
         val resumeOnLaunch: Boolean = true,
         /** Highlight lyrics word by word when the provider gives timings. */
         val wordLyrics: Boolean = true,
+        /** Take the player's tint from the cover. Off keeps the stable id hash. */
+        val artColour: Boolean = true,
     )
 
     private lateinit var sp: SharedPreferences
@@ -101,6 +103,7 @@ object Prefs {
             skipSilence = sp.getBoolean("skipSilence", d.skipSilence),
             resumeOnLaunch = sp.getBoolean("resumeOnLaunch", d.resumeOnLaunch),
             wordLyrics = sp.getBoolean("wordLyrics", d.wordLyrics),
+            artColour = sp.getBoolean("artColour", d.artColour),
         )
     }
 
@@ -133,6 +136,7 @@ object Prefs {
             .putBoolean("skipSilence", next.skipSilence)
             .putBoolean("resumeOnLaunch", next.resumeOnLaunch)
             .putBoolean("wordLyrics", next.wordLyrics)
+            .putBoolean("artColour", next.artColour)
             .apply()
     }
 }

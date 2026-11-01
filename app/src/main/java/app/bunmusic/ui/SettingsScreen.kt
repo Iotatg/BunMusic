@@ -82,6 +82,7 @@ fun SettingsScreen(
 ) {
     val settings by Prefs.settings.collectAsState()
     val downloads by Downloads.entries.collectAsState()
+    val downloadQueue by Downloads.queue.collectAsState()
     val account by Auth.account.collectAsState()
     val eq by Eq.state.collectAsState()
 
@@ -327,6 +328,16 @@ fun SettingsScreen(
                 }
                 Divider()
                 ToggleRow(
+                    "Colour from the cover",
+                    if (settings.artColour) {
+                        "The player takes its tint from the artwork"
+                    } else {
+                        "A stable colour per track, derived from its id"
+                    },
+                    settings.artColour,
+                ) { v -> Prefs.update { it.copy(artColour = v) } }
+                Divider()
+                ToggleRow(
                     "Word-by-word lyrics",
                     "Lights up each word as the line is sung",
                     settings.wordLyrics,
@@ -476,9 +487,24 @@ fun SettingsScreen(
                     onToast("Image cache cleared")
                 }
                 Divider()
+                // wifiOnly existed in Prefs since the first build with no reader
+                // and no switch. It is the download gate now, so it needs a face.
+                ToggleRow(
+                    "Download on Wi-Fi only",
+                    if (settings.wifiOnly) {
+                        "Downloads wait for Wi-Fi instead of using mobile data"
+                    } else {
+                        "Downloads use mobile data when there is no Wi-Fi"
+                    },
+                    settings.wifiOnly,
+                ) { v -> Prefs.update { it.copy(wifiOnly = v) } }
+                Divider()
                 NavRow(
                     "Downloads",
-                    "${downloads.size} tracks · ${fmtBytes(downloads.sumOf { it.bytes })}",
+                    when {
+                        downloadQueue.isNotEmpty() -> "${downloadQueue.size} in the queue · ${downloads.size} saved"
+                        else -> "${downloads.size} tracks · ${fmtBytes(downloads.sumOf { it.bytes })}"
+                    },
                     G.Download,
                 ) { onOpenDownloads() }
                 Divider()

@@ -1,5 +1,12 @@
 package app.bunmusic.ui
 
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -8,6 +15,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -27,6 +35,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
@@ -191,7 +202,15 @@ private fun BarRow(label: String, count: Int, fraction: Float, tint: Color) {
 @Composable
 fun DownloadsScreen(onBack: () -> Unit, onPlay: (List<Track>, Int) -> Unit) {
     val entries by Downloads.entries.collectAsState()
+    val queue by Downloads.queue.collectAsState()
+    val speed by Downloads.speed.collectAsState()
+    val paused by Downloads.paused.collectAsState()
+
     val tracks = remember(entries) { entries.mapNotNull { Store.track(it.trackId) } }
+    val active = queue.filter { it.state != Downloads.State.FAILED }
+    val failed = queue.filter { it.state == Downloads.State.FAILED }
+    val waiting = active.count { it.state == Downloads.State.WAITING }
+    val running = active.count { it.state == Downloads.State.RUNNING }
 
     LazyColumn(
         Modifier.fillMaxSize().statusBarsPadding(),
@@ -210,22 +229,92 @@ fun DownloadsScreen(onBack: () -> Unit, onPlay: (List<Track>, Int) -> Unit) {
             }
         }
 
-        if (entries.isEmpty()) {
+        // ------------------------------------------------------------ the queue
+        if (active.isNotEmpty() || failed.isNotEmpty()) {
+            item {
+                Row(
+                    Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column(Modifier.weight(1f)) {
+                        Text(
+                            when {
+                                paused -> "Paused"
+                                running > 0 && speed > 0 -> "Downloading $running · ${fmtSpeed(speed)}"
+                                running > 0 -> "Downloading $running"
+                                waiting > 0 -> "Waiting for Wi-Fi"
+                                else -> "${active.size} in the queue"
+                            },
+                            color = Ink.Text, fontSize = 13.sp, fontFamily = SoraFamily,
+                            fontWeight = FontWeight.Medium,
+                        )
+                        Text(
+                            "${active.size} queued · ${failed.size} failed",
+                            color = Ink.Faint, fontSize = 11.sp, fontFamily = SoraFamily,
+                        )
+                    }
+                    if (active.isNotEmpty()) {
+                        GhostBtn(if (paused) "Resume" else "Pause", if (paused) G.Play else G.Pause) {
+                            if (paused) Downloads.resumeAll() else Downloads.pauseAll()
+                        }
+                    }
+                }
+            }
+
+            if (waiting > 0) {
+                item {
+                    // The switch that used to be decoration. Saying why a download
+                    // is sitting still is the whole difference between a queue and
+                    // a bug.
+                    Text(
+                        "Wi-Fi only is on — ${if (waiting == 1) "one download is" else "$waiting downloads are"} held back until this phone is on Wi-Fi.",
+                        color = Ink.Faint, fontSize = 11.sp, fontFamily = SoraFamily,
+                        lineHeight = 15.sp,
+                        modifier = Modifier.padding(horizontal = 20.dp, vertical = 2.dp),
+                    )
+                }
+            }
+
+            items(active, key = { "q" + it.track.id }) { job -> JobRow(job) }
+
+            items(failed, key = { "f" + it.track.id }) { job -> JobRow(job) }
+
+            if (failed.isNotEmpty()) {
+                item {
+                    Row(Modifier.padding(horizontal = 20.dp, vertical = 10.dp)) {
+                        FilledBtn("Retry failed", G.Refresh) { Downloads.retryAllFailed() }
+                        Spacer(Modifier.width(10.dp))
+                        GhostBtn("Clear", G.Trash) { Downloads.clearFailed() }
+                    }
+                }
+            }
+        }
+
+        // --------------------------------------------------------- what is here
+        if (entries.isEmpty() && active.isEmpty() && failed.isEmpty()) {
             item {
                 EmptyState(
                     G.Download, "Nothing downloaded yet",
-                    "Open a track's ⋮ menu and tap Download offline.",
+                    "Open a track's menu and tap Download offline.",
                 )
             }
-        } else {
+        } else if (entries.isNotEmpty()) {
             item {
-                Row(Modifier.padding(horizontal = 20.dp, vertical = 14.dp)) {
+                Row(
+                    Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        "Downloaded",
+                        color = Ink.Faint, fontSize = 11.sp, fontFamily = SoraFamily,
+                        modifier = Modifier.weight(1f),
+                    )
                     FilledBtn("Play all", G.Play) { onPlay(tracks, 0) }
                     Spacer(Modifier.width(10.dp))
                     GhostBtn("Remove all", G.Trash) { Downloads.clearAll() }
                 }
             }
-            items(entries) { e ->
+            items(entries, key = { "e" + it.trackId }) { e ->
                 Row(
                     Modifier
                         .fillMaxWidth()
@@ -264,4 +353,107 @@ fun DownloadsScreen(onBack: () -> Unit, onPlay: (List<Track>, Int) -> Unit) {
             }
         }
     }
+}
+
+/** One queued, running, held-back or failed download. */
+@Composable
+private fun JobRow(job: Downloads.Job) {
+    val failed = job.state == Downloads.State.FAILED
+    Row(
+        Modifier.fillMaxWidth().padding(horizontal = 8.dp).padding(horizontal = 12.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        ArtImage(
+            url = job.track.artUrl,
+            asset = job.track.artAsset,
+            modifier = Modifier.size(46.dp),
+            shape = RoundedCornerShape(12.dp),
+        )
+        Spacer(Modifier.width(12.dp))
+        Column(Modifier.weight(1f)) {
+            Text(
+                job.track.title,
+                color = if (failed) Ink.Muted else Ink.Text,
+                fontSize = 13.5.sp, fontFamily = SoraFamily,
+                fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis,
+            )
+            Spacer(Modifier.height(2.dp))
+            Text(
+                when (job.state) {
+                    Downloads.State.QUEUED -> "Queued"
+                    Downloads.State.WAITING -> "Waiting for Wi-Fi"
+                    Downloads.State.FAILED -> job.error ?: "Failed"
+                    Downloads.State.RUNNING ->
+                        if (job.totalBytes > 0) {
+                            "${(job.fraction * 100).toInt()}% · ${fmtBytes(job.doneBytes)} of ${fmtBytes(job.totalBytes)}"
+                        } else {
+                            "Starting… ${fmtBytes(job.doneBytes)}"
+                        }
+                },
+                color = if (failed) Ink.Faint else Ink.Muted,
+                fontSize = 11.sp, fontFamily = SoraFamily,
+                maxLines = 1, overflow = TextOverflow.Ellipsis,
+            )
+            if (!failed) {
+                Spacer(Modifier.height(6.dp))
+                ThinBar(
+                    fraction = job.fraction,
+                    indeterminate = job.indeterminate,
+                    tint = if (job.state == Downloads.State.RUNNING) Ink.Lime else Ink.Faint,
+                )
+            }
+        }
+        Spacer(Modifier.width(10.dp))
+        Box(
+            Modifier.size(32.dp).clip(CircleShape).clickable {
+                if (failed) Downloads.retry(job.track.id) else Downloads.cancel(job.track.id)
+            },
+            contentAlignment = Alignment.Center,
+        ) {
+            Glyph(if (failed) G.Refresh else G.Close, Ink.Faint, 14.dp)
+        }
+    }
+}
+
+/**
+ * A five-pixel bar. Indeterminate means the server did not send a length, and a
+ * bar that sits at 0 % in that case reads as "stuck", so a block slides across.
+ */
+@Composable
+private fun ThinBar(fraction: Float, indeterminate: Boolean, tint: Color) {
+    val transition = rememberInfiniteTransition(label = "download")
+    val phase by transition.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(tween(1_300, easing = LinearEasing), RepeatMode.Restart),
+        label = "phase",
+    )
+    val track = Ink.Line
+    Canvas(Modifier.fillMaxWidth().height(5.dp)) {
+        val radius = CornerRadius(size.height / 2f)
+        drawRoundRect(color = track, cornerRadius = radius)
+        if (indeterminate) {
+            val w = size.width * 0.28f
+            drawRoundRect(
+                color = tint,
+                topLeft = Offset((size.width - w) * phase, 0f),
+                size = Size(w, size.height),
+                cornerRadius = radius,
+            )
+        } else if (fraction > 0f) {
+            drawRoundRect(
+                color = tint,
+                size = Size((size.width * fraction).coerceAtLeast(size.height), size.height),
+                cornerRadius = radius,
+            )
+        }
+    }
+}
+
+/** "1.4 MB/s" — one decimal below ten, none above, because the extra digit is noise. */
+private fun fmtSpeed(bytesPerSecond: Long): String = when {
+    bytesPerSecond < 1024 -> "$bytesPerSecond B/s"
+    bytesPerSecond < 1024 * 1024 -> "${bytesPerSecond / 1024} KB/s"
+    bytesPerSecond < 10 * 1024 * 1024 -> String.format("%.1f MB/s", bytesPerSecond / 1048576.0)
+    else -> "${bytesPerSecond / (1024 * 1024)} MB/s"
 }
