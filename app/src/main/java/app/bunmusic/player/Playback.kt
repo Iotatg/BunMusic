@@ -542,6 +542,18 @@ object Playback {
         _state.value = _state.value.copy(speed = v)
     }
 
+    /**
+     * The listener swiped the card away while it was paused.
+     *
+     * The service goes (otherwise it runs on with nothing able to reach it) but
+     * the saved session stays, so the queue is still there on the next launch.
+     */
+    fun dismissCard() {
+        _player?.pause()
+        saveSession(force = true)
+        if (::appContext.isInitialized) ServiceLauncher.stop(appContext)
+    }
+
     fun stop() {
         _player?.stop()
         _player?.clearMediaItems()

@@ -3,9 +3,13 @@ package app.bunmusic.player
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
+import android.app.PendingIntent
 import android.content.Context
+import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.os.Handler
+import android.os.Looper
 import android.util.LruCache
 import android.view.View
 import android.widget.RemoteViews
@@ -46,6 +50,7 @@ class BunNotificationProvider(private val context: Context) : MediaNotification.
 
     private val art = ArtCache()
     private val io = Executors.newSingleThreadExecutor { r -> Thread(r, "bun-notif-art").apply { isDaemon = true } }
+    private val main = Handler(Looper.getMainLooper())
 
     private var session: MediaSession? = null
     private var factory: MediaNotification.ActionFactory? = null
@@ -53,17 +58,7 @@ class BunNotificationProvider(private val context: Context) : MediaNotification.
     private var buttons: ImmutableList<CommandButton> = ImmutableList.of()
 
     init {
-        val manager = context.getSystemService(NotificationManager::class.java)
-        if (manager.getNotificationChannel(CHANNEL_ID) == null) {
-            manager.createNotificationChannel(
-                NotificationChannel(CHANNEL_ID, "Playback", NotificationManager.IMPORTANCE_LOW).apply {
-                    description = "What is playing right now"
-                    setShowBadge(false)
-                    enableVibration(false)
-                    setSound(null, null)
-                }
-            )
-        }
+        ensureChannel(context)
     }
 
     override fun createNotification(
@@ -207,6 +202,19 @@ class BunNotificationProvider(private val context: Context) : MediaNotification.
             // before the controls appear.
             .setForegroundServiceBehavior(NotificationCompat.FOREGROUND_SERVICE_IMMEDIATE)
             .setPriority(NotificationCompat.PRIORITY_LOW)
+            // Swiping the card away while paused has to mean something. Without
+            // this the notification disappears and the service keeps running with
+            // no way left to reach it — a player that is neither playing nor
+            // stoppable. While playing the card is ongoing, so it cannot be
+            // swiped in the first place.
+            .setDeleteIntent(
+                PendingIntent.getBroadcast(
+                    context,
+                    2,
+                    Intent(context, NotificationDismissReceiver::class.java),
+                    PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+                )
+            )
 
         if (cover != null) builder.setLargeIcon(cover)
 
@@ -250,8 +258,14 @@ class BunNotificationProvider(private val context: Context) : MediaNotification.
         val s = session ?: return
         val f = factory ?: return
         val c = callback ?: return
-        runCatching {
-            c.onNotificationChanged(MediaNotification(NOTIFICATION_ID, build(s, f, buttons)))
+        // The artwork arrives on the download thread. RemoteViews, the player
+        // state the card is built from and Media3's own callback all belong to the
+        // main thread, so the redraw is posted there instead of run where the
+        // bytes landed.
+        main.post {
+            runCatching {
+                c.onNotificationChanged(MediaNotification(NOTIFICATION_ID, build(s, f, buttons)))
+            }
         }
     }
 
@@ -320,5 +334,25 @@ class BunNotificationProvider(private val context: Context) : MediaNotification.
     companion object {
         const val CHANNEL_ID = "bunmusic_playback"
         const val NOTIFICATION_ID = 1001
+
+        /**
+         * Create the playback channel if it is not there yet.
+         *
+         * Also called by the test card in Settings, which may run before the
+         * service has ever been created — a notification posted on a channel that
+         * does not exist is dropped without a word on Android 8 and later.
+         */
+        fun ensureChannel(context: Context) {
+            val manager = context.getSystemService(NotificationManager::class.java) ?: return
+            if (manager.getNotificationChannel(CHANNEL_ID) != null) return
+            manager.createNotificationChannel(
+                NotificationChannel(CHANNEL_ID, "Playback", NotificationManager.IMPORTANCE_LOW).apply {
+                    description = "What is playing right now"
+                    setShowBadge(false)
+                    enableVibration(false)
+                    setSound(null, null)
+                }
+            )
+        }
     }
 }

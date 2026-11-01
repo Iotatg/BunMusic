@@ -68,6 +68,7 @@ import app.bunmusic.data.Session
 import app.bunmusic.data.Store
 import app.bunmusic.player.BunNotificationProvider
 import app.bunmusic.player.Playback
+import app.bunmusic.player.TestCard
 import app.bunmusic.system.PlaybackControls
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -551,6 +552,22 @@ fun SettingsScreen(
                     }
                     Divider()
                 }
+                // The playback card needs a service, a session, a resolved stream
+                // and a playing track before it can exist, so "nothing appears"
+                // has five possible causes. This card has none of those
+                // dependencies, which is the point: it splits the problem in two.
+                NavRow(
+                    "Send a test card",
+                    "Posts one notification, so you can see whether the phone allows it at all",
+                    G.Sparkle,
+                ) {
+                    val posted = TestCard.post(context)
+                    onToast(
+                        if (posted) "Posted — pull down the shade to look for it"
+                        else "The phone refuses notifications — fix the permission above first"
+                    )
+                }
+                Divider()
                 NavRow("Clear search history", "Removes saved queries", G.Search) {
                     Store.clearQueries()
                     onToast("Search history cleared")

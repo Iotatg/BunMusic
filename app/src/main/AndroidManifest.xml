@@ -123,6 +123,12 @@
             </intent-filter>
         </service>
 
+        <!-- The swipe on the playback card. Not exported: the only PendingIntent
+             that reaches it is the one this app put on the notification. -->
+        <receiver
+            android:name=".player.NotificationDismissReceiver"
+            android:exported="false" />
+
         <!-- Wired and Bluetooth buttons arrive here when the app is not on
              screen: the receiver hands the event to the session, which is what
              makes play/pause on a headset work with the phone in a pocket. -->
