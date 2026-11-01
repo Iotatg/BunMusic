@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Only the share folder is exposed, and only for as long as the share sheet
+     holds a read grant on it. -->
+<paths>
+    <cache-path name="shared" path="shared/" />
+</paths>

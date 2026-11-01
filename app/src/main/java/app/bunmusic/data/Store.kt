@@ -38,6 +38,7 @@ object Store {
     private val SCOPED_KEYS = listOf(
         KEY_REG, KEY_LIKES, KEY_HISTORY, KEY_RECENT, KEY_PLAYLISTS,
         KEY_TOTAL_MS, KEY_PLAYS, KEY_ARTISTS, KEY_TRACKS, KEY_DAYS, KEY_QUERIES,
+        KEY_DISLIKE, KEY_FOLLOWS, KEY_PLAY_IDS,
     )
 
     /**
@@ -104,6 +105,9 @@ object Store {
     private const val KEY_ARTISTS = "stats_artists"
     private const val KEY_TRACKS = "stats_tracks"
     private const val KEY_DAYS = "stats_days"
+    private const val KEY_PLAY_IDS = "stats_play_ids"
+    private const val KEY_DISLIKE = "disliked_ids"
+    private const val KEY_FOLLOWS = "followed_artists"
 
     private fun regRaw(): String = prefs.getString(k(KEY_REG), null) ?: ""
 
@@ -129,6 +133,9 @@ object Store {
     }
 
     fun track(id: String): Track? = registry()[id]
+
+    /** Everything the registry knows, most recently remembered first. */
+    fun allTracks(): List<Track> = registry().values.toList().asReversed()
 
     // ------------------------------------------------------------------ likes
 
@@ -164,6 +171,79 @@ object Store {
     fun likedTracks(): List<Track> {
         val map = registry()
         return likeIds().mapNotNull { map[it] }
+    }
+
+    /**
+     * Like or unlike a whole selection at once.
+     *
+     * The old single-track path rewrote the list once per track, which for a
+     * fifty-song selection meant fifty writes and fifty full re-reads. This
+     * builds the result once.
+     */
+    @Synchronized
+    fun likeMany(ids: List<String>, liked: Boolean) {
+        if (ids.isEmpty()) return
+        val current = likeIds().toMutableList()
+        if (liked) {
+            ids.reversed().forEach { if (!current.contains(it)) current.add(0, it) }
+        } else {
+            current.removeAll(ids.toSet())
+        }
+        prefs.edit().putString(k(KEY_LIKES), current.joinToString(R.toString())).apply()
+    }
+
+    // --------------------------------------------------------------- dislikes
+
+    /**
+     * "Not for me".
+     *
+     * Kept apart from the likes list rather than as a third state on it: a dislike
+     * must never be able to eat a like, and the two lists are read by different
+     * screens. Disliking a liked track unlikes it, because both at once is a
+     * contradiction the radio has no answer for.
+     */
+    private fun dislikeIds(): List<String> =
+        (prefs.getString(k(KEY_DISLIKE), null) ?: "").split(R).filter { it.isNotBlank() }
+
+    fun dislikes(): Set<String> = dislikeIds().toSet()
+
+    fun isDisliked(id: String): Boolean = dislikeIds().contains(id)
+
+    @Synchronized
+    fun toggleDislike(track: Track): Boolean {
+        remember(track)
+        val ids = dislikeIds().toMutableList()
+        val now = if (ids.contains(track.id)) {
+            ids.remove(track.id); false
+        } else {
+            ids.add(0, track.id)
+            if (likeIds().contains(track.id)) {
+                prefs.edit().putString(
+                    k(KEY_LIKES),
+                    likeIds().filterNot { it == track.id }.joinToString(R.toString()),
+                ).apply()
+            }
+            true
+        }
+        prefs.edit().putString(k(KEY_DISLIKE), ids.joinToString(R.toString())).apply()
+        return now
+    }
+
+    // ---------------------------------------------------------------- follows
+
+    fun follows(): Set<String> =
+        (prefs.getString(k(KEY_FOLLOWS), null) ?: "").split(R).filter { it.isNotBlank() }.toSet()
+
+    fun isFollowing(artist: String): Boolean = follows().contains(artist.trim())
+
+    @Synchronized
+    fun toggleFollow(artist: String): Boolean {
+        val name = artist.trim()
+        if (name.isEmpty()) return false
+        val set = follows().toMutableSet()
+        val now = if (!set.add(name)) { set.remove(name); false } else true
+        prefs.edit().putString(k(KEY_FOLLOWS), set.joinToString(R.toString())).apply()
+        return now
     }
 
     // ---------------------------------------------------------------- history
@@ -294,6 +374,23 @@ object Store {
         )
     }
 
+    /** Add a whole selection in one write — see [likeMany] for why. */
+    @Synchronized
+    fun addManyToPlaylist(playlistId: String, tracks: List<Track>): Int {
+        if (tracks.isEmpty()) return 0
+        tracks.forEach { remember(it) }
+        var added = 0
+        writePlaylists(
+            playlists().map { pl ->
+                if (pl.id != playlistId) return@map pl
+                val ids = pl.trackIds.toMutableList()
+                tracks.forEach { if (ids.add(it.id)) added++ }
+                pl.copy(trackIds = ids)
+            }
+        )
+        return added
+    }
+
     fun playlistTracks(playlistId: String): List<Track> {
         val map = registry()
         return playlist(playlistId)?.trackIds?.mapNotNull { map[it] } ?: emptyList()
@@ -331,6 +428,11 @@ object Store {
         val tracks = counter(KEY_TRACKS).toMutableMap()
         tracks[track.title] = (tracks[track.title] ?: 0) + 1
 
+        // Counted by id as well as by title: the auto playlists need to look a
+        // track up again, and a title is not a key.
+        val byId = counter(KEY_PLAY_IDS).toMutableMap()
+        byId[track.id] = (byId[track.id] ?: 0) + 1
+
         val days = (prefs.getStringSet(k(KEY_DAYS), emptySet()) ?: emptySet()).toMutableSet()
         days.add(epochDay().toString())
 
@@ -339,6 +441,7 @@ object Store {
             .putLong(k(KEY_TOTAL_MS), totalMs)
             .putString(k(KEY_ARTISTS), writeCounter(artists))
             .putString(k(KEY_TRACKS), writeCounter(tracks))
+            .putString(k(KEY_PLAY_IDS), writeCounter(byId))
             .putStringSet(k(KEY_DAYS), days)
             .apply()
     }
@@ -354,6 +457,11 @@ object Store {
             week = weekBars(),
         )
     }
+
+    /** track id -> times played, for the auto playlists. */
+    fun playCounts(): Map<String, Int> = counter(KEY_PLAY_IDS)
+
+    fun lastPlayedAt(id: String): Long = history().firstOrNull { it.track.id == id }?.atMs ?: 0L
 
     private fun weekBars(): List<Int> {
         val counts = IntArray(7)

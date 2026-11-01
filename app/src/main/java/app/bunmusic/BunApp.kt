@@ -12,6 +12,8 @@ import okio.Path.Companion.toPath
 import app.bunmusic.data.Auth
 import app.bunmusic.data.Downloads
 import app.bunmusic.data.Prefs
+import app.bunmusic.data.Scrobble
+import app.bunmusic.data.Session
 import app.bunmusic.data.Store
 import app.bunmusic.player.Playback
 
@@ -25,7 +27,12 @@ class BunApp : Application(), SingletonImageLoader.Factory {
         app.bunmusic.core.Skin.load(this)
         Cache.init(this)
         Downloads.init(this)
+        Session.init(this)
+        Scrobble.init(this)
         Playback.init(this)
+        // Bring the last queue back, paused where it stopped. Nothing is prepared
+        // here — the first press of play does the network work.
+        if (Prefs.settings.value.resumeOnLaunch) Playback.restoreSession()
     }
 
     /**

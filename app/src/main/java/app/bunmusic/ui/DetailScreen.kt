@@ -1,5 +1,6 @@
 package app.bunmusic.ui
 
+import android.content.Intent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -27,6 +28,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.platform.LocalContext
+import kotlinx.coroutines.launch
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -44,9 +48,12 @@ import app.bunmusic.core.Ink
 import app.bunmusic.core.LocalBunWindow
 import app.bunmusic.core.SerifFamily
 import app.bunmusic.core.SoraFamily
+import app.bunmusic.core.Haptics
+import app.bunmusic.data.Downloads
 import app.bunmusic.data.Collection
 import app.bunmusic.data.CollectionKind
 import app.bunmusic.data.Shelf
+import app.bunmusic.data.Store
 import app.bunmusic.data.Track
 import app.bunmusic.data.YtMusic
 import app.bunmusic.player.Playback
@@ -216,6 +223,8 @@ fun DetailScreen(
     var loading by remember { mutableStateOf(true) }
     var failed by remember { mutableStateOf(false) }
     var headerArt by remember { mutableStateOf(artUrl) }
+    val scope = rememberCoroutineScope()
+    val ctx = LocalContext.current
 
     LaunchedEffect(browseId, title) {
         loading = true
@@ -335,6 +344,49 @@ fun DetailScreen(
                     }
                 }
             }
+            }
+        }
+
+        // Actions that only make sense for a whole collection: follow the artist,
+        // start a station from these songs, take them all offline, share the page.
+        if (tracks.isNotEmpty() || kind == CollectionKind.ARTIST) {
+            item {
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 20.dp, vertical = 8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    if (kind == CollectionKind.ARTIST) {
+                        var following by remember(title) { mutableStateOf(Store.isFollowing(title)) }
+                        Chip(
+                            text = if (following) "Following" else "Follow",
+                            selected = following,
+                            leading = if (following) G.Check else G.Bell,
+                        ) {
+                            following = Store.toggleFollow(title)
+                            Haptics.tick()
+                        }
+                    }
+                    Chip("Radio", false, G.Wave) {
+                        Playback.startRadioFrom(tracks)
+                        Haptics.tick()
+                    }
+                    Chip("Download", false, G.Download) {
+                        scope.launch {
+                            tracks.take(50).forEach { Downloads.download(it) }
+                        }
+                        Haptics.tick()
+                    }
+                    Chip("Share", false, G.Share) {
+                        val body = "$title — BunMusic\nhttps://music.youtube.com/browse/$browseId"
+                        val send = Intent(Intent.ACTION_SEND).apply {
+                            type = "text/plain"
+                            putExtra(Intent.EXTRA_TEXT, body)
+                        }
+                        ctx.startActivity(Intent.createChooser(send, "Share"))
+                    }
+                }
             }
         }
 

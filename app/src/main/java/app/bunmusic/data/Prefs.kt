@@ -58,6 +58,10 @@ object Prefs {
         val prefetchAhead: Boolean = true,
         /** Skip silent gaps inside a track instead of playing silence. */
         val skipSilence: Boolean = false,
+        /** Bring the last queue back, paused, when the app is reopened. */
+        val resumeOnLaunch: Boolean = true,
+        /** Highlight lyrics word by word when the provider gives timings. */
+        val wordLyrics: Boolean = true,
     )
 
     private lateinit var sp: SharedPreferences
@@ -95,6 +99,8 @@ object Prefs {
             cacheLimitMb = sp.getInt("cacheLimit", d.cacheLimitMb),
             prefetchAhead = sp.getBoolean("prefetchAhead", d.prefetchAhead),
             skipSilence = sp.getBoolean("skipSilence", d.skipSilence),
+            resumeOnLaunch = sp.getBoolean("resumeOnLaunch", d.resumeOnLaunch),
+            wordLyrics = sp.getBoolean("wordLyrics", d.wordLyrics),
         )
     }
 
@@ -125,6 +131,8 @@ object Prefs {
             .putInt("cacheLimit", next.cacheLimitMb)
             .putBoolean("prefetchAhead", next.prefetchAhead)
             .putBoolean("skipSilence", next.skipSilence)
+            .putBoolean("resumeOnLaunch", next.resumeOnLaunch)
+            .putBoolean("wordLyrics", next.wordLyrics)
             .apply()
     }
 }

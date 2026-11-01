@@ -261,6 +261,7 @@ private fun Shell(guest: Boolean, onLeaveGuest: () -> Unit, launch: Launch = Lau
                             onOpenDownloads = { push(Route.Downloads) },
                             onOpenStats = { push(Route.Stats) },
                             onMore = { sheetTrack = it },
+                            onToast = { toast = it },
                         )
 
                         Route.Search -> SearchScreen(

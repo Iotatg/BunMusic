@@ -13,7 +13,9 @@ import app.bunmusic.data.Auth
 import app.bunmusic.data.Cache
 import app.bunmusic.data.Downloads
 import app.bunmusic.data.Eq
+import app.bunmusic.data.Library
 import app.bunmusic.data.Prefs
+import app.bunmusic.data.Scrobble
 import app.bunmusic.data.Store
 import app.bunmusic.data.Track
 import app.bunmusic.player.Playback
@@ -346,6 +348,59 @@ fun buildCommands(host: CommandHost): List<Command> {
         WidgetArt.clear(host.context)
         Widgets.refresh(host.context)
         host.toast("Widget art cache cleared")
+    }
+
+    // ------------------------------------------------------------- listening
+    add("Playback", "play.dislike", "Not for me", "Skips it and remembers", G.ThumbDown, "dislike skip ban") {
+        val now = Playback.dislikeCurrent()
+        host.toast(if (now) "Skipped — fewer like this" else "Removed from the dislike list")
+    }
+    add("Playback", "play.radio.here", "Radio from this song", "Endless station", G.Wave, "station autoplay") {
+        val t = Playback.state.value.track
+        if (t == null) host.toast("Nothing playing") else Playback.startRadio(t)
+    }
+    add("Playback", "play.resume", "Pick up where you left off", "Restores the last queue", G.Clock, "session resume") {
+        if (Playback.state.value.hasTrack) host.toast("Already playing something") else {
+            Playback.restoreSession()
+            host.toast(if (Playback.state.value.hasTrack) "Restored" else "Nothing to resume")
+        }
+    }
+
+    add("Library", "lib.most", "Play your most played", "", G.Chart, "top heavy rotation") {
+        val list = Library.rank(Store.playCounts(), Store.allTracks())
+        if (list.isEmpty()) host.toast("Nothing counted yet") else Playback.play(list, 0)
+    }
+    add("Library", "lib.repeat", "Play what is on repeat", "This week", G.Refresh, "repeat") {
+        val list = Library.onRepeat(Store.history())
+        if (list.isEmpty()) host.toast("Nothing repeated yet") else Playback.play(list, 0)
+    }
+    add("Library", "lib.forgotten", "Play something forgotten", "Not touched in a month", G.Moon, "old") {
+        val list = Library.forgotten(Store.likedTracks(), Store.history())
+        if (list.isEmpty()) host.toast("Nothing forgotten — you are thorough") else Playback.play(list, 0)
+    }
+    // Nothing here may read the store while the catalogue is being built: the
+    // unit tests build it without a Context, and a lateinit prefs blows up.
+    add("Library", "lib.followed", "Followed artists", "Who you keep an eye on", G.Bell, "following") {
+        host.toast(
+            Store.follows().takeIf { it.isNotEmpty() }?.joinToString(", ")?.take(80)
+                ?: "Not following anyone yet — open an artist and tap Follow"
+        )
+    }
+
+    add("Data", "data.receipt", "Share a listening receipt", "As an image", G.Receipt, "stats image share") {
+        ShareCard.share(host.context)
+    }
+    add("Data", "data.scrobble.on", "Turn scrobbling on", "ListenBrainz", G.Cloud) {
+        if (Scrobble.token.isBlank()) {
+            host.toast("Paste a token in Settings → Listening first")
+        } else {
+            Scrobble.setEnabled(true)
+            host.toast("Scrobbling on")
+        }
+    }
+    add("Data", "data.scrobble.off", "Turn scrobbling off", "", G.Cloud) {
+        Scrobble.setEnabled(false)
+        host.toast("Scrobbling off")
     }
 
     // --------------------------------------------------------------- system

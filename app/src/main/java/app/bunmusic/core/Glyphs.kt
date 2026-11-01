@@ -26,7 +26,8 @@ enum class G {
     Heart, HeartFill, Queue, Back, Forward, More, Plus, Close, Mic, Download,
     Youtube, Clock, Check, Trash, Filter, Wave, Sparkle, Disc, List, Share, Offline,
     Compass, Chart, Gear, Moon, Grid, Flame, User, Drag, Speed, PlayCircle, Refresh,
-    Google, Mail, Phone, Lock, Eye, EyeOff, Logout, Shield, Sliders, Edit, Key
+    Google, Mail, Phone, Lock, Eye, EyeOff, Logout, Shield, Sliders, Edit, Key,
+    Copy, ThumbDown, Bell, Sort, Receipt, Pin, Cloud, External
 }
 
 @Composable
@@ -224,6 +225,47 @@ private fun DrawScope.drawGlyph(g: G, c: Color, sw: Float) {
         G.Offline -> {
             drawCircle(c, 8.4f, Offset(12f, 12f), style = s)
             line(5.4f, 18.6f, 18.6f, 5.4f)
+        }
+        G.Copy -> {
+            drawRoundRect(
+                c, Offset(8.6f, 3.6f), Size(11.8f, 11.8f),
+                androidx.compose.ui.geometry.CornerRadius(2.6f), style = s,
+            )
+            poly(15.4f, 18.4f, 15.4f, 20.4f, 3.6f, 20.4f, 3.6f, 8.6f, 5.6f, 8.6f)
+        }
+        G.ThumbDown -> {
+            poly(4f, 4.4f, 14.4f, 4.4f, 17.6f, 11.2f, 17.6f, 13.6f, 10.6f, 13.6f, 11.6f, 19.6f, 8.4f, 19.6f, 6.6f, 13.6f, 4f, 13.6f, 4f, 4.4f, close = true)
+        }
+        G.Bell -> {
+            poly(6.2f, 16.4f, 6.2f, 10.6f)
+            poly(17.8f, 16.4f, 17.8f, 10.6f)
+            drawArc(c, 180f, 180f, false, Offset(6.2f, 4.6f), Size(11.6f, 11.6f), style = s)
+            line(4.6f, 16.4f, 19.4f, 16.4f)
+            line(12f, 16.6f, 12f, 19.4f)
+        }
+        G.Sort -> {
+            line(4.4f, 7f, 19.6f, 7f)
+            line(4.4f, 12f, 14.4f, 12f)
+            line(4.4f, 17f, 9.6f, 17f)
+        }
+        G.Receipt -> {
+            poly(5.4f, 3.4f, 18.6f, 3.4f, 18.6f, 20.6f, 15.8f, 18.4f, 13.2f, 20.6f, 12f, 18.4f, 10.8f, 20.6f, 8.2f, 18.4f, 5.4f, 20.6f, close = true)
+            line(8.4f, 8.4f, 15.6f, 8.4f)
+            line(8.4f, 12.4f, 15.6f, 12.4f)
+        }
+        G.Pin -> {
+            drawCircle(c, 4.2f, Offset(12f, 9.4f), style = s)
+            line(12f, 13.6f, 12f, 20.4f)
+        }
+        G.Cloud -> {
+            drawArc(c, 150f, 240f, false, Offset(3.4f, 6.4f), Size(11f, 11f), style = s)
+            drawArc(c, 300f, 210f, false, Offset(9.6f, 4.4f), Size(11f, 11f), style = s)
+            line(5.4f, 17.4f, 18.6f, 17.4f)
+        }
+        G.External -> {
+            poly(13.6f, 4.4f, 19.6f, 4.4f, 19.6f, 10.4f)
+            line(19.6f, 4.4f, 11.2f, 12.8f)
+            poly(17.2f, 14.4f, 17.2f, 19.6f, 4.4f, 19.6f, 4.4f, 6.8f, 9.6f, 6.8f)
         }
         G.Compass -> {
             drawCircle(c, 8.4f, Offset(12f, 12f), style = s)

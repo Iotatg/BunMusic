@@ -12,6 +12,8 @@ import app.bunmusic.data.Cache
 import app.bunmusic.data.Downloads
 import app.bunmusic.data.Eq
 import app.bunmusic.data.Prefs
+import app.bunmusic.data.Scrobble
+import app.bunmusic.data.Session
 import app.bunmusic.data.Store
 import app.bunmusic.data.Track
 import app.bunmusic.data.YtMusic
@@ -75,6 +77,13 @@ object Playback {
     private var eqSession: Int = -1
     /** Guards against a failing item bouncing between error and retry forever. */
     private var retrying = false
+    /** Where a restored session should start once the item is prepared. */
+    private var pendingSeekMs = 0L
+    /** Session writes are throttled; the ticker calls publish() twice a second. */
+    private var lastSaveAt = 0L
+    private var playStartedAt = 0L
+    private var scrobbled = false
+    private var lastGain = 1f
 
     /** How long the sleep timer takes to fade out. */
     private val FADE_MS = 10_000L
@@ -169,6 +178,49 @@ object Playback {
         publish()
     }
 
+    // --------------------------------------------------------------- session
+
+    /**
+     * Bring back the last queue, paused where it was left.
+     *
+     * Deliberately does *not* prepare the track: preparing resolves a stream URL,
+     * and a cold start on mobile data should not quietly open a socket before the
+     * listener has asked for anything. The state is restored, the artwork and the
+     * queue are on screen, and the first press of play does the network work.
+     */
+    fun restoreSession() {
+        if (_player == null || _state.value.track != null) return
+        val saved = Session.load() ?: return
+        val track = saved.track ?: return
+        queue = saved.queue
+        index = saved.index
+        rebuildShuffle()
+        pendingSeekMs = saved.positionMs.coerceAtLeast(0L)
+        _state.value = PlayerState(
+            track = track,
+            isPlaying = false,
+            positionMs = pendingSeekMs,
+            durationMs = track.durationMs,
+            queue = queue,
+            index = index,
+            shuffle = saved.shuffle,
+            repeat = saved.repeat,
+            speed = saved.speed,
+        )
+        runCatching { _player?.playbackParameters = PlaybackParameters(saved.speed) }
+        publish()
+    }
+
+    /** True when a cold start has something to offer on the home screen. */
+    fun resumable(): Session.Saved? = if (_state.value.track != null) null else Session.resumable()
+
+    private fun saveSession(force: Boolean = false) {
+        val now = System.currentTimeMillis()
+        if (!force && now - lastSaveAt < 4_000) return
+        lastSaveAt = now
+        Session.save(_state.value)
+    }
+
     // ------------------------------------------------------------- commands
 
     fun play(tracks: List<Track>, startIndex: Int = 0) {
@@ -198,6 +250,7 @@ object Playback {
         val p = _player ?: return
         if (p.isPlaying) {
             p.pause()
+            saveSession(force = true)
         } else {
             if (p.playbackState == Player.STATE_IDLE) load(index, autoplay = true) else p.play()
         }
@@ -429,6 +482,30 @@ object Playback {
         return liked
     }
 
+    /**
+     * "Not for me": record it, and move on.
+     *
+     * A dislike that only wrote a flag would be a lie — the whole point is that the
+     * song stops. So it also skips, which is what every streaming app does with
+     * this button.
+     */
+    fun dislikeCurrent(): Boolean {
+        val track = _state.value.track ?: return false
+        val now = Store.toggleDislike(track)
+        if (now) next()
+        publish()
+        return now
+    }
+
+    /**
+     * Radio from a list rather than a single song: an artist page, a playlist, a
+     * whole album. Seeded on the first track that can actually produce a station.
+     */
+    fun startRadioFrom(tracks: List<Track>) {
+        val seed = tracks.firstOrNull { it.videoId.isNotBlank() } ?: return
+        startRadio(seed)
+    }
+
     // ------------------------------------------------------------ sleep timer
 
     fun sleepIn(minutes: Int) {
@@ -462,7 +539,9 @@ object Playback {
         _player?.clearMediaItems()
         queue = emptyList()
         index = -1
+        pendingSeekMs = 0L
         _state.value = PlayerState()
+        Session.clear()
     }
 
     // --------------------------------------------------------------- loading
@@ -563,9 +642,19 @@ object Playback {
             }
             p.prepare()
             bindEffects(p)
+            // A restored session starts where it stopped, not at 0:00.
+            if (pendingSeekMs > 0) {
+                p.seekTo(pendingSeekMs)
+                _state.value = _state.value.copy(positionMs = pendingSeekMs)
+                pendingSeekMs = 0L
+            }
             if (autoplay) p.play()
+            playStartedAt = System.currentTimeMillis()
+            scrobbled = false
             _state.value = _state.value.copy(buffering = false, track = track)
             publish()
+            saveSession(force = true)
+            runCatching { Scrobble.nowPlaying(track) }
 
             // Keep the whole song, not just the part that played. This is what makes
             // the second play offline-capable.
@@ -574,7 +663,11 @@ object Playback {
             }
             // ...and quietly pull the next couple down as well, so the end of this
             // song does not have to wait on a resolve.
-            if (Prefs.settings.value.prefetchAhead && !Prefs.settings.value.offlineOnly) {
+            // "Gapless" is the prefetch: the only gap between two separate streams
+            // is the resolve, so having the next one already on disk is the whole
+            // feature. Turning it off is what makes a gap appear on purpose.
+            val settings = Prefs.settings.value
+            if ((settings.gapless || settings.prefetchAhead) && !settings.offlineOnly) {
                 prefetchAhead(i)
             }
         }
@@ -655,6 +748,7 @@ object Playback {
 
     private fun publish() {
         val p = _player ?: return
+        if (_state.value.track != null) saveSession()
         val duration = p.duration.takeIf { it > 0 && it != C.TIME_UNSET } ?: _state.value.track?.durationMs ?: 0L
         _state.value = _state.value.copy(
             isPlaying = p.isPlaying,
@@ -669,23 +763,58 @@ object Playback {
         app.bunmusic.widget.Widgets.onPlayback()
     }
 
+    /**
+     * Twice a second: publish, then work out one gain from two independent
+     * reasons to lower it — the sleep timer running out, and the crossfade at a
+     * track boundary. They are combined with `min` rather than by each writing
+     * `player.volume`, because the last writer used to win and a fade-out could
+     * resurrect the music after the timer had already silenced it.
+     */
     private fun startTicker() {
         if (ticker?.isActive == true) return
         ticker = scope.launch {
             while (true) {
                 publish()
                 val s = _state.value
-                if (s.sleepEndsAt > 0) {
-                    val left = s.sleepEndsAt - System.currentTimeMillis()
-                    if (left <= 0) {
-                        _player?.pause()
-                        runCatching { _player?.volume = 1f }
-                        _state.value = _state.value.copy(sleepEndsAt = 0L)
-                    } else if (left <= FADE_MS) {
-                        // Ease the last ten seconds down instead of clipping the song
-                        // mid-note — the whole point of a sleep timer is that you do
-                        // not notice it.
-                        runCatching { _player?.volume = (left.toFloat() / FADE_MS).coerceIn(0f, 1f) }
+                val p = _player
+                if (p != null) {
+                    var sleepGain = 1f
+                    if (s.sleepEndsAt > 0) {
+                        val left = s.sleepEndsAt - System.currentTimeMillis()
+                        if (left <= 0) {
+                            p.pause()
+                            _state.value = _state.value.copy(sleepEndsAt = 0L)
+                        } else if (left <= FADE_MS) {
+                            // Ease the last ten seconds down instead of clipping the
+                            // song mid-note — the point of a sleep timer is that you
+                            // do not notice it.
+                            sleepGain = (left.toFloat() / FADE_MS).coerceIn(0f, 1f)
+                        }
+                    }
+                    val fadeMs = Prefs.settings.value.crossfadeSec * 1_000L
+                    val crossGain = if (fadeMs > 0 && s.isPlaying) {
+                        Crossfade.gain(p.currentPosition, p.duration.takeIf { it > 0 } ?: 0L, fadeMs)
+                    } else {
+                        1f
+                    }
+                    val gain = minOf(sleepGain, crossGain)
+                    // Only touch the player when it actually changed: a volume
+                    // setter 2x a second on every tick is audible on some devices.
+                    if (kotlin.math.abs(gain - lastGain) > 0.004f) {
+                        runCatching { p.volume = gain }
+                        lastGain = gain
+                    }
+
+                    // Scrobble once per track, at the half-way mark or four minutes
+                    // in, whichever comes first — the usual rule.
+                    if (!scrobbled && s.isPlaying && s.durationMs > 0) {
+                        val mark = minOf(s.durationMs / 2, 240_000L)
+                        if (s.positionMs >= mark) {
+                            scrobbled = true
+                            val track = s.track
+                            val at = playStartedAt / 1000
+                            if (track != null) scope.launch { runCatching { Scrobble.submit(track, at) } }
+                        }
                     }
                 }
                 delay(500)

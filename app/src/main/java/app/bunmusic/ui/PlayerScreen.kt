@@ -47,6 +47,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.zIndex
 import androidx.compose.ui.draw.clip
@@ -58,6 +59,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -465,6 +467,9 @@ private fun SecondaryRow(
             active = state.speed != 1f,
         ) { onSpeed() }
         SecondaryAction("Queue", G.List, active = false) { onQueue() }
+        // "Not for me" belongs next to the transport, not buried in a menu: the
+        // moment you want it is the moment the song starts.
+        SecondaryAction("Not for me", G.ThumbDown, active = false) { Playback.dislikeCurrent() }
     }
 }
 
@@ -822,6 +827,9 @@ private fun ColumnScope.CharcoalPlayer(
             active = state.speed != 1f,
         ) { onSpeed() }
         SecondaryAction("Queue", G.List, active = false) { onQueue() }
+        // "Not for me" belongs next to the transport, not buried in a menu: the
+        // moment you want it is the moment the song starts.
+        SecondaryAction("Not for me", G.ThumbDown, active = false) { Playback.dislikeCurrent() }
     }
     Spacer(Modifier.height(8.dp))
 }
@@ -1056,6 +1064,7 @@ private fun LyricsSheet(track: Track, positionMs: Long, onClose: () -> Unit) {
     var lyrics by remember(track.id) { mutableStateOf<Lyrics?>(null) }
     var loading by remember(track.id) { mutableStateOf(true) }
     val listState = rememberLazyListState()
+    val ctx = LocalContext.current
 
     LaunchedEffect(track.id) {
         loading = true
@@ -1092,7 +1101,29 @@ private fun LyricsSheet(track: Track, positionMs: Long, onClose: () -> Unit) {
                     maxLines = 1, overflow = TextOverflow.Ellipsis,
                 )
             }
+            IconBtn(G.Copy, Ink.Muted, 38.dp, 16.dp) { copyLyrics(track, lyrics, ctx) }
+            IconBtn(G.Share, Ink.Muted, 38.dp, 16.dp) { shareLyrics(ctx, track, lyrics) }
             IconBtn(G.Close, Ink.Text, 38.dp, 16.dp, onClose)
+        }
+
+        // A lyric file that runs 700 ms ahead of the audio is the most common
+        // complaint about synced lyrics, and the fix is one number.
+        Row(
+            Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 2.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text("Shift", color = Ink.Faint, fontSize = 10.5.sp, fontFamily = SoraFamily)
+            listOf(-1000, 0, 1000, 2000).forEach { ms ->
+                Chip(
+                    when {
+                        ms == 0 -> "0"
+                        ms > 0 -> "+${ms / 1000}"
+                        else -> "${ms / 1000}"
+                    },
+                    selected = Prefs.settings.value.lyricsOffsetMs == ms,
+                ) { Prefs.update { it.copy(lyricsOffsetMs = ms) } }
+            }
         }
 
         when {
@@ -1125,18 +1156,103 @@ private fun LyricsSheet(track: Track, positionMs: Long, onClose: () -> Unit) {
             ) {
                 itemsIndexed(lines) { i, line ->
                     val active = i == activeIndex
-                    Text(
-                        line.text,
+                    // Word-level wipe. LRCLIB ships line timings, not word timings,
+                    // so the split point is proportional across the line: the words
+                    // light up as the line is sung rather than all at once.
+                    val progress = if (active) {
+                        val from = line.atMs
+                        val to = lines.getOrNull(i + 1)?.atMs ?: (from + 3_000)
+                        ((positionMs + shift - from).toFloat() / (to - from).coerceAtLeast(1L))
+                            .coerceIn(0f, 1f)
+                    } else {
+                        0f
+                    }
+                    LyricLineView(
+                        annotated = if (active && Prefs.settings.value.wordLyrics) {
+                            wipeLine(line.text, progress, Ink.Lime, Ink.Lime.copy(alpha = 0.34f))
+                        } else {
+                            null
+                        },
+                        text = line.text,
                         color = if (active) Ink.Lime else Ink.Text.copy(alpha = if (i < activeIndex) 0.42f else 0.86f),
-                        fontSize = if (active) 19.sp else 16.sp,
-                        fontFamily = SerifFamily,
-                        lineHeight = 24.sp,
-                        textAlign = TextAlign.Start,
+                        size = if (active) 19 else 16,
+                        onClick = { Playback.seekTo((line.atMs - shift).coerceAtLeast(0L)) },
                     )
                 }
             }
         }
     }
+}
+
+/**
+ * One lyric line. Tapping it seeks there, which is the only way to use a lyric
+ * sheet while the song is playing something else in your head.
+ */
+@Composable
+private fun LyricLineView(
+    annotated: androidx.compose.ui.text.AnnotatedString?,
+    text: String,
+    color: Color,
+    size: Int,
+    onClick: () -> Unit,
+) {
+    val base = androidx.compose.ui.text.TextStyle(
+        color = color,
+        fontSize = size.sp,
+        fontFamily = SerifFamily,
+        lineHeight = (size + 8).sp,
+    )
+    Box(Modifier.fillMaxWidth().clickable { onClick() }) {
+        if (annotated != null) {
+            androidx.compose.material3.Text(annotated, style = base)
+        } else {
+            androidx.compose.material3.Text(text, style = base)
+        }
+    }
+}
+
+/** The active line, split at the word the singer has reached. */
+private fun wipeLine(
+    line: String,
+    progress: Float,
+    sung: Color,
+    unsung: Color,
+): androidx.compose.ui.text.AnnotatedString {
+    val words = line.split(" ")
+    val cut = (words.size * progress).toInt().coerceIn(0, words.size)
+    return androidx.compose.ui.text.buildAnnotatedString {
+        words.forEachIndexed { i, w ->
+            withStyle(androidx.compose.ui.text.SpanStyle(color = if (i < cut) sung else unsung)) {
+                append(w)
+            }
+            if (i != words.lastIndex) append(" ")
+        }
+    }
+}
+
+private fun lyricText(track: Track, lyrics: Lyrics?): String {
+    val body = lyrics?.plain?.takeIf { it.isNotBlank() }
+        ?: lyrics?.lines?.joinToString("\n") { it.text }
+        ?: return ""
+    return "${track.title} — ${track.artist}\n\n$body"
+}
+
+private fun copyLyrics(track: Track, lyrics: Lyrics?, ctx: android.content.Context) {
+    val body = lyricText(track, lyrics)
+    if (body.isBlank()) return
+    val clip = ctx.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+    clip.setPrimaryClip(android.content.ClipData.newPlainText("lyrics", body))
+}
+
+private fun shareLyrics(ctx: android.content.Context, track: Track, lyrics: Lyrics?) {
+    val body = lyricText(track, lyrics)
+    if (body.isBlank()) return
+    val send = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+        type = "text/plain"
+        putExtra(android.content.Intent.EXTRA_SUBJECT, "${track.title} — ${track.artist}")
+        putExtra(android.content.Intent.EXTRA_TEXT, body)
+    }
+    ctx.startActivity(android.content.Intent.createChooser(send, "Share lyrics"))
 }
 
 @Composable

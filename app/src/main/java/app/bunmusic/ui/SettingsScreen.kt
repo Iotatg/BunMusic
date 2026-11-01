@@ -5,6 +5,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -14,6 +15,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -23,6 +25,9 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -54,6 +59,8 @@ import app.bunmusic.data.Cache
 import app.bunmusic.data.Downloads
 import app.bunmusic.data.Eq
 import app.bunmusic.data.Prefs
+import app.bunmusic.data.Scrobble
+import app.bunmusic.data.Session
 import app.bunmusic.data.Store
 import app.bunmusic.player.Playback
 import kotlinx.coroutines.Dispatchers
@@ -81,6 +88,7 @@ fun SettingsScreen(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var googleSheet by remember { mutableStateOf(false) }
+    var tokenSheet by remember { mutableStateOf(false) }
     var cacheTick by remember { mutableIntStateOf(0) }
     val streamBytes by produceState(0L, cacheTick) {
         value = withContext(Dispatchers.IO) { Cache.streamBytes() }
@@ -205,11 +213,23 @@ fun SettingsScreen(
                     }
                 }
                 Divider()
-                ToggleRow("Gapless playback", "No silence between tracks", settings.gapless) { v ->
-                    Prefs.update { it.copy(gapless = v) }
-                }
+                // This used to be a switch wired to nothing. It is now the thing
+                // that decides whether the next track is pre-resolved, which is
+                // exactly what removes the gap between two separate streams.
+                ToggleRow(
+                    "Gapless playback",
+                    "Pre-loads the next track so songs run into each other",
+                    settings.gapless,
+                ) { v -> Prefs.update { it.copy(gapless = v) } }
                 Divider()
-                ChoiceRow("Crossfade", if (settings.crossfadeSec == 0) "Off" else "${settings.crossfadeSec}s") {
+                ChoiceRow(
+                    "Crossfade",
+                    if (settings.crossfadeSec == 0) {
+                        "Off — songs start and stop at full volume"
+                    } else {
+                        "Fades the last ${settings.crossfadeSec}s out and the first ${settings.crossfadeSec}s in"
+                    },
+                ) {
                     listOf(0, 3, 6, 12).forEach { sec ->
                         Chip(if (sec == 0) "Off" else "${sec}s", selected = settings.crossfadeSec == sec) {
                             Prefs.update { it.copy(crossfadeSec = sec) }
@@ -228,6 +248,15 @@ fun SettingsScreen(
                     "Never stream — play downloads and bundled tracks",
                     settings.offlineOnly,
                 ) { v -> Prefs.update { it.copy(offlineOnly = v) } }
+                Divider()
+                ToggleRow(
+                    "Resume where you left off",
+                    "Brings the last queue back, paused at the same second",
+                    settings.resumeOnLaunch,
+                ) { v ->
+                    Prefs.update { it.copy(resumeOnLaunch = v) }
+                    if (!v) Session.clear()
+                }
             }
         }
 
@@ -297,6 +326,13 @@ fun SettingsScreen(
                     }
                 }
                 Divider()
+                ToggleRow(
+                    "Word-by-word lyrics",
+                    "Lights up each word as the line is sung",
+                    settings.wordLyrics,
+                ) { v -> Prefs.update { it.copy(wordLyrics = v) } }
+
+                Divider()
                 ToggleRow("Haptics", "A small tick on like and play", settings.haptics) { v ->
                     Prefs.update { it.copy(haptics = v) }
                     app.bunmusic.core.Haptics.enabled = v
@@ -318,6 +354,51 @@ fun SettingsScreen(
                     "Every action in the app, searchable",
                     G.Search,
                 ) { onOpenCommands() }
+            }
+        }
+
+        item { GroupLabel("Listening") }
+        item {
+            SettingsCard {
+                ToggleRow(
+                    "ListenBrainz scrobbling",
+                    if (Scrobble.token.isBlank()) {
+                        "Paste a token first — nothing is sent without one"
+                    } else {
+                        "Sends each play to your ListenBrainz profile"
+                    },
+                    Scrobble.enabled,
+                ) { v ->
+                    if (v && Scrobble.token.isBlank()) {
+                        tokenSheet = true
+                    } else {
+                        Scrobble.setEnabled(v)
+                        onToast(if (v) "Scrobbling on" else "Scrobbling off")
+                    }
+                }
+                Divider()
+                NavRow(
+                    "ListenBrainz token",
+                    if (Scrobble.token.isBlank()) "Not set" else "••••" + Scrobble.token.takeLast(6),
+                    G.Key,
+                ) { tokenSheet = true }
+                Divider()
+                NavRow(
+                    "Listening receipt",
+                    "A shareable card of your numbers",
+                    G.Receipt,
+                ) { ShareCard.share(context) }
+                if (Scrobble.pending() > 0) {
+                    Divider()
+                    NavRow(
+                        "Queued scrobbles",
+                        "${Scrobble.pending()} waiting for a connection",
+                        G.Cloud,
+                    ) {
+                        Scrobble.clearQueue()
+                        onToast("Queue cleared")
+                    }
+                }
             }
         }
 
@@ -499,6 +580,19 @@ fun SettingsScreen(
         }
     }
 
+    if (tokenSheet) {
+        TokenSheet(
+            initial = Scrobble.token,
+            onDismiss = { tokenSheet = false },
+            onSave = { value ->
+                Scrobble.token = value
+                Scrobble.setEnabled(value.isNotBlank())
+                tokenSheet = false
+                onToast(if (value.isBlank()) "Token cleared" else "Token saved")
+            },
+        )
+    }
+
     if (googleSheet) {
         GoogleSetupSheet(
             current = settings.googleClientId,
@@ -609,5 +703,67 @@ private fun NavRow(title: String, subtitle: String, glyph: G, bun: BunSkin? = nu
             Text(subtitle, color = Ink.Faint, fontSize = 11.sp, fontFamily = SoraFamily)
         }
         Glyph(G.Forward, Ink.Faint, 14.dp)
+    }
+}
+
+/**
+ * Where a ListenBrainz token is pasted.
+ *
+ * Deliberately not a link-and-redirect OAuth flow: ListenBrainz hands out a token
+ * on a web page, the user copies it, and that is the whole exchange. A token in a
+ * password-style field is honest about what it is and cannot leak a secret the app
+ * does not have.
+ */
+@Composable
+private fun TokenSheet(initial: String, onDismiss: () -> Unit, onSave: (String) -> Unit) {
+    var value by remember { mutableStateOf(initial) }
+    Box(
+        Modifier
+            .fillMaxSize()
+            .background(Color.Black.copy(alpha = 0.55f))
+            .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { onDismiss() },
+        contentAlignment = Alignment.BottomCenter,
+    ) {
+        Column(
+            Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(topStart = 26.dp, topEnd = 26.dp))
+                .background(Ink.Sheet)
+                .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) {}
+                .padding(22.dp)
+                .navigationBarsPadding(),
+        ) {
+            Text("ListenBrainz token", color = Ink.Text, fontSize = 16.sp, fontFamily = SoraFamily, fontWeight = FontWeight.SemiBold)
+            Spacer(Modifier.height(6.dp))
+            Text(
+                "listenbrainz.org → Settings → API tokens. Paste it here; it stays on this device.",
+                color = Ink.Faint, fontSize = 11.5.sp, fontFamily = SoraFamily, lineHeight = 16.sp,
+            )
+            Spacer(Modifier.height(14.dp))
+            Box(
+                Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(Ink.Field)
+                    .padding(horizontal = 12.dp, vertical = 12.dp),
+            ) {
+                if (value.isEmpty()) {
+                    Text("eyJhbGciOi…", color = Ink.Faint, fontSize = 12.5.sp, fontFamily = SoraFamily)
+                }
+                BasicTextField(
+                    value = value,
+                    onValueChange = { value = it.trim() },
+                    singleLine = true,
+                    textStyle = TextStyle(color = Ink.Text, fontSize = 12.5.sp, fontFamily = SoraFamily),
+                    cursorBrush = SolidColor(Ink.Lime),
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+            Spacer(Modifier.height(16.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                FilledBtn("Save", G.Check) { onSave(value) }
+                GhostBtn("Clear") { onSave("") }
+            }
+        }
     }
 }

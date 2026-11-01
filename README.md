@@ -7,10 +7,36 @@ saved offline.
 
 ```
 package   app.bunmusic
-version   1.1.0 (14)
+version   1.2.0 (15)
 minSdk    26  ·  target/compile 37
 author    Iota Coder · iota14934@gmail.com
 ```
+
+---
+
+## 1.2.0 — the half that was missing
+
+Measured against [SimpMusic](https://github.com/maxrave-dev/SimpMusic), row by row
+(`BunMusic-vs-SimpMusic-1.2.0.png` in the release). What changed:
+
+| | |
+|---|---|
+| **Session restore** | queue, position, speed, repeat and shuffle survive a cold start; the app comes back paused at the same second |
+| **Crossfade, for real** | a smoothstep gain curve at both ends of a track — the switch used to be wired to nothing |
+| **Gapless, for real** | the prefetch *is* the feature: pre-resolving the next stream is what removes the gap |
+| **Library search + sort** | one field, three orders, and Play all / Shuffle on Liked and Recent |
+| **Auto playlists** | most played, on repeat this week, not played in a month |
+| **Multi-select** | like, queue or download a whole selection in one write |
+| **Word-by-word lyrics** | proportional wipe across the line, tap any line to seek, copy or share the whole song |
+| **Artist pages** | follow, radio seed, bulk download, share |
+| **Listening receipt** | a 1080 × 1350 PNG drawn with `android.graphics`, out through a `FileProvider` |
+| **ListenBrainz** | token-based scrobbling, silent on failure, queued when offline |
+| **Not for me** | a dislike that also skips |
+| **125 commands** | ten more, including all of the above |
+
+Still missing, and listed rather than hidden: Cast, Android Auto, Wear, desktop/iOS,
+AI mixes, proxy, SponsorBlock, QR login sync and Listen Together. Every one of those
+needs a server, a second platform, or a paid API key.
 
 ---
 
