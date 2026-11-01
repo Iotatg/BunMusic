@@ -38,7 +38,8 @@ object Store {
     private val SCOPED_KEYS = listOf(
         KEY_REG, KEY_LIKES, KEY_HISTORY, KEY_RECENT, KEY_PLAYLISTS,
         KEY_TOTAL_MS, KEY_PLAYS, KEY_ARTISTS, KEY_TRACKS, KEY_DAYS, KEY_QUERIES,
-        KEY_DISLIKE, KEY_FOLLOWS, KEY_PLAY_IDS, KEY_EVENTS,
+        KEY_DISLIKE, KEY_FOLLOWS, KEY_PLAY_IDS, KEY_EVENTS, KEY_PINNED, KEY_NOTES,
+        KEY_SKIPS,
     )
 
     /**
@@ -109,6 +110,9 @@ object Store {
     private const val KEY_EVENTS = "play_events"
     private const val KEY_DISLIKE = "disliked_ids"
     private const val KEY_FOLLOWS = "followed_artists"
+    private const val KEY_PINNED = "pinned_playlists"
+    private const val KEY_NOTES = "playlist_notes"
+    private const val KEY_SKIPS = "stats_skips"
 
     private fun regRaw(): String = prefs.getString(k(KEY_REG), null) ?: ""
 
@@ -403,7 +407,47 @@ object Store {
         return playlist(playlistId)?.trackIds?.mapNotNull { map[it] } ?: emptyList()
     }
 
-    // --------------------------------------------------------- search history
+    // ------------------------------------------------------ pins and notes
+
+    /**
+     * Pinned playlists sit above the fold in the library.
+     *
+     * Stored as ids, not positions: a pin is a property of the playlist, and a
+     * reorder of the list must not silently move somebody's favourites.
+     */
+    fun pins(): Set<String> =
+        (prefs.getString(k(KEY_PINNED), null) ?: "").split(R).filter { it.isNotBlank() }.toSet()
+
+    fun isPinned(playlistId: String): Boolean = pins().contains(playlistId)
+
+    @Synchronized
+    fun togglePin(playlistId: String): Boolean {
+        val now = pins()
+        val next = if (now.contains(playlistId)) now - playlistId else now + playlistId
+        prefs.edit().putString(k(KEY_PINNED), next.joinToString(R.toString())).apply()
+        return next.contains(playlistId)
+    }
+
+    /** Free-text note attached to a playlist. Empty removes it. */
+    fun note(playlistId: String): String {
+        val raw = prefs.getString(k(KEY_NOTES), null) ?: return ""
+        for (line in raw.split(R)) {
+            val at = line.indexOf(F)
+            if (at > 0 && line.substring(0, at) == playlistId) return line.substring(at + 1)
+        }
+        return ""
+    }
+
+    @Synchronized
+    fun setNote(playlistId: String, text: String) {
+        val kept = (prefs.getString(k(KEY_NOTES), null) ?: "")
+            .split(R)
+            .filter { it.isNotBlank() && it.substringBefore(F) != playlistId }
+        val next = if (text.isBlank()) kept else kept + "$playlistId$F${text.replace('\n', ' ')}"
+        prefs.edit().putString(k(KEY_NOTES), next.joinToString(R.toString())).apply()
+    }
+
+    // ---------------------------------------------------------- search history
 
     private const val KEY_QUERIES = "queries"
 
@@ -458,6 +502,21 @@ object Store {
             .putStringSet(k(KEY_DAYS), days)
             .apply()
     }
+
+    /**
+     * A skip is not a play.
+     *
+     * Counted separately so smart shuffle can learn what to stop offering
+     * without corrupting the play counts, the charts or the year in review.
+     */
+    @Synchronized
+    fun recordSkip(track: Track) {
+        val map = counter(KEY_SKIPS).toMutableMap()
+        map[track.id] = (map[track.id] ?: 0) + 1
+        prefs.edit().putString(k(KEY_SKIPS), writeCounter(map)).apply()
+    }
+
+    fun skips(): Map<String, Int> = counter(KEY_SKIPS)
 
     /** The raw play log, newest first. See [Listening] for the arithmetic over it. */
     fun events(): List<Listening.Event> =

@@ -64,6 +64,24 @@ object Prefs {
         val wordLyrics: Boolean = true,
         /** Take the player's tint from the cover. Off keeps the stable id hash. */
         val artColour: Boolean = true,
+        /** Cut every non-essential animation. Set by the system too. */
+        val reducedMotion: Boolean = false,
+        /** 0.85 – 1.30. Multiplies the type scale, not the layout. */
+        val fontScale: Float = 1f,
+        /** Stronger hairlines and text contrast for bright sunlight. */
+        val highContrast: Boolean = false,
+        /** Library shows covers in a two-column grid instead of rows. */
+        val libraryGrid: Boolean = false,
+        /** Shuffle keeps artists apart and pushes skipped songs to the back. */
+        val smartShuffle: Boolean = true,
+        /** Bars under the artwork on the player. */
+        val visualizer: Boolean = true,
+        /** Show the daily mixes and taste card on Home. */
+        val discoveryHome: Boolean = true,
+        /** Fade the last ten seconds of a sleep timer. */
+        val sleepFade: Boolean = true,
+        /** Show a banner when the queue runs offline. */
+        val offlineBanner: Boolean = true,
     )
 
     private lateinit var sp: SharedPreferences
@@ -104,6 +122,15 @@ object Prefs {
             resumeOnLaunch = sp.getBoolean("resumeOnLaunch", d.resumeOnLaunch),
             wordLyrics = sp.getBoolean("wordLyrics", d.wordLyrics),
             artColour = sp.getBoolean("artColour", d.artColour),
+            reducedMotion = sp.getBoolean("reducedMotion", d.reducedMotion),
+            fontScale = sp.getFloat("fontScale", d.fontScale).coerceIn(0.85f, 1.30f),
+            highContrast = sp.getBoolean("highContrast", d.highContrast),
+            libraryGrid = sp.getBoolean("libraryGrid", d.libraryGrid),
+            smartShuffle = sp.getBoolean("smartShuffle", d.smartShuffle),
+            visualizer = sp.getBoolean("visualizer", d.visualizer),
+            discoveryHome = sp.getBoolean("discoveryHome", d.discoveryHome),
+            sleepFade = sp.getBoolean("sleepFade", d.sleepFade),
+            offlineBanner = sp.getBoolean("offlineBanner", d.offlineBanner),
         )
     }
 
@@ -137,6 +164,15 @@ object Prefs {
             .putBoolean("resumeOnLaunch", next.resumeOnLaunch)
             .putBoolean("wordLyrics", next.wordLyrics)
             .putBoolean("artColour", next.artColour)
+            .putBoolean("reducedMotion", next.reducedMotion)
+            .putFloat("fontScale", next.fontScale)
+            .putBoolean("highContrast", next.highContrast)
+            .putBoolean("libraryGrid", next.libraryGrid)
+            .putBoolean("smartShuffle", next.smartShuffle)
+            .putBoolean("visualizer", next.visualizer)
+            .putBoolean("discoveryHome", next.discoveryHome)
+            .putBoolean("sleepFade", next.sleepFade)
+            .putBoolean("offlineBanner", next.offlineBanner)
             .apply()
     }
 }

@@ -477,6 +477,58 @@ fun buildCommands(host: CommandHost): List<Command> {
         host.toast(if (next) "Downloads will wait for Wi-Fi" else "Downloads may use mobile data")
     }
 
+    // ------------------------------------------------------------ discovery
+    add("Discover", "disc.open", "Made for you", "Mixes, taste, time capsule", G.Sparkle, "daily mix recommendation") {
+        host.go(Route.Discovery)
+    }
+    add("Discover", "disc.mix", "Play the first mix", "Whatever the top artist is", G.Play, "daily mix play") {
+        val mixes = app.bunmusic.data.Discovery.mixes(
+            Store.history(), Store.likedTracks(), Store.allTracks(), limit = 1,
+        )
+        if (mixes.isEmpty()) host.toast("Play a few songs first") else Playback.play(mixes.first().tracks, 0)
+    }
+    add("Discover", "disc.radio", "Start a radio from your best song", "Seeded by play count", G.Wave, "radio station") {
+        val seed = app.bunmusic.data.Discovery.radioSeed(
+            Store.likedTracks(), Store.history(), Playback.state.value.track?.id,
+        )
+        if (seed == null) host.toast("Nothing to seed a radio with") else Playback.startRadio(seed)
+    }
+    add("Discover", "disc.smartshuffle", "Smart shuffle", "Toggle artist spread and skip learning", G.Shuffle, "shuffle smart") {
+        val next = !Prefs.settings.value.smartShuffle
+        Prefs.update { it.copy(smartShuffle = next) }
+        host.toast(if (next) "Smart shuffle on" else "Plain shuffle")
+    }
+
+    // ------------------------------------------------------------- queue
+    add("Queue", "queue.shuffleup", "Shuffle what is next", "Leaves the current song alone", G.Shuffle, "queue shuffle") {
+        Playback.shuffleUpcoming()
+        host.toast("Up next shuffled")
+    }
+    add("Queue", "queue.clearplayed", "Clear recently played", "Drops the rows above the current song", G.Trash, "history queue") {
+        Playback.clearPlayed()
+        host.toast("Recently played cleared from the queue")
+    }
+    add("Queue", "queue.ab", "A–B loop", "Mark, mark, clear", G.Repeat, "repeat section loop") {
+        Playback.abCycle()
+        host.toast(if (Playback.state.value.abActive) "A–B loop set" else "A–B cleared")
+    }
+
+    // ---------------------------------------------------------- appearance
+    add("Appearance", "look.motion", "Reduced motion", "Toggle transitions and the visualiser", G.Speed, "animation accessibility") {
+        val next = !Prefs.settings.value.reducedMotion
+        Prefs.update { it.copy(reducedMotion = next) }
+        host.toast(if (next) "Motion reduced" else "Full motion")
+    }
+    add("Appearance", "look.contrast", "High contrast", "Toggle daylight text", G.Eye, "accessibility contrast") {
+        val next = !Prefs.settings.value.highContrast
+        Prefs.update { it.copy(highContrast = next) }
+        app.bunmusic.core.Skin.contrast = next
+        host.toast(if (next) "High contrast on" else "Standard contrast")
+    }
+    add("Appearance", "look.storage", "Storage", "What the cache and artwork cost", G.Cloud, "space clean cache") {
+        host.go(Route.Storage)
+    }
+
     // --------------------------------------------------------------- system
     add("System", "sys.share", "Share BunMusic", "", G.Share) {
         val send = Intent(Intent.ACTION_SEND).apply {
@@ -541,6 +593,9 @@ private fun routeName(route: Route): String = when (route) {
     Route.Buns -> "buns"
     Route.About -> "about"
     Route.Widgets -> "widgets"
+    Route.Discovery -> "discovery"
+    Route.Storage -> "storage"
+    is Route.SearchFor -> "search"
     is Route.Detail -> "detail"
     is Route.MoodPage -> "mood"
     is Route.PlaylistPage -> "playlist"

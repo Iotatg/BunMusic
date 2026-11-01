@@ -44,6 +44,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -92,6 +93,8 @@ fun PlayerScreen(
     onClose: () -> Unit,
     onMore: () -> Unit,
     openQueueOnStart: Boolean = false,
+    onSearch: (String) -> Unit = {},
+    onToast: (String) -> Unit = {},
 ) {
     val track = state.track
     val settings by Prefs.settings.collectAsState()
@@ -99,6 +102,9 @@ fun PlayerScreen(
     var showLyrics by remember { mutableStateOf(false) }
     var showSleep by remember { mutableStateOf(false) }
     var showSpeed by remember { mutableStateOf(false) }
+    var showCredits by remember { mutableStateOf(false) }
+    var showInfo by remember { mutableStateOf(false) }
+    var likePulse by remember { mutableIntStateOf(0) }
     var inlineLyrics by remember { mutableStateOf(false) }
     val window = LocalBunWindow.current
     // The widget's queue button opens the player *and* the queue. It used to
@@ -237,6 +243,7 @@ fun PlayerScreen(
                 }
                 Spacer(Modifier.weight(1f))
                 Row(verticalAlignment = Alignment.CenterVertically) {
+                    IconBtn(G.Receipt, Ink.Text, 38.dp, 17.dp) { showCredits = true }
                     IconBtn(G.Queue, Ink.Text, 38.dp, 18.dp) { showQueue = true }
                     IconBtn(G.More, Ink.Text, 38.dp, 18.dp, onMore)
                 }
@@ -260,6 +267,19 @@ fun PlayerScreen(
             }
 
             Spring(0.30f, window.short)
+
+            // ---- visualizer: bars that stop when the music stops
+            if (settings.visualizer) {
+                VisualizerBars(
+                    playing = state.isPlaying,
+                    tint = tint,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(22.dp)
+                        .padding(horizontal = 54.dp),
+                )
+                Spacer(Modifier.height(4.dp))
+            }
 
             // ---- inline lyrics peek
             if (settings.lyricsOnPlayer) {
@@ -300,19 +320,26 @@ fun PlayerScreen(
                             )
                             Spacer(Modifier.width(7.dp))
                         }
-                        Text(
-                            track.artist,
+                        MarqueeText(
+                            text = track.artist,
                             color = Ink.Muted,
-                            fontSize = 12.5.sp,
-                            fontFamily = SoraFamily,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
+                            size = 12,
+                            family = SoraFamily,
+                            weight = FontWeight.Normal,
+                            modifier = Modifier.weight(1f),
                         )
                     }
                 }
                 var liked by remember(track.id) { mutableStateOf(Store.isLiked(track.id)) }
                 Box(
-                    Modifier.size(42.dp).clip(CircleShape).clickable { liked = Store.toggleLike(track.id) },
+                    Modifier.size(42.dp).clip(CircleShape).clickable {
+                        val now = Store.toggleLike(track.id)
+                        liked = now
+                        if (now) {
+                            likePulse++
+                            Haptics.tick()
+                        }
+                    },
                     contentAlignment = Alignment.Center,
                 ) {
                     Glyph(
@@ -335,6 +362,16 @@ fun PlayerScreen(
 
             Spacer(Modifier.height(10.dp))
 
+            // ---- A–B loop, only while a loop exists
+            if (state.abActive) {
+                AbRepeatBar(
+                    state = state,
+                    tint = tint,
+                    modifier = Modifier.padding(horizontal = 20.dp),
+                )
+                Spacer(Modifier.height(6.dp))
+            }
+
             // ---- secondary actions
             SecondaryRow(
                 state = state,
@@ -354,7 +391,11 @@ fun PlayerScreen(
             enter = fadeIn() + slideInVertically { it },
             exit = fadeOut() + slideOutVertically { it },
         ) {
-            QueueSheet(state = state, onClose = { showQueue = false })
+            QueuePanel(
+                state = state,
+                onClose = { showQueue = false },
+                onSaved = { name -> onToast("Saved as \"$name\"") },
+            )
         }
 
         AnimatedVisibility(
@@ -380,6 +421,34 @@ fun PlayerScreen(
                 onPick = { Playback.setSpeed(it) },
             )
         }
+
+        if (showCredits) {
+            CreditsSheet(
+                track = track,
+                onClose = { showCredits = false },
+                onSearch = { q ->
+                    showCredits = false
+                    onSearch(q)
+                },
+                onInfo = {
+                    showCredits = false
+                    showInfo = true
+                },
+                onToast = onToast,
+            )
+        }
+
+        if (showInfo) {
+            TrackInfoSheet(track = track, onClose = { showInfo = false }, onToast = onToast)
+        }
+
+        // The burst sits above everything for less than a second; it is feedback,
+        // not a decoration, so it is drawn even with reduced motion (fade only).
+        LikeBurst(
+            pulse = likePulse,
+            tint = Ink.Rose,
+            modifier = Modifier.align(Alignment.Center),
+        )
     }
 }
 
@@ -437,18 +506,33 @@ private fun TransportRow(state: PlayerState, tint: Color, modifier: Modifier = M
     ) {
         IconBtn(G.Shuffle, if (state.shuffle) tint else Ink.Faint, 40.dp, 18.dp) { Playback.toggleShuffle() }
         IconBtn(G.Prev, Ink.Text, 48.dp, 24.dp) { Playback.previous() }
-        Box(
-            Modifier
-                .size(72.dp)
-                .clip(CircleShape)
-                .background(tint)
-                .clickable { Playback.toggle() },
-            contentAlignment = Alignment.Center,
-        ) {
-            if (state.buffering && !state.isPlaying) {
-                Glyph(G.Wave, Ink.Void, 26.dp)
+        // The ring around the button is the song's progress: the seek bar is a
+        // fine instrument but it is two centimetres below your thumb, and this
+        // answers "how far in am I" without looking away from the button.
+        ProgressRing(
+            progress = if (state.durationMs > 0) {
+                state.positionMs.toFloat() / state.durationMs
             } else {
-                Glyph(if (state.isPlaying) G.Pause else G.Play, Ink.Void, 26.dp)
+                0f
+            },
+            size = 76.dp,
+            stroke = 2.dp,
+            tint = tint,
+            track = Ink.Hairline,
+        ) {
+            Box(
+                Modifier
+                    .size(66.dp)
+                    .clip(CircleShape)
+                    .background(tint)
+                    .clickable { Playback.toggle() },
+                contentAlignment = Alignment.Center,
+            ) {
+                if (state.buffering && !state.isPlaying) {
+                    Glyph(G.Wave, Ink.Void, 26.dp)
+                } else {
+                    Glyph(if (state.isPlaying) G.Pause else G.Play, Ink.Void, 26.dp)
+                }
             }
         }
         IconBtn(G.Next, Ink.Text, 48.dp, 24.dp) { Playback.next() }
@@ -469,6 +553,7 @@ private fun SecondaryRow(
     onSpeed: () -> Unit,
     onQueue: () -> Unit,
     modifier: Modifier = Modifier,
+    onAb: () -> Unit = { Playback.abCycle() },
 ) {
     Row(modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
         SecondaryAction("Lyrics", G.Mic, active = false) { onLyrics() }
@@ -482,6 +567,7 @@ private fun SecondaryRow(
             G.Speed,
             active = state.speed != 1f,
         ) { onSpeed() }
+        SecondaryAction("A–B", G.Repeat, active = state.abActive) { onAb() }
         SecondaryAction("Queue", G.List, active = false) { onQueue() }
         // "Not for me" belongs next to the transport, not buried in a menu: the
         // moment you want it is the moment the song starts.
@@ -582,13 +668,13 @@ private fun WidePlayer(
                             )
                             Spacer(Modifier.width(7.dp))
                         }
-                        Text(
-                            track.artist,
+                        MarqueeText(
+                            text = track.artist,
                             color = Ink.Muted,
-                            fontSize = 12.5.sp,
-                            fontFamily = SoraFamily,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
+                            size = 12,
+                            family = SoraFamily,
+                            weight = FontWeight.Normal,
+                            modifier = Modifier.weight(1f),
                         )
                     }
                 }

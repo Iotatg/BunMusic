@@ -69,6 +69,7 @@ fun SearchScreen(
     onPlay: (List<Track>, Int) -> Unit,
     onOpenCollection: (Collection) -> Unit,
     onMore: (Track) -> Unit,
+    initialQuery: String? = null,
 ) {
     var query by remember { mutableStateOf("") }
     var results by remember { mutableStateOf(SearchResults()) }
@@ -88,6 +89,13 @@ fun SearchScreen(
         history = Store.queries()
         loading = true
         searched = true
+    }
+
+    // Opened from a credit, an album line or a mix card: search immediately,
+    // instead of dropping the listener on an empty field holding the word they
+    // just tapped.
+    LaunchedEffect(initialQuery) {
+        if (!initialQuery.isNullOrBlank()) runSearch(initialQuery)
     }
 
     val voice = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->

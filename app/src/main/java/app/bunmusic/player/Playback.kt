@@ -42,12 +42,16 @@ data class PlayerState(
     val speed: Float = 1f,
     val sleepEndsAt: Long = 0L,
     val error: String? = null,
+    /** A–B repeat markers. 0 means unset. */
+    val abStartMs: Long = 0L,
+    val abEndMs: Long = 0L,
 ) {
     val hasTrack: Boolean get() = track != null
     val hasNext: Boolean get() = index >= 0 && index < queue.lastIndex
     val hasPrev: Boolean get() = index > 0
     val sleepRemainingMs: Long get() = (sleepEndsAt - System.currentTimeMillis()).coerceAtLeast(0L)
     val sleepActive: Boolean get() = sleepEndsAt > 0L
+    val abActive: Boolean get() = abStartMs >= 0 && abEndMs > abStartMs
 }
 
 /**
@@ -268,6 +272,16 @@ object Playback {
     /** Returns true when playback actually moved to another track. */
     fun next(auto: Boolean = false): Boolean {
         if (queue.isEmpty()) return false
+        // Leaving a song inside the first thirty seconds is a skip, not a listen.
+        // Recorded separately so smart shuffle can learn from it without the play
+        // counts, the charts or the year in review ever seeing it.
+        if (!auto) {
+            val p = _player
+            val current = queue.getOrNull(index)
+            if (p != null && current != null && p.currentPosition < 30_000L) {
+                Store.recordSkip(current)
+            }
+        }
         val nextIdx = when {
             shuffleOrder.isNotEmpty() && _state.value.shuffle -> {
                 val pos = shuffleOrder.indexOf(index)
@@ -448,6 +462,25 @@ object Playback {
         publish()
     }
 
+    /** Drop everything before the current track. The past stops taking up rows. */
+    fun clearPlayed() {
+        if (index <= 0 || index !in queue.indices) return
+        queue = queue.drop(index)
+        index = 0
+        rebuildShuffle()
+        publish()
+    }
+
+    /** Shuffle what is left to play, leaving the current track and the past alone. */
+    fun shuffleUpcoming() {
+        if (index !in queue.indices) return
+        queue = app.bunmusic.data.QueueMath.shuffleUpcoming(
+            queue, index, (System.currentTimeMillis() / 1000).toInt(),
+        )
+        if (_state.value.shuffle) rebuildShuffle()
+        publish()
+    }
+
     /** Back to the top of the current track. */
     fun restart() {
         _player?.seekTo(0)
@@ -532,6 +565,42 @@ object Playback {
         _state.value = _state.value.copy(sleepEndsAt = 0L)
         // A timer that was already fading must not leave the music quiet.
         runCatching { _player?.volume = 1f }
+    }
+
+    // ------------------------------------------------------------- A–B repeat
+
+    /** Mark A. Marking B without an A first marks both ends at once. */
+    fun markA() {
+        val at = _state.value.positionMs.coerceAtLeast(0L)
+        _state.value = _state.value.copy(abStartMs = at, abEndMs = 0L)
+    }
+
+    fun markB() {
+        val s = _state.value
+        val at = s.positionMs
+        if (s.abStartMs <= 0L || at <= s.abStartMs + 1_000L) {
+            // A single button press on a fresh track: loop from here to the end of
+            // the song rather than refusing with a toast nobody asked for.
+            val end = s.durationMs.takeIf { it > s.abStartMs + 2_000L } ?: return
+            _state.value = s.copy(abEndMs = end)
+        } else {
+            _state.value = s.copy(abEndMs = at)
+        }
+        _player?.seekTo(s.abStartMs)
+    }
+
+    fun clearAb() {
+        _state.value = _state.value.copy(abStartMs = 0L, abEndMs = 0L)
+    }
+
+    /** One button that walks A → B → clear, for the row under the transport. */
+    fun abCycle() {
+        val s = _state.value
+        when {
+            s.abActive -> clearAb()
+            s.abStartMs <= 0L -> markA()
+            else -> markB()
+        }
     }
 
     // ----------------------------------------------------------------- speed
@@ -745,6 +814,10 @@ object Playback {
      * Shuffle that behaves itself: it starts on the song you are already on, and it
      * never puts two tracks by the same artist back to back when it has a choice.
      * `indices.shuffled()` does neither, and the difference is audible.
+     *
+     * With smart shuffle on, two more rules apply: songs skipped three times are
+     * left out entirely, and songs heard in the last ten plays go behind
+     * everything else. Both are read from [Store], never written here.
      */
     private fun rebuildShuffle() {
         if (queue.isEmpty()) {
@@ -752,7 +825,16 @@ object Playback {
             return
         }
         val start = index.takeIf { it in queue.indices } ?: 0
-        val pool = queue.indices.filter { it != start }.toMutableList()
+        val smart = Prefs.settings.value.smartShuffle
+        val skips = if (smart) Store.skips() else emptyMap()
+        val recent = if (smart) Store.history().take(10).map { it.track.id }.toSet() else emptySet()
+
+        val eligible = queue.indices.filter { it != start && (skips[queue[it].id] ?: 0) < 3 }
+        val fallback = queue.indices.filter { it != start }
+        val base = eligible.ifEmpty { fallback }
+        val pool = (base.filter { queue[it].id !in recent } + base.filter { queue[it].id in recent })
+            .toMutableList()
+
         val order = ArrayList<Int>(queue.size)
         order.add(start)
         var lastArtist = queue[start].artist.trim().lowercase()
@@ -805,13 +887,18 @@ object Playback {
                 val s = _state.value
                 val p = _player
                 if (p != null) {
+                    // A–B repeat: the loop lives here, not in the player, because
+                    // ExoPlayer's repeat modes are per-item and this is per-second.
+                    if (s.abActive && s.positionMs >= s.abEndMs) {
+                        p.seekTo(s.abStartMs)
+                    }
                     var sleepGain = 1f
                     if (s.sleepEndsAt > 0) {
                         val left = s.sleepEndsAt - System.currentTimeMillis()
                         if (left <= 0) {
                             p.pause()
                             _state.value = _state.value.copy(sleepEndsAt = 0L)
-                        } else if (left <= FADE_MS) {
+                        } else if (Prefs.settings.value.sleepFade && left <= FADE_MS) {
                             // Ease the last ten seconds down instead of clipping the
                             // song mid-note — the point of a sleep timer is that you
                             // do not notice it.

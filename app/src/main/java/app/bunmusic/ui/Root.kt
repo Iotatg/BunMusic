@@ -59,12 +59,14 @@ import app.bunmusic.core.G
 import app.bunmusic.core.Glyph
 import app.bunmusic.core.Ink
 import app.bunmusic.core.LocalBunWindow
+import app.bunmusic.core.Network
 import app.bunmusic.core.Skin
 import app.bunmusic.core.SoraFamily
 import app.bunmusic.data.Auth
 import app.bunmusic.data.Collection
 import app.bunmusic.data.CollectionKind
 import app.bunmusic.data.Downloads
+import app.bunmusic.data.Prefs
 import app.bunmusic.data.Store
 import app.bunmusic.data.Track
 import app.bunmusic.player.Playback
@@ -85,6 +87,10 @@ sealed interface Route {
     data object Buns : Route
     data object About : Route
     data object Widgets : Route
+    data object Discovery : Route
+    data object Storage : Route
+    /** Search opened from a credit, a mix or a long press — prefilled. */
+    data class SearchFor(val query: String) : Route
     data class Detail(
         val title: String,
         val artUrl: String?,
@@ -101,7 +107,6 @@ private val Route.depth: Int
         Route.Home, Route.Explore, Route.Library, Route.Search -> 0
         else -> 1
     }
-
 @Composable
 fun Root(launch: Launch = Launch()) {
     val account by Auth.account.collectAsState()
@@ -140,6 +145,18 @@ private fun Shell(guest: Boolean, onLeaveGuest: () -> Unit, launch: Launch = Lau
     val density = LocalDensity.current
 
     val route = stack.last()
+    val settings by Prefs.settings.collectAsState()
+    val context = androidx.compose.ui.platform.LocalContext.current
+    var online by remember { mutableStateOf(true) }
+    // Polled rather than listened to: a ConnectivityManager callback needs a
+    // lifecycle owner and a permission on some OEMs, and four seconds is fast
+    // enough for a banner that says "the lift doors just closed".
+    LaunchedEffect(Unit) {
+        while (true) {
+            online = Network.online(context)
+            kotlinx.coroutines.delay(4_000)
+        }
+    }
 
     val push: (Route) -> Unit = { stack = stack + it }
     val pop: () -> Unit = { if (stack.size > 1) stack = stack.dropLast(1) }
@@ -243,6 +260,7 @@ private fun Shell(guest: Boolean, onLeaveGuest: () -> Unit, launch: Launch = Lau
                             onTogglePlay = { Playback.toggle() },
                             onMore = { sheetTrack = it },
                             onOpenSettings = { push(Route.Settings) },
+                            onOpenDiscovery = { push(Route.Discovery) },
                         )
 
                         Route.Explore -> ExploreScreen(
@@ -272,6 +290,14 @@ private fun Shell(guest: Boolean, onLeaveGuest: () -> Unit, launch: Launch = Lau
                             onMore = { sheetTrack = it },
                         )
 
+                        is Route.SearchFor -> SearchScreen(
+                            state = chrome,
+                            onPlay = { list, i -> Playback.play(list, i) },
+                            onOpenCollection = openCollection,
+                            onMore = { sheetTrack = it },
+                            initialQuery = r.query,
+                        )
+
                         Route.Settings -> SettingsScreen(
                             onBack = pop,
                             onOpenStats = { push(Route.Stats) },
@@ -283,6 +309,8 @@ private fun Shell(guest: Boolean, onLeaveGuest: () -> Unit, launch: Launch = Lau
                             onOpenAbout = { push(Route.About) },
                             onOpenWidgets = { push(Route.Widgets) },
                             onOpenCommands = { paletteOpen = true },
+                            onOpenStorage = { push(Route.Storage) },
+                            onOpenDiscovery = { push(Route.Discovery) },
                             onToast = { toast = it },
                         )
 
@@ -306,6 +334,20 @@ private fun Shell(guest: Boolean, onLeaveGuest: () -> Unit, launch: Launch = Lau
                             onToast = { toast = it },
                         )
 
+                        Route.Discovery -> DiscoveryScreen(
+                            state = chrome,
+                            onBack = pop,
+                            onPlay = { list, i -> Playback.play(list, i) },
+                            onMore = { sheetTrack = it },
+                            onToast = { toast = it },
+                        )
+
+                        Route.Storage -> StorageScreen(
+                            onBack = pop,
+                            onOpenDownloads = { push(Route.Downloads) },
+                            onToast = { toast = it },
+                        )
+
                         Route.Hotlist -> HotlistScreen(
                             state = chrome,
                             downloadedIds = downloadedIds,
@@ -323,6 +365,7 @@ private fun Shell(guest: Boolean, onLeaveGuest: () -> Unit, launch: Launch = Lau
                             onBack = pop,
                             onPlay = { list, i -> Playback.play(list, i) },
                             onMore = { sheetTrack = it },
+                            onToast = { toast = it },
                         )
 
                         is Route.MoodPage -> MoodScreen(
@@ -351,6 +394,7 @@ private fun Shell(guest: Boolean, onLeaveGuest: () -> Unit, launch: Launch = Lau
             }
 
             // ---- bottom chrome
+            MotionFade(visible = !online && settings.offlineBanner) { OfflineStrip() }
             BottomChrome(
                 state = state,
                 route = route,
@@ -377,6 +421,8 @@ private fun Shell(guest: Boolean, onLeaveGuest: () -> Unit, launch: Launch = Lau
                 },
                 onMore = { sheetTrack = state.track },
                 openQueueOnStart = queueOnStart,
+                onSearch = { q -> push(Route.SearchFor(q)) },
+                onToast = { toast = it },
             )
         }
 
@@ -425,6 +471,26 @@ private fun Shell(guest: Boolean, onLeaveGuest: () -> Unit, launch: Launch = Lau
             }
             CommandPalette(host = host, onDismiss = { paletteOpen = false })
         }
+    }
+}
+
+@Composable
+private fun OfflineStrip() {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .background(Ink.Rose.copy(alpha = 0.14f))
+            .padding(horizontal = 16.dp, vertical = 7.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Glyph(G.Offline, Ink.Rose, 13.dp)
+        Spacer(Modifier.width(8.dp))
+        Text(
+            "Offline — downloads and cached songs still play",
+            color = Ink.Rose,
+            fontSize = 10.5.sp,
+            fontFamily = SoraFamily,
+        )
     }
 }
 

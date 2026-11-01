@@ -4,12 +4,15 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -37,6 +40,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -51,6 +55,11 @@ import app.bunmusic.data.Collection
 import app.bunmusic.data.Downloads
 import app.bunmusic.data.Library
 import app.bunmusic.data.Playlist
+import app.bunmusic.data.PlaylistIo
+import app.bunmusic.data.Prefs
+import app.bunmusic.data.SortKey
+import app.bunmusic.data.SortSpec
+import app.bunmusic.data.Sorting
 import app.bunmusic.data.Store
 import app.bunmusic.data.Track
 import app.bunmusic.player.Playback
@@ -58,8 +67,11 @@ import app.bunmusic.player.PlayerState
 import kotlinx.coroutines.launch
 
 /** How the liked / recent lists are ordered. */
-private enum class Sort(val label: String) {
-    ADDED("Added"), AZ("A–Z"), PLAYS("Most played")
+private enum class Sort(val label: String, val key: SortKey) {
+    ADDED("Added", SortKey.RECENT),
+    AZ("A–Z", SortKey.TITLE),
+    PLAYS("Most played", SortKey.PLAYS),
+    DURATION("Duration", SortKey.DURATION),
 }
 
 @Composable
@@ -76,8 +88,11 @@ fun LibraryScreen(
 ) {
     var tab by remember { mutableIntStateOf(0) }
     var playlists by remember { mutableStateOf(Store.playlists()) }
+    var pins by remember { mutableStateOf(Store.pins()) }
     var query by remember { mutableStateOf("") }
     var sort by remember { mutableStateOf(Sort.ADDED) }
+    var sortDesc by remember { mutableStateOf(false) }
+    var grid by remember { mutableStateOf(Prefs.settings.value.libraryGrid) }
     var openAuto by remember { mutableStateOf<String?>(null) }
     // Selection mode: a long press is the usual gesture, but it has to be added to
     // three different row implementations; a Select button in the header works
@@ -93,18 +108,54 @@ fun LibraryScreen(
     val likedIds = remember(liked) { liked.map { it.id }.toSet() }
     val scope = rememberCoroutineScope()
     val plays = remember(state.track?.id) { Store.playCounts() }
+    val context = LocalContext.current
+
+    // Import an M3U from another player. The file is read once, resolved against
+    // the local registry, and turned into an ordinary playlist — no link back to
+    // the file, so a deleted download cannot empty it later.
+    val importer = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        val text = runCatching {
+            context.contentResolver.openInputStream(uri)?.bufferedReader()?.use { it.readText() }
+        }.getOrNull()
+        if (text == null) {
+            onToast("Could not read that file")
+            return@rememberLauncherForActivityResult
+        }
+        val parsed = PlaylistIo.parse(text)
+        if (parsed.isEmpty) {
+            onToast("No tracks found in that file")
+            return@rememberLauncherForActivityResult
+        }
+        val (found, missing) = PlaylistIo.resolve(parsed, Store.allTracks())
+        val created = Store.createPlaylist(parsed.name ?: "Imported playlist")
+        Store.addManyToPlaylist(created.id, found)
+        playlists = Store.playlists()
+        onToast(
+            when {
+                found.isEmpty() -> "None of those tracks are in your library yet"
+                missing > 0 -> "Imported ${found.size} · $missing not in library"
+                else -> "Imported ${found.size} tracks"
+            }
+        )
+    }
 
     /** One filter + sort pipeline for every list on this screen. */
     fun shape(list: List<Track>): List<Track> {
-        val q = query.trim()
-        val filtered = if (q.isEmpty()) list else list.filter {
-            it.title.contains(q, true) || it.artist.contains(q, true) || it.album.contains(q, true)
-        }
-        return when (sort) {
-            Sort.ADDED -> filtered
-            Sort.AZ -> filtered.sortedBy { it.title.lowercase() }
-            Sort.PLAYS -> filtered.sortedByDescending { plays[it.id] ?: 0 }
-        }
+        val filtered = Sorting.filter(
+            tracks = list,
+            query = query,
+            downloadedOnly = false,
+            likedOnly = false,
+        )
+        // The list arrives in its own order — for likes that is newest first —
+        // so it doubles as the "recently added" index without a second store.
+        return Sorting.sort(
+            tracks = filtered,
+            spec = SortSpec(sort.key, sortDesc),
+            plays = plays,
+            addedOrder = filtered.map { it.id },
+        )
     }
 
     val shown = when (tab) {
@@ -135,6 +186,16 @@ fun LibraryScreen(
                             ) {
                                 selecting = !selecting
                                 if (!selecting) selected = emptySet()
+                            }
+                            // Grid or rows. The choice is stored, because a layout
+                            // preference that resets on every launch is not one.
+                            IconBtn(
+                                if (grid) G.List else G.Grid,
+                                if (grid) Ink.Lime else Ink.Muted,
+                                38.dp, 18.dp,
+                            ) {
+                                grid = !grid
+                                Prefs.update { it.copy(libraryGrid = grid) }
                             }
                         }
                         IconBtn(G.Chart, Ink.Muted, 38.dp, 18.dp, onOpenStats)
@@ -218,8 +279,23 @@ fun LibraryScreen(
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Sort.entries.forEach { s ->
-                        Chip(s.label, selected = sort == s) { sort = s }
+                        Chip(s.label, selected = sort == s) {
+                            // Tapping the active chip flips the direction instead of
+                            // doing nothing, which is where the second sort control
+                            // used to be missing.
+                            if (sort == s) sortDesc = !sortDesc else {
+                                sort = s
+                                // "Most played" means most first; every other key
+                                // reads naturally ascending.
+                                sortDesc = s == Sort.PLAYS
+                            }
+                        }
                     }
+                    IconBtn(
+                        if (sortDesc) G.Sort else G.Filter,
+                        if (sortDesc) Ink.Lime else Ink.Faint,
+                        32.dp, 15.dp,
+                    ) { sortDesc = !sortDesc }
                 }
             }
             // Play all / shuffle: every other list in the app had these and the
@@ -297,6 +373,24 @@ fun LibraryScreen(
                 }
             }
 
+            item {
+                Row(
+                    Modifier.padding(horizontal = gutter, vertical = 4.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    GhostBtn("Import .m3u", G.Download) {
+                        importer.launch(
+                            arrayOf(
+                                "audio/x-mpegurl",
+                                "audio/mpegurl",
+                                "text/plain",
+                                "application/octet-stream",
+                            )
+                        )
+                    }
+                }
+            }
+
             if (playlists.isEmpty()) {
                 item {
                     EmptyState(
@@ -305,8 +399,17 @@ fun LibraryScreen(
                     )
                 }
             } else {
-                items(playlists, key = { it.id }) { p ->
-                    PlaylistRow(p, onClick = { onOpenPlaylist(p.id) })
+                items(playlists.sortedByDescending { pins.contains(it.id) }, key = { it.id }) { p ->
+                    PlaylistRow(
+                        p = p,
+                        pinned = pins.contains(p.id),
+                        onClick = { onOpenPlaylist(p.id) },
+                        onPin = {
+                            val now = Store.togglePin(p.id)
+                            pins = Store.pins()
+                            onToast(if (now) "Pinned to the top" else "Unpinned")
+                        },
+                    )
                 }
             }
         }
@@ -316,6 +419,10 @@ fun LibraryScreen(
                 item { EmptyState(G.Heart, "Nothing liked yet", "Tap the heart on any track and it lands here.") }
             } else if (shown.isEmpty()) {
                 item { EmptyState(G.Search, "No match", "Nothing liked matches \u201c$query\u201d.") }
+            } else if (grid) {
+                item {
+                    TrackGrid(shown, state.track?.id, state.isPlaying, { i -> onPlay(shown, i) }, onMore)
+                }
             } else {
                 itemsIndexed(shown, key = { i, t -> t.id + "#" + i }) { i, t ->
                     Box(Modifier.padding(horizontal = 8.dp)) {
@@ -337,6 +444,10 @@ fun LibraryScreen(
         if (tab == 2) {
             if (recents.isEmpty()) {
                 item { EmptyState(G.Clock, "No history yet", "Play something — it shows up here.") }
+            } else if (grid) {
+                item {
+                    TrackGrid(shown, state.track?.id, state.isPlaying, { i -> onPlay(shown, i) }, onMore)
+                }
             } else {
                 itemsIndexed(shown, key = { i, t -> t.id + "#" + i }) { i, t ->
                     Box(Modifier.padding(horizontal = 8.dp)) {
@@ -539,9 +650,16 @@ private fun ShortcutCard(
 }
 
 @Composable
-private fun PlaylistRow(p: Playlist, onClick: () -> Unit) {
+private fun PlaylistRow(
+    p: Playlist,
+    pinned: Boolean,
+    onClick: () -> Unit,
+    onPin: () -> Unit,
+) {
     val gutter = LocalBunWindow.current.gutter
-    val first = Store.playlistTracks(p.id).firstOrNull()
+    val tracks = remember(p.id, p.trackIds.size) { Store.playlistTracks(p.id) }
+    val first = tracks.firstOrNull()
+    val note = remember(p.id) { Store.note(p.id) }
     Row(
         Modifier
             .fillMaxWidth()
@@ -564,22 +682,117 @@ private fun PlaylistRow(p: Playlist, onClick: () -> Unit) {
         }
         Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                if (pinned) {
+                    Glyph(G.Pin, Ink.Lime, 11.dp)
+                    Spacer(Modifier.width(5.dp))
+                }
+                Text(
+                    p.name,
+                    color = Ink.Text,
+                    fontSize = 14.sp,
+                    fontFamily = SoraFamily,
+                    fontWeight = FontWeight.Medium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+            // Count and running time, not just a number: "42 tracks" says nothing
+            // about whether this is a commute or a weekend.
             Text(
-                p.name,
-                color = Ink.Text,
-                fontSize = 14.sp,
-                fontFamily = SoraFamily,
-                fontWeight = FontWeight.Medium,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            Text(
-                "${p.size} tracks",
+                Sorting.summary(tracks),
                 color = Ink.Faint,
                 fontSize = 11.5.sp,
                 fontFamily = SoraFamily,
             )
+            if (note.isNotBlank()) {
+                Text(
+                    note,
+                    color = Ink.Muted,
+                    fontSize = 10.5.sp,
+                    fontFamily = SoraFamily,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+        }
+        Box(
+            Modifier.size(34.dp).clip(RoundedCornerShape(10.dp)).clickable { onPin() },
+            contentAlignment = Alignment.Center,
+        ) {
+            Glyph(G.Pin, if (pinned) Ink.Lime else Ink.Faint, 15.dp)
         }
         Glyph(G.Forward, Ink.Faint, 15.dp)
+    }
+}
+
+/**
+ * The library as covers instead of rows.
+ *
+ * A LazyVerticalGrid cannot live inside a LazyColumn, so the list is chunked into
+ * rows of two and rendered inside one item. The lists this shows are capped at
+ * fifty, which is the point where a grid stops being faster than a row list.
+ */
+@Composable
+private fun TrackGrid(
+    tracks: List<Track>,
+    currentId: String?,
+    playing: Boolean,
+    onPlayAt: (Int) -> Unit,
+    onMore: (Track) -> Unit,
+) {
+    val gutter = LocalBunWindow.current.gutter
+    Column(Modifier.padding(horizontal = gutter)) {
+        tracks.chunked(2).forEachIndexed { rowIndex, pair ->
+            Row(
+                Modifier.fillMaxWidth().padding(vertical = 7.dp),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                pair.forEachIndexed { col, t ->
+                    val index = rowIndex * 2 + col
+                    Column(
+                        Modifier.weight(1f).clickable { onPlayAt(index) },
+                    ) {
+                        Box {
+                            ArtImage(
+                                url = t.artUrl,
+                                asset = t.artAsset,
+                                modifier = Modifier.fillMaxWidth().aspectRatio(1f),
+                                shape = RoundedCornerShape(14.dp),
+                            )
+                            if (currentId == t.id && playing) {
+                                Box(
+                                    Modifier
+                                        .fillMaxWidth()
+                                        .aspectRatio(1f)
+                                        .clip(RoundedCornerShape(14.dp))
+                                        .background(Ink.Void.copy(alpha = 0.5f)),
+                                    contentAlignment = Alignment.Center,
+                                ) { EqualizerBars(Ink.Lime) }
+                            }
+                        }
+                        Spacer(Modifier.height(5.dp))
+                        Text(
+                            t.title,
+                            color = if (currentId == t.id) Ink.Lime else Ink.Text,
+                            fontSize = 11.5.sp,
+                            fontFamily = SoraFamily,
+                            fontWeight = FontWeight.Medium,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                        Text(
+                            t.artist,
+                            color = Ink.Faint,
+                            fontSize = 10.sp,
+                            fontFamily = SoraFamily,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                }
+                if (pair.size == 1) Spacer(Modifier.weight(1f))
+            }
+        }
     }
 }

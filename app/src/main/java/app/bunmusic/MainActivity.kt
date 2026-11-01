@@ -61,11 +61,16 @@ class MainActivity : ComponentActivity() {
         readIntent(intent)
         setContent {
             BunTheme {
-                // The window size is resolved once, at the top, so every screen
-                // and every shared component reads the same answer.
-                BunWindowProvider {
-                    val request by launch.collectAsState()
-                    Root(launch = request)
+                // Motion and type scale are applied above every screen: reduced
+                // motion from the system or the app, and the app-level font
+                // multiplier, both live here so no screen has to know about them.
+                app.bunmusic.core.BunMotion {
+                    // The window size is resolved once, at the top, so every screen
+                    // and every shared component reads the same answer.
+                    BunWindowProvider {
+                        val request by launch.collectAsState()
+                        Root(launch = request)
+                    }
                 }
             }
         }

@@ -46,7 +46,9 @@ import app.bunmusic.core.LocalBunWindow
 import app.bunmusic.core.SerifFamily
 import app.bunmusic.core.SoraFamily
 import app.bunmusic.data.Collection
+import app.bunmusic.data.Discovery
 import app.bunmusic.data.Mood
+import app.bunmusic.data.Prefs
 import app.bunmusic.data.Shelf
 import app.bunmusic.data.Store
 import app.bunmusic.data.Track
@@ -66,6 +68,7 @@ fun HomeScreen(
     onTogglePlay: () -> Unit,
     onMore: (Track) -> Unit,
     onOpenSettings: () -> Unit,
+    onOpenDiscovery: () -> Unit = {},
 ) {
     var shelves by remember { mutableStateOf<List<Shelf>>(emptyList()) }
     var moods by remember { mutableStateOf<List<Mood>>(emptyList()) }
@@ -113,7 +116,12 @@ fun HomeScreen(
                 Display(greeting(), 33)
                 Spacer(Modifier.height(4.dp))
                 Text(
-                    "Everything on YouTube Music — nothing bundled, nothing wasted.",
+                    // The line under the greeting changes with the hour. It is a
+                    // small thing, but a home screen that says "good evening" and
+                    // then "start your morning" is two clocks disagreeing.
+                    Discovery.hourMood(
+                        java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY)
+                    ).line,
                     color = Ink.Muted,
                     fontSize = 12.5.sp,
                     fontFamily = SoraFamily,
@@ -122,6 +130,18 @@ fun HomeScreen(
         }
 
         item { SearchPill(onClick = onOpenSearch, modifier = Modifier.padding(horizontal = gutter)) }
+
+        // ---- made for you: computed on the device, so it is here before the
+        // network shelves have answered
+        if (Prefs.settings.value.discoveryHome) {
+            item {
+                DiscoveryRow(
+                    onPlay = onPlay,
+                    onSeeAll = onOpenDiscovery,
+                    modifier = Modifier.padding(top = 6.dp),
+                )
+            }
+        }
 
         item { Spacer(Modifier.height(18.dp)) }
 
@@ -435,6 +455,80 @@ private fun RecentTile(track: Track, downloaded: Boolean, size: androidx.compose
             fontFamily = SoraFamily,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
+        )
+    }
+}
+
+/**
+ * The first row on Home that does not need a network.
+ *
+ * Six artist mixes, built from the play log while the YouTube shelves are still
+ * loading. If the connection is dead this row is still there, which is the whole
+ * point of computing it on the device.
+ */
+@Composable
+private fun DiscoveryRow(
+    onPlay: (List<Track>, Int) -> Unit,
+    onSeeAll: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val history = remember { Store.history() }
+    val liked = remember { Store.likedTracks() }
+    val all = remember { Store.allTracks() }
+    val mixes = remember(history, liked, all) {
+        Discovery.mixes(history, liked, all, limit = 5, size = 20)
+    }
+    if (mixes.isEmpty()) return
+
+    Column(modifier) {
+        SectionTitle("Made for you", mixes.size, "See all", onSeeAll)
+        LazyRow(
+            contentPadding = PaddingValues(horizontal = 16.dp),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            items(mixes, key = { it.id }) { mix ->
+                MiniMixCard(mix) { onPlay(mix.tracks, 0) }
+            }
+        }
+    }
+}
+
+@Composable
+private fun MiniMixCard(mix: Discovery.Mix, onPlay: () -> Unit) {
+    val tint = when (mix.accent % 4) {
+        0 -> Ink.Lavender
+        1 -> Ink.Lime
+        2 -> Ink.Rose
+        else -> Ink.Mint
+    }
+    Column(
+        Modifier
+            .width(150.dp)
+            .clip(RoundedCornerShape(16.dp))
+            .background(Brush.linearGradient(listOf(tint.copy(alpha = 0.34f), Ink.Card)))
+            .clickable { onPlay() }
+            .padding(12.dp),
+    ) {
+        Box(
+            Modifier.size(34.dp).clip(CircleShape).background(tint),
+            contentAlignment = Alignment.Center,
+        ) { Glyph(G.Play, Ink.OnAccent, 12.dp) }
+        Spacer(Modifier.height(12.dp))
+        Text(
+            mix.title,
+            color = Ink.Text,
+            fontSize = 13.sp,
+            fontFamily = SoraFamily,
+            fontWeight = FontWeight.SemiBold,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+        )
+        Spacer(Modifier.height(2.dp))
+        Text(
+            "${mix.tracks.size} tracks",
+            color = Ink.Muted,
+            fontSize = 10.sp,
+            fontFamily = SoraFamily,
         )
     }
 }

@@ -7,10 +7,38 @@ saved offline.
 
 ```
 package   app.bunmusic
-version   1.3.0 (16)
+version   2.0.0 (22)
 minSdk    26  ·  target/compile 37
 author    Iota Coder · iota14934@gmail.com
 ```
+
+---
+
+## 2.0.0 — fifty things Spotify does, done on the device
+
+The list was taken from Spotify's own feature set — mixes, taste, queue, credits,
+accessibility, storage — and rebuilt where BunMusic can honestly support it: no
+server, no account on somebody else's machine, no second platform.
+
+| System | What landed |
+|---|---|
+| **Discovery** | Daily mixes per artist, a taste profile (plays + likes, likes weigh two), "Because you liked X", "On this day" time capsule, fresh finds, deep cuts, blend with followed artists, a radio seed picker, a discovery-share number, and a "Made for you" screen that opens before the network answers |
+| **Shuffle** | Smart shuffle: drops songs skipped three times, pushes the last ten plays to the back, and never puts the same artist twice in a row — the greedy "first different" version stranded the last two of a kind, so it now spends the biggest pile first |
+| **Library** | Sort by title, artist, duration or plays; direction toggle on the active chip; a real filter pipeline; duplicate finder that ignores "(Remastered 2011)"; playlist totals; pinned playlists; playlist notes; a two-column cover grid |
+| **Queue** | Split into recently played / now playing / up next, with running time, shuffle-upcoming, clear-played and drag reorder |
+| **Player** | Visualiser bars driven by position, credits sheet, technical track info, A–B repeat, 0.05-step speed control, like burst, "go to artist / album" search |
+| **Design** | Reduced motion (system + app), four-step text scale, high-contrast palette, marquee titles, counted section headers, stat pills, progress ring |
+| **Storage** | Four buckets — downloads, stream cache, artwork, library — with a stacked bar, a per-bucket clear and a cleanup plan that never touches downloads |
+| **Portability** | M3U export through the system document picker, M3U import with BOM/CRLF/URL tolerance, and a report of what the library did not have |
+| **Offline** | A banner that appears when the phone loses its way out, polled every four seconds |
+| **Commands** | 144, ten of them new |
+
+368 unit tests, 0 failures. Same signing key.
+
+Honest limit: no phone and no emulator in the build environment, so the new
+screens are compiled and their arithmetic is tested, but nobody has watched them
+on a display. The engine is pure functions on purpose — that is the part that can
+be proven from here.
 
 ---
 

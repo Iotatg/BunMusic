@@ -265,7 +265,39 @@ object Skin {
     var current: BunSkin by mutableStateOf(BunSkin.MIDNIGHT)
         private set
 
-    val p: BunPalette get() = paletteOf(current)
+    /**
+     * High-contrast mode.
+     *
+     * A state, not a preference read inside [p], so flipping it recomposes every
+     * screen instead of waiting for the next unrelated redraw. The preference is
+     * the source of truth; this is its mirror for the colour getters.
+     */
+    var contrast: Boolean by mutableStateOf(false)
+
+    val p: BunPalette get() = paletteOf(current).let { if (contrast) highContrast(it) else it }
+
+    /**
+     * Push text and separators further apart in luminance without touching the
+     * accent. Sunlight is the target, not taste: text goes to pure black or pure
+     * white, captions clear 7:1, and hairlines double their alpha.
+     */
+    private fun highContrast(p: BunPalette): BunPalette = if (p.light) {
+        p.copy(
+            text = Color(0xFF000000),
+            muted = Color(0xFF2E2A35),
+            faint = Color(0xFF4A4552),
+            line = Color(0xFF8A8494),
+            hairline = Color(0x33000000),
+        )
+    } else {
+        p.copy(
+            text = Color(0xFFFFFFFF),
+            muted = Color(0xFFDCD7E4),
+            faint = Color(0xFFB8B2C4),
+            line = Color(0xFF453E52),
+            hairline = Color(0x2EFFFFFF),
+        )
+    }
 
     /** A bun's palette without making it current — used by the picker previews. */
     fun paletteOf(skin: BunSkin): BunPalette = when (skin) {
@@ -303,6 +335,9 @@ object Skin {
         Prefs.init(context)
         val stored = store(context).getString(KEY, null) ?: Prefs.settings.value.skin
         current = BunSkin.of(stored)
+        // Mirror the contrast preference before the first frame, so a cold start
+        // in sunlight does not paint one low-contrast frame first.
+        contrast = Prefs.settings.value.highContrast
         // keep the two stores honest if one of them was written by an older build
         if (stored != Prefs.settings.value.skin) {
             Prefs.update { it.copy(skin = stored) }

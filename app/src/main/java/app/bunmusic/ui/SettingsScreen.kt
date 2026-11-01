@@ -86,6 +86,8 @@ fun SettingsScreen(
     onOpenAbout: () -> Unit,
     onOpenWidgets: () -> Unit,
     onOpenCommands: () -> Unit,
+    onOpenStorage: () -> Unit = {},
+    onOpenDiscovery: () -> Unit = {},
     onToast: (String) -> Unit,
 ) {
     val settings by Prefs.settings.collectAsState()
@@ -362,6 +364,78 @@ fun SettingsScreen(
                     Prefs.update { it.copy(haptics = v) }
                     app.bunmusic.core.Haptics.enabled = v
                 }
+                Divider()
+                // ---- motion and legibility
+                ToggleRow(
+                    "Reduced motion",
+                    "Cuts page transitions, the visualiser and the marquee. The system setting is honoured too.",
+                    settings.reducedMotion,
+                ) { v -> Prefs.update { it.copy(reducedMotion = v) } }
+                Divider()
+                ChoiceRow(
+                    "Text size",
+                    when {
+                        settings.fontScale < 1f -> "Smaller than the system default"
+                        settings.fontScale > 1f -> "Larger than the system default"
+                        else -> "Follows the system"
+                    },
+                ) {
+                    listOf(0.9f to "S", 1f to "M", 1.15f to "L", 1.3f to "XL").forEach { (scale, label) ->
+                        Chip(label, selected = kotlin.math.abs(settings.fontScale - scale) < 0.01f) {
+                            Prefs.update { it.copy(fontScale = scale) }
+                        }
+                    }
+                }
+                Divider()
+                ToggleRow(
+                    "High contrast",
+                    "Pure black or white text and stronger separators, for daylight",
+                    settings.highContrast,
+                ) { v ->
+                    Prefs.update { it.copy(highContrast = v) }
+                    app.bunmusic.core.Skin.contrast = v
+                }
+                Divider()
+                ToggleRow(
+                    "Visualiser",
+                    "Bars under the artwork that follow the playback position",
+                    settings.visualizer,
+                ) { v -> Prefs.update { it.copy(visualizer = v) } }
+                Divider()
+                ToggleRow(
+                    "Smart shuffle",
+                    "Keeps artists apart and stops offering songs you skip",
+                    settings.smartShuffle,
+                ) { v -> Prefs.update { it.copy(smartShuffle = v) } }
+                Divider()
+                ToggleRow(
+                    "Sleep timer fade",
+                    "Eases the last ten seconds down instead of cutting the song",
+                    settings.sleepFade,
+                ) { v -> Prefs.update { it.copy(sleepFade = v) } }
+                Divider()
+                ToggleRow(
+                    "Offline banner",
+                    "Says so when the phone loses its connection",
+                    settings.offlineBanner,
+                ) { v -> Prefs.update { it.copy(offlineBanner = v) } }
+            }
+        }
+
+        item { GroupLabel("Discovery") }
+        item {
+            SettingsCard {
+                NavRow(
+                    "Made for you",
+                    "Daily mixes, taste profile, time capsule",
+                    G.Sparkle,
+                ) { onOpenDiscovery() }
+                Divider()
+                ToggleRow(
+                    "Discovery row on Home",
+                    "Show the mixes above the shelves",
+                    settings.discoveryHome,
+                ) { v -> Prefs.update { it.copy(discoveryHome = v) } }
             }
         }
 
@@ -379,6 +453,12 @@ fun SettingsScreen(
                     "Every action in the app, searchable",
                     G.Search,
                 ) { onOpenCommands() }
+                Divider()
+                NavRow(
+                    "Storage",
+                    "Cache, artwork and downloads, split by what they cost",
+                    G.Cloud,
+                ) { onOpenStorage() }
             }
         }
 
