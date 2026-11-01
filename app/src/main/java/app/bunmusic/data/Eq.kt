@@ -42,7 +42,7 @@ object Eq {
     val presets = listOf("Flat", "Bass", "Vocal", "Rock", "Electronic", "Podcast")
 
     /** Gains in dB, spread across however many bands the device exposes. */
-    private val presetGains = mapOf(
+    internal val presetGains = mapOf(
         "Flat" to listOf(0f, 0f, 0f, 0f, 0f),
         "Bass" to listOf(7.5f, 5f, 0f, -1f, -2f),
         "Vocal" to listOf(-2f, 0f, 5f, 4f, 1f),
@@ -217,7 +217,7 @@ object Eq {
     }
 
     /** Map a five-point curve onto an arbitrary band count. */
-    private fun spread(gains: List<Float>, index: Int, total: Int): Float {
+    internal fun spread(gains: List<Float>, index: Int, total: Int): Float {
         if (total <= 1) return gains.first()
         val pos = index.toFloat() / (total - 1) * (gains.size - 1)
         val low = pos.toInt().coerceIn(0, gains.size - 1)

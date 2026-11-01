@@ -99,7 +99,7 @@ object Backup {
         summary
     }
 
-    private fun trackJson(t: Track): JsonObject = buildJsonObject {
+    internal fun trackJson(t: Track): JsonObject = buildJsonObject {
         put("id", t.id)
         put("title", t.title)
         put("artist", t.artist)
@@ -112,7 +112,7 @@ object Backup {
         put("assetAudio", t.assetAudio ?: "")
     }
 
-    private fun trackFrom(o: JsonObject): Track? {
+    internal fun trackFrom(o: JsonObject): Track? {
         val id = o["id"]?.jsonPrimitive?.contentOrNull ?: return null
         val title = o["title"]?.jsonPrimitive?.contentOrNull ?: return null
         return Track(

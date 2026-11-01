@@ -451,7 +451,7 @@ private fun ThinBar(fraction: Float, indeterminate: Boolean, tint: Color) {
 }
 
 /** "1.4 MB/s" — one decimal below ten, none above, because the extra digit is noise. */
-private fun fmtSpeed(bytesPerSecond: Long): String = when {
+internal fun fmtSpeed(bytesPerSecond: Long): String = when {
     bytesPerSecond < 1024 -> "$bytesPerSecond B/s"
     bytesPerSecond < 1024 * 1024 -> "${bytesPerSecond / 1024} KB/s"
     bytesPerSecond < 10 * 1024 * 1024 -> String.format("%.1f MB/s", bytesPerSecond / 1048576.0)

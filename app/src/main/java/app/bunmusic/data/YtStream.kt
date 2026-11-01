@@ -108,7 +108,7 @@ object YtStream {
      * AAC, so it gets a small nudge; otherwise this is a straight distance
      * match, which keeps a "Low" listener off a 256 kbps stream on mobile data.
      */
-    private fun pick(candidates: List<Pair<JsonObject, Long>>, quality: Prefs.Quality): Pair<JsonObject, Long>? {
+    internal fun pick(candidates: List<Pair<JsonObject, Long>>, quality: Prefs.Quality): Pair<JsonObject, Long>? {
         if (candidates.isEmpty()) return null
         val target = quality.bitrate
         return when (quality) {

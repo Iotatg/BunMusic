@@ -45,7 +45,8 @@ object LyricsApi {
         result
     }
 
-    private fun clean(s: String): String = s
+    /** Visible to tests: the query cleaner is the only thing standing between a messy title and a hit. */
+    internal fun clean(s: String): String = s
         .substringBefore("(")
         .substringBefore("[")
         .replace(Regex("(?i)\\s*(feat\\.?|ft\\.?|featuring)\\s+.*"), "")
@@ -113,7 +114,7 @@ object LyricsApi {
 
     private fun enc(s: String): String = URLEncoder.encode(s, "UTF-8")
 
-    private fun parseLrc(raw: String): List<LyricLine> {
+    internal fun parseLrc(raw: String): List<LyricLine> {
         val out = ArrayList<LyricLine>()
         val regex = Regex("\\[(\\d{1,2}):(\\d{2})(?:[.:](\\d{1,3}))?]")
         for (line in raw.lines()) {
