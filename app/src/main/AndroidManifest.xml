@@ -10,6 +10,18 @@
     <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
 
+    <!-- Android 11+ hides other packages from us. MediaButtonReceiver and the
+         session token both need to resolve the media session service, so the
+         intent is declared as visible. -->
+    <queries>
+        <intent>
+            <action android:name="androidx.media3.session.MediaSessionService" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.MEDIA_BUTTON" />
+        </intent>
+    </queries>
+
     <application
         android:name=".BunApp"
         android:allowBackup="true"
@@ -96,14 +108,31 @@
             </intent-filter>
         </activity-alias>
 
+        <!-- stopWithTask=false: swiping the app off the recents list must not
+             take the music, the session and the notification with it.
+             MEDIA_BUTTON is in the filter so a headset or a car can address this
+             service directly, not only through the session. -->
         <service
             android:name=".player.PlaybackService"
             android:exported="true"
-            android:foregroundServiceType="mediaPlayback">
+            android:foregroundServiceType="mediaPlayback"
+            android:stopWithTask="false">
             <intent-filter>
                 <action android:name="androidx.media3.session.MediaSessionService" />
+                <action android:name="android.intent.action.MEDIA_BUTTON" />
             </intent-filter>
         </service>
+
+        <!-- Wired and Bluetooth buttons arrive here when the app is not on
+             screen: the receiver hands the event to the session, which is what
+             makes play/pause on a headset work with the phone in a pocket. -->
+        <receiver
+            android:name="androidx.media3.session.MediaButtonReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MEDIA_BUTTON" />
+            </intent-filter>
+        </receiver>
 
         <!-- Four home-screen widgets. Each needs its own receiver, because that
              is how the launcher identifies which widget is which. -->

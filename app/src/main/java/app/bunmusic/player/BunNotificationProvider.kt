@@ -156,8 +156,11 @@ class BunNotificationProvider(private val context: Context) : MediaNotification.
         )
 
         val open = session.sessionActivity
-        val big = remoteBig(title, artist, position, duration, permille, art.get(track?.artUrl), playing)
-        val compact = remoteCompact(title, artist, position, duration, permille, art.get(track?.artUrl), playing)
+        // One lookup, used three times: the two layouts and the large icon that
+        // the lock screen of an older Android draws instead of the custom view.
+        val cover = art.get(track?.artUrl)
+        val big = remoteBig(title, artist, position, duration, permille, cover, playing)
+        val compact = remoteCompact(title, artist, position, duration, permille, cover, playing)
 
         // Only ids that exist in each layout: a RemoteViews action aimed at a
         // missing view is at best ignored and at worst an exception at apply
@@ -199,6 +202,13 @@ class BunNotificationProvider(private val context: Context) : MediaNotification.
             .setOnlyAlertOnce(true)
             .setOngoing(playing)
             .setColor(0xFFD8F65C.toInt())
+            // Android 12+ otherwise holds a new foreground notification back for
+            // ten seconds and shows it silently — the music is audible long
+            // before the controls appear.
+            .setForegroundServiceBehavior(NotificationCompat.FOREGROUND_SERVICE_IMMEDIATE)
+            .setPriority(NotificationCompat.PRIORITY_LOW)
+
+        if (cover != null) builder.setLargeIcon(cover)
 
         return builder.build()
     }
