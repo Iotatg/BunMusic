@@ -54,7 +54,18 @@ fun AboutScreen(onBack: () -> Unit) {
             }
         }
 
-        item { GroupTitle("New in 1.4.0") }
+        item { GroupTitle("New in 1.5.0") }
+        item {
+            AboutCard {
+                Change("The lock screen, fixed at the root", "The media session was built on the player directly, and this player only ever holds one track — so the session concluded there was no next and no previous, and the lock screen showed a play button and nothing else. The queue is real; only the player's view of it was missing. A session bridge now answers for it")
+                Change("A notification with a position", "The default one is the platform's media template: three buttons and no time. This one draws artwork, title, artist, elapsed and remaining, and a progress bar that is redrawn once a second while playing and stops when paused")
+                Change("Like, shuffle and repeat from outside", "Three custom session commands, declared once and drawn both in the notification and by the system's own media control on Android 13+. The glyphs carry the state: a filled heart, a crossed shuffle, a repeat with a 1")
+                Change("It comes back after a reboot", "Android 13 media resumption asks the app what was playing. The answer is the saved session, with each track carried whole inside the media item, because the player underneath cannot be trusted to remember a queue")
+                Change("When nothing appears, the reason is a system switch", "Settings → Lock screen & notifications shows whether notifications are allowed at all, and opens the page that decides it. An app cannot grant itself that permission, so it can only tell you where it is")
+            }
+        }
+
+        item { GroupTitle("Earlier") }
         item {
             AboutCard {
                 Change("Your year, from your own log", "The app counted totals but threw the timestamps away, so it could say \"41 plays of this artist\" and not \"March\" or \"2 am\". Every play now lands in a timestamped log, capped at 1,200 entries — about 45 KB — so the questions that need a date finally have an answer")

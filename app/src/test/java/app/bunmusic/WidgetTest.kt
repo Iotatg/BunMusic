@@ -112,7 +112,7 @@ class CommandTest {
 
     @Test
     fun thereAreAtLeastOneHundredCommands() {
-        assertEquals("the catalogue size is part of the deal", 133, commands.size)
+        assertEquals("the catalogue size is part of the deal", 134, commands.size)
     }
 
     @Test

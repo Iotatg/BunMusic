@@ -230,6 +230,23 @@ fun buildCommands(host: CommandHost): List<Command> {
         }
     }
 
+    // The lock screen is the one part of the app it cannot draw for itself:
+    // whether it appears at all is a system permission, not a setting of ours.
+    add(
+        "System", "sys.notifications", "Lock screen & notifications",
+        "Opens the system page", G.Bell, "media controls bar notification permission",
+    ) {
+        val context = host.context
+        val opened = runCatching {
+            context.startActivity(
+                android.content.Intent(android.provider.Settings.ACTION_APP_NOTIFICATION_SETTINGS)
+                    .putExtra(android.provider.Settings.EXTRA_APP_PACKAGE, context.packageName)
+                    .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+            )
+        }.isSuccess
+        if (opened) host.close() else host.toast("Could not open system settings")
+    }
+
     // ----------------------------------------------------------- appearance
     BunSkin.entries.forEach { bun ->
         add("Appearance", "skin.${bun.id}", "Wear ${bun.title}", bun.tagline, G.Grid, "theme skin bun") {

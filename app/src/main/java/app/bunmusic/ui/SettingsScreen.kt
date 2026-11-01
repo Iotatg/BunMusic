@@ -1,6 +1,8 @@
 package app.bunmusic.ui
 
 import android.content.Intent
+import android.provider.Settings
+import androidx.core.app.NotificationManagerCompat
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
@@ -89,6 +91,9 @@ fun SettingsScreen(
 
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+    // Re-read on every recomposition: the user may have just come back from the
+    // system page this row opens.
+    val notificationsOn = NotificationManagerCompat.from(context).areNotificationsEnabled()
     var googleSheet by remember { mutableStateOf(false) }
     var tokenSheet by remember { mutableStateOf(false) }
     var cacheTick by remember { mutableIntStateOf(0) }
@@ -512,6 +517,24 @@ fun SettingsScreen(
                 NavRow("Listening stats", "Time, top artists, weekly bars", G.Chart) { onOpenStats() }
                 Divider()
                 NavRow("Year in review", "Your year as a scrollable reel", G.Sparkle) { onOpenWrapped() }
+                Divider()
+                // The one switch that decides whether any of the lock-screen work
+                // is visible at all. On Android 13+ a denied permission means no
+                // notification, no bar, no controls — and the app can only point
+                // at the system page, it cannot grant itself.
+                NavRow(
+                    "Lock screen & notifications",
+                    if (notificationsOn) "Controls and the progress bar are allowed"
+                    else "Blocked in system settings — nothing can appear",
+                    G.Bell,
+                ) {
+                    runCatching {
+                        context.startActivity(
+                            Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
+                                .putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
+                        )
+                    }.onFailure { onToast("Could not open system settings") }
+                }
                 Divider()
                 NavRow("Clear search history", "Removes saved queries", G.Search) {
                     Store.clearQueries()

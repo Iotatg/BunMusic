@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- A dark card on purpose. The layout's text is near-white, and the system
+     hands media notifications a light background in light mode; without this
+     the title disappears. -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
+    <solid android:color="#141118" />
+    <corners android:radius="16dp" />
+</shape>
