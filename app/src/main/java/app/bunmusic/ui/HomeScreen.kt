@@ -63,6 +63,7 @@ fun HomeScreen(
     onOpenMood: (Mood) -> Unit,
     onPlay: (List<Track>, Int) -> Unit,
     onOpenPlayer: () -> Unit,
+    onTogglePlay: () -> Unit,
     onMore: (Track) -> Unit,
     onOpenSettings: () -> Unit,
 ) {
@@ -127,7 +128,12 @@ fun HomeScreen(
         item {
             val hero = state.track ?: recents.firstOrNull()
             if (hero != null) {
-                HeroCard(track = hero, playing = state.isPlaying, onPlay = { onOpenPlayer() })
+                HeroCard(
+                    track = hero,
+                    playing = state.isPlaying,
+                    onOpen = { onOpenPlayer() },
+                    onToggle = onTogglePlay,
+                )
             } else {
                 StartCard(onOpenSearch = onOpenSearch)
             }
@@ -197,10 +203,16 @@ fun HomeScreen(
             item { SectionHeader(shelf.title) }
             if (shelf.tracks.isNotEmpty()) {
                 item {
-                    Column(Modifier.padding(horizontal = 8.dp)) {
+                    // Rows inset by (gutter - their own 10 dp) so the titles line up
+                    // with the section heading above them instead of drifting 2 dp.
+                    Column(Modifier.padding(horizontal = (gutter - 10.dp).coerceAtLeast(0.dp))) {
                         shelf.tracks.take(5).forEachIndexed { i, t ->
                             TrackRow(
                                 track = t,
+                                // Numbered: the row used to print a lone "•" in the
+                                // gutter, which read as a stray character rather than
+                                // as a list position.
+                                index = i + 1,
                                 playing = state.isPlaying,
                                 isCurrent = state.track?.id == t.id,
                                 downloaded = downloadedIds.contains(t.id),
@@ -301,7 +313,7 @@ private fun StartCard(onOpenSearch: () -> Unit) {
 }
 
 @Composable
-private fun HeroCard(track: Track, playing: Boolean, onPlay: () -> Unit) {
+private fun HeroCard(track: Track, playing: Boolean, onOpen: () -> Unit, onToggle: () -> Unit) {
     val pulse by animateFloatAsState(if (playing) 1f else 0.92f, label = "pulse")
     Box(
         Modifier
@@ -311,7 +323,7 @@ private fun HeroCard(track: Track, playing: Boolean, onPlay: () -> Unit) {
             .background(
                 Brush.linearGradient(Ink.Hero)
             )
-            .clickable { onPlay() }
+            .clickable { onOpen() }
             .padding(20.dp)
     ) {
         Column {
@@ -345,7 +357,7 @@ private fun HeroCard(track: Track, playing: Boolean, onPlay: () -> Unit) {
                     )
                     Spacer(Modifier.height(4.dp))
                     Text(
-                        track.artist + " · " + track.album,
+                        track.creditLine(),
                         color = Ink.HeroSub,
                         fontSize = 11.5.sp,
                         fontFamily = SoraFamily,
@@ -353,10 +365,14 @@ private fun HeroCard(track: Track, playing: Boolean, onPlay: () -> Unit) {
                         overflow = TextOverflow.Ellipsis,
                     )
                     Spacer(Modifier.height(16.dp))
+                    // The pill says "Pause", so it pauses. It used to be pure
+                    // decoration inside a card that opened the player: the most
+                    // obvious button on the home screen did the wrong thing.
                     Row(
                         Modifier
                             .clip(CircleShape)
                             .background(Ink.HeroBtn)
+                            .clickable { onToggle() }
                             .padding(horizontal = 16.dp, vertical = 9.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {

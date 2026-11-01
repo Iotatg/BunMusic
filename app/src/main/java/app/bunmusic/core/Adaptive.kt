@@ -124,6 +124,15 @@ data class BunWindow(
     /** Width of the navigation rail when [wide]. */
     val railWidth: Dp get() = 92.dp
 
+    /**
+     * Widest the floating tab bar may get. Four labels need about 480 dp; past
+     * that the pill stops being a pill and becomes a stripe across the bezel.
+     */
+    val navMax: Dp get() = 560.dp
+
+    /** Widest the now-playing strip may get before its two ends lose each other. */
+    val miniMax: Dp get() = 780.dp
+
     companion object {
         const val MEDIUM_FROM = 600
         const val EXPANDED_FROM = 840

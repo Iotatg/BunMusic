@@ -18,6 +18,19 @@ data class Track(
     val isLocal: Boolean get() = source == Source.LOCAL
 
     fun uri(): String = if (isLocal) "asset:///${assetAudio ?: ""}" else "yt://$videoId"
+
+    /**
+     * "Artist · Album" with the empty half dropped.
+     *
+     * The hero card used to concatenate `artist + " · " + album` unconditionally.
+     * YouTube Music doesn't always return an album, so the card read
+     * "Mehul Mahesh & DJ Aynik ·" — a separator pointing at nothing. Build the
+     * parts, then join the ones that exist.
+     */
+    fun creditLine(): String {
+        val parts = listOf(artist.trim(), album.trim()).filter { it.isNotEmpty() }
+        return if (parts.isEmpty()) "Unknown artist" else parts.joinToString(" · ")
+    }
 }
 
 enum class CollectionKind { ALBUM, ARTIST, PLAYLIST, MIX }

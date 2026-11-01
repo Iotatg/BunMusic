@@ -7,7 +7,7 @@ saved offline.
 
 ```
 package   app.bunmusic
-version   1.0.11 (12)
+version   1.0.12 (13)
 minSdk    26  ·  target/compile 37
 author    Iota Coder · iota14934@gmail.com
 ```
@@ -229,6 +229,25 @@ home, album pages, Explore, Charts, mood pages and the automix radio queue.
 ---
 
 ## Changelog
+
+**1.0.12** — the bottom of the screen, fixed properly.
+
+- **The playing bar was cut in half.** The light buns packed the now-playing strip
+  (62 dp) and the tab bar (87 dp) into a hard-coded `height(122.dp)` box, so the
+  bar was drawn straight over the bottom half of the strip — artwork and all.
+  The bottom of the screen is a `Column` that is exactly as tall as its children,
+  with the window inset applied once at the container.
+- **Pause pauses.** The pill on the home hero card was decoration inside a card
+  that opened the player. It toggles playback now; the card still opens it.
+- **The heart saves.** In the mini player the heart filled while the song played
+  and paused the track when tapped. It is a like button now.
+- **No separator pointing at nothing.** `artist + " · " + album` printed
+  "Mehul Mahesh & DJ Aynik ·" whenever YouTube Music returned no album.
+- **A list, not a stray dot.** Rows without a number printed a lone "•" in the
+  gutter, half a line below the title. Numbered lists are numbered, and the
+  number sits on the title's first line.
+- **A pill, not a stripe.** The tab bar caps at 560 dp, the strip at 780 dp.
+- **Toasts measure the chrome** instead of assuming 120 dp.
 
 **1.0.11** — it fits the screen it is on.
 

@@ -68,6 +68,7 @@ import app.bunmusic.core.Skin
 import app.bunmusic.core.SoraFamily
 import app.bunmusic.data.Collection
 import app.bunmusic.data.Cache
+import app.bunmusic.data.Store
 import app.bunmusic.data.Track
 import app.bunmusic.player.PlayerState
 import coil3.compose.AsyncImage
@@ -481,18 +482,25 @@ private fun CharcoalTrackRow(
             .background(if (isCurrent) Ink.Field else Color.Transparent)
             .clickable { onPlay() }
             .padding(start = 10.dp, end = 6.dp, top = 10.dp, bottom = 10.dp),
-        verticalAlignment = Alignment.CenterVertically,
+        // Top-aligned so the number sits on the title's baseline instead of
+        // floating halfway between the title and the artist line.
+        verticalAlignment = Alignment.Top,
     ) {
-        Box(Modifier.width(26.dp), contentAlignment = Alignment.CenterStart) {
-            if (isCurrent) MiniWave(Ink.Text, playing) else Text(
-                if (index >= 0) index.toString().padStart(2, '0') else "•",
-                color = Ink.Faint,
-                fontSize = 11.5.sp,
-                fontFamily = SoraFamily,
-                fontWeight = FontWeight.Medium,
-            )
+        if (index >= 0 || isCurrent) {
+            Box(
+                Modifier.width(26.dp).padding(top = 3.dp),
+                contentAlignment = Alignment.CenterStart,
+            ) {
+                if (isCurrent) MiniWave(Ink.Text, playing) else Text(
+                    index.toString().padStart(2, '0'),
+                    color = Ink.Faint,
+                    fontSize = 11.5.sp,
+                    fontFamily = SoraFamily,
+                    fontWeight = FontWeight.Medium,
+                )
+            }
+            Spacer(Modifier.width(6.dp))
         }
-        Spacer(Modifier.width(6.dp))
         Column(Modifier.weight(1f)) {
             Text(
                 track.title,
@@ -520,7 +528,8 @@ private fun CharcoalTrackRow(
         }
         if (onLike != null) {
             Box(
-                Modifier.tapTarget().size(30.dp).clip(CircleShape).clickable { onLike() },
+                Modifier.align(Alignment.CenterVertically).tapTarget().size(30.dp)
+                    .clip(CircleShape).clickable { onLike() },
                 contentAlignment = Alignment.Center,
             ) {
                 Glyph(if (liked) G.HeartFill else G.Heart, if (liked) Ink.Rose else Ink.Faint, 15.dp)
@@ -528,7 +537,8 @@ private fun CharcoalTrackRow(
         }
         if (onMore != null) {
             Box(
-                Modifier.tapTarget().size(30.dp).clip(CircleShape).clickable { onMore() },
+                Modifier.align(Alignment.CenterVertically).tapTarget().size(30.dp)
+                    .clip(CircleShape).clickable { onMore() },
                 contentAlignment = Alignment.Center,
             ) { Glyph(G.More, Ink.Faint, 15.dp) }
         }
@@ -794,6 +804,11 @@ private fun CharcoalMiniPlayer(
     onToggle: () -> Unit,
     modifier: Modifier,
 ) {
+    // The heart used to be wired to playback: it filled while the song played and
+    // called `onToggle` when tapped, so the one control that looks like "save this"
+    // actually paused the track. It is a like button now, and the play button on
+    // the right is the only thing that toggles playback.
+    var liked by remember(track.id) { mutableStateOf(Store.isLiked(track.id)) }
     Row(
         modifier
             .fillMaxWidth()
@@ -833,9 +848,18 @@ private fun CharcoalMiniPlayer(
             )
         }
         Box(
-            Modifier.tapTarget().size(34.dp).clip(CircleShape).clickable { onToggle() },
+            Modifier.tapTarget().size(34.dp).clip(CircleShape).clickable {
+                liked = Store.toggleLike(track.id)
+                Haptics.tick()
+            },
             contentAlignment = Alignment.Center,
-        ) { Glyph(if (state.isPlaying) G.HeartFill else G.Heart, Ink.MiniText.copy(alpha = 0.9f), 18.dp) }
+        ) {
+            Glyph(
+                if (liked) G.HeartFill else G.Heart,
+                if (liked) Ink.Rose else Ink.MiniText.copy(alpha = 0.9f),
+                18.dp,
+            )
+        }
         Spacer(Modifier.width(6.dp))
         Box(
             Modifier

@@ -39,6 +39,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -46,6 +47,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
@@ -129,6 +132,10 @@ private fun Shell(guest: Boolean, onLeaveGuest: () -> Unit, openPlayerOnStart: B
     LaunchedEffect(openPlayerOnStart) { if (openPlayerOnStart) playerOpen = true }
     var sheetTrack by remember { mutableStateOf<Track?>(null) }
     var toast by remember { mutableStateOf<String?>(null) }
+    // Measured, not guessed: the toast used to be lifted by a hard-coded 120 dp,
+    // which cleared the bar on a phone and floated in the middle of a tablet.
+    var chromePx by remember { mutableIntStateOf(0) }
+    val density = LocalDensity.current
 
     val route = stack.last()
 
@@ -214,6 +221,7 @@ private fun Shell(guest: Boolean, onLeaveGuest: () -> Unit, openPlayerOnStart: B
                             onOpenMood = { m -> push(Route.MoodPage(m.title, m.browseId, m.params)) },
                             onPlay = { list, i -> Playback.play(list, i) },
                             onOpenPlayer = { if (state.hasTrack) playerOpen = true },
+                            onTogglePlay = { Playback.toggle() },
                             onMore = { sheetTrack = it },
                             onOpenSettings = { push(Route.Settings) },
                         )
@@ -314,54 +322,16 @@ private fun Shell(guest: Boolean, onLeaveGuest: () -> Unit, openPlayerOnStart: B
             }
 
             // ---- bottom chrome
-            if (window.wide) {
-                // No tab bar here — the rail has it. The mini player stays, capped
-                // so it reads as a card rather than a 1000 dp stripe.
-                if (state.hasTrack) {
-                    Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-                        Box(Modifier.widthIn(max = 760.dp)) {
-                            MiniPlayer(
-                                state = state,
-                                onOpen = { playerOpen = true },
-                                onToggle = { Playback.toggle() },
-                                onNext = { Playback.next() },
-                            )
-                        }
-                    }
-                }
-                Spacer(Modifier.navigationBarsPadding().height(12.dp))
-            } else if (Ink.isLight) {
-                Box(Modifier.fillMaxWidth().navigationBarsPadding()) {
-                    Box(Modifier.fillMaxWidth().height(if (state.hasTrack) 122.dp else 84.dp)) {
-                        if (state.hasTrack) {
-                            Box(Modifier.align(Alignment.TopCenter)) {
-                                MiniPlayer(
-                                    state = state,
-                                    onOpen = { playerOpen = true },
-                                    onToggle = { Playback.toggle() },
-                                    onNext = { Playback.next() },
-                                )
-                            }
-                        }
-                        BottomNav(
-                            current = route,
-                            onSelect = { tab(it) },
-                            modifier = Modifier.align(Alignment.BottomCenter),
-                        )
-                    }
-                }
-            } else {
-                if (state.hasTrack) {
-                    MiniPlayer(
-                        state = state,
-                        onOpen = { playerOpen = true },
-                        onToggle = { Playback.toggle() },
-                        onNext = { Playback.next() },
-                    )
-                }
-
-                BottomNav(route, { tab(it) })
-            }
+            BottomChrome(
+                state = state,
+                route = route,
+                window = window,
+                onOpen = { playerOpen = true },
+                onToggle = { Playback.toggle() },
+                onNext = { Playback.next() },
+                onSelect = { tab(it) },
+                modifier = Modifier.onSizeChanged { chromePx = it.height },
+            )
             }
         }
 
@@ -388,19 +358,23 @@ private fun Shell(guest: Boolean, onLeaveGuest: () -> Unit, openPlayerOnStart: B
         }
 
         toast?.let { msg ->
-            Toast(msg, onDone = { toast = null })
+            Toast(
+                message = msg,
+                bottom = with(density) { chromePx.toDp() } + 12.dp,
+                onDone = { toast = null },
+            )
         }
     }
 }
 
 @Composable
-private fun Toast(message: String, onDone: () -> Unit) {
+private fun Toast(message: String, bottom: androidx.compose.ui.unit.Dp, onDone: () -> Unit) {
     androidx.compose.runtime.LaunchedEffect(message) {
         kotlinx.coroutines.delay(1900)
         onDone()
     }
     Box(
-        Modifier.fillMaxSize().padding(bottom = 120.dp),
+        Modifier.fillMaxSize().padding(bottom = bottom),
         contentAlignment = Alignment.BottomCenter,
     ) {
         Box(
@@ -416,6 +390,60 @@ private fun Toast(message: String, onDone: () -> Unit) {
 }
 
 // --------------------------------------------------------------- bottom nav
+
+/**
+ * Everything pinned under the content: the now-playing strip, then the tab bar.
+ *
+ * This used to be two hand-tuned branches — one for the light buns, one for the
+ * dark — and the light one sized itself with a hard-coded `height(122.dp)` box
+ * holding both the strip (62 dp) and the bar (87 dp). They don't fit in 122 dp,
+ * so the bar was drawn straight over the bottom half of the strip: the playing
+ * bar looked cut off at the screen edge, and the artwork with it.
+ *
+ * There is no arithmetic here now. A Column is as tall as its children, the
+ * window inset is applied once at the container, and the content above gets
+ * exactly the space that is left — which is what "the bar is at the bottom" was
+ * supposed to mean in the first place.
+ */
+@Composable
+private fun BottomChrome(
+    state: PlayerState,
+    route: Route,
+    window: BunWindow,
+    onOpen: () -> Unit,
+    onToggle: () -> Unit,
+    onNext: () -> Unit,
+    onSelect: (Route) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier
+            .fillMaxWidth()
+            .navigationBarsPadding()
+            .padding(bottom = if (window.wide) 10.dp else 0.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        if (state.hasTrack) {
+            // Capped: on a tablet the strip was a full-width 1400 dp bar with a
+            // 44 dp thumbnail at one end and a play button a metre away.
+            Box(Modifier.widthIn(max = window.miniMax).fillMaxWidth()) {
+                MiniPlayer(
+                    state = state,
+                    onOpen = onOpen,
+                    onToggle = onToggle,
+                    onNext = onNext,
+                )
+            }
+        }
+        if (!window.wide) {
+            // Same reason: a floating pill that spans the bezel stops reading as
+            // a pill. 560 dp is the widest four labels need.
+            Box(Modifier.widthIn(max = window.navMax).fillMaxWidth()) {
+                BottomNav(current = route, onSelect = onSelect)
+            }
+        }
+    }
+}
 
 private data class NavTab(val label: String, val glyph: G, val route: Route)
 
@@ -454,7 +482,6 @@ private fun DarkNav(current: Route, onSelect: (Route) -> Unit, modifier: Modifie
     Box(
         modifier
             .fillMaxWidth()
-            .navigationBarsPadding()
             .padding(horizontal = 16.dp, vertical = 10.dp),
     ) {
         Row(

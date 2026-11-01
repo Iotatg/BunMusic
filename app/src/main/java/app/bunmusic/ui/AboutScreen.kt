@@ -47,7 +47,7 @@ fun AboutScreen(onBack: () -> Unit) {
                 Display("BunMusic", 32)
                 Spacer(Modifier.height(4.dp))
                 Text(
-                    "1.0.11 · build 12 · ${Skin.current.title} bun",
+                    "1.0.12 · build 13 · ${Skin.current.title} bun",
                     color = Ink.Muted, fontSize = 12.sp, fontFamily = SoraFamily,
                 )
             }
@@ -56,6 +56,13 @@ fun AboutScreen(onBack: () -> Unit) {
         item { GroupTitle("What's new") }
         item {
             AboutCard {
+                Change("The playing bar is no longer cut in half", "The light buns packed the now-playing strip (62 dp) and the tab bar (87 dp) into a hard-coded 122 dp box, so the bar was drawn straight over the bottom half of the strip. The bottom of the screen is a Column that is exactly as tall as what it holds now, and the system inset is applied once, at the container")
+                Change("Pause pauses", "The pill on the home card was decoration inside a card that opened the player — the most obvious button in the app did something else. It toggles playback; tapping the card still opens the player")
+                Change("The heart saves", "In the mini player the heart filled while the song played and paused the track when tapped. It is a like button now, and it says so")
+                Change("No separator pointing at nothing", "YouTube Music doesn't always return an album, and the hero card printed \"Artist ·\" anyway. The credit line is built from the parts that exist")
+                Change("A list, not a stray dot", "Rows without a number printed a lone bullet in the gutter, half a line below the title. Lists that have positions are numbered, and the number sits on the title's first line")
+                Change("A pill, not a stripe", "On a wide window the tab bar stretched bezel to bezel and the strip's two ends drifted a screen apart. The bar caps at 560 dp and the strip at 780 dp, both centred")
+                Change("Toasts know where the bar is", "The toast was lifted by a hard-coded 120 dp. It measures the bottom chrome instead")
                 Change("Every screen, every screen", "The layout has three width classes now — phone, small tablet, large tablet — and each one is drawn for its size instead of the phone being stretched. Tested from 320 dp to 1280 dp")
                 Change("The tabs move to the side", "From 600 dp the bottom bar becomes a rail down the left edge: same four destinations, same glyphs, same selected fill, and 84 dp of height back for the content")
                 Change("A tablet player, not a blown-up phone", "From 840 dp in landscape the now-playing screen splits: artwork left, controls right. Portrait keeps one column, capped so the disc isn't a wall")
@@ -100,7 +107,7 @@ fun AboutScreen(onBack: () -> Unit) {
         item { GroupTitle("Build") }
         item {
             AboutCard {
-                Fact("Version", "1.0.11 (12)")
+                Fact("Version", "1.0.12 (13)")
                 Fact("Package", "app.bunmusic")
                 Fact("Min SDK", "26 · Android 8.0")
                 Fact("Target SDK", "37")
