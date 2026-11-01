@@ -77,6 +77,7 @@ sealed interface Route {
     data object Search : Route
     data object Settings : Route
     data object Stats : Route
+    data object YearReview : Route
     data object Downloads : Route
     data object Profile : Route
     data object Equalizer : Route
@@ -274,6 +275,7 @@ private fun Shell(guest: Boolean, onLeaveGuest: () -> Unit, launch: Launch = Lau
                         Route.Settings -> SettingsScreen(
                             onBack = pop,
                             onOpenStats = { push(Route.Stats) },
+                            onOpenWrapped = { push(Route.YearReview) },
                             onOpenDownloads = { push(Route.Downloads) },
                             onOpenProfile = { push(Route.Profile) },
                             onOpenEqualizer = { push(Route.Equalizer) },
@@ -312,6 +314,7 @@ private fun Shell(guest: Boolean, onLeaveGuest: () -> Unit, launch: Launch = Lau
                         )
 
                         Route.Stats -> StatsScreen(onBack = pop)
+                        Route.YearReview -> WrappedScreen(onBack = pop)
                         Route.Downloads -> DownloadsScreen(onBack = pop, onPlay = { list, i -> Playback.play(list, i) })
 
                         is Route.PlaylistPage -> PlaylistScreen(

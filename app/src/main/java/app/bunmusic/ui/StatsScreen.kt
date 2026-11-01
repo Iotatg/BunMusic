@@ -31,6 +31,8 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -44,17 +46,47 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import java.util.Calendar
 import app.bunmusic.core.G
 import app.bunmusic.core.Glyph
 import app.bunmusic.core.Ink
 import app.bunmusic.core.SoraFamily
 import app.bunmusic.data.Downloads
+import app.bunmusic.data.Listening
 import app.bunmusic.data.Store
 import app.bunmusic.data.Track
+import app.bunmusic.data.Wrapped
 
 @Composable
 fun StatsScreen(onBack: () -> Unit) {
+    val events = remember { Store.events() }
+    val offset = remember { Listening.zoneOffset() }
     val stats = remember { Store.stats() }
+    var period by remember { mutableIntStateOf(1) }
+
+    val now = remember(events) { System.currentTimeMillis() }
+    val year = remember { Calendar.getInstance().get(Calendar.YEAR) }
+
+    // One window feeds the chart, the clock and both top lists. Computing them
+    // from three different sources is how a screen ends up claiming "12 plays"
+    // above a chart that adds up to 9.
+    val window = remember(period, events) {
+        when (period) {
+            0 -> Listening.inRange(events, now - 7 * Listening.DAY, now + 1)
+            1 -> Listening.inRange(events, now - 30 * Listening.DAY, now + 1)
+            else -> events.filter { Wrapped.yearOf(it.atMs, offset) == year }
+        }
+    }
+    val bars = remember(period, window) {
+        when (period) {
+            0 -> Listening.daily(window, 7, now, offset)
+            1 -> Listening.daily(window, 30, now, offset)
+            else -> Listening.monthly(window, year, offset)
+        }
+    }
+    val hours = remember(window) { Listening.hourly(window, offset) }
+    val topArtists = remember(window) { Listening.topArtists(window, Store::track) }
+    val topTracks = remember(window) { Listening.topTracks(window, Store::track) }
 
     LazyColumn(
         Modifier.fillMaxSize().statusBarsPadding(),
@@ -82,34 +114,104 @@ fun StatsScreen(onBack: () -> Unit) {
         }
 
         item {
-            Panel(Modifier.padding(horizontal = 20.dp).fillMaxWidth()) {
+            Row(
+                Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 2.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                PeriodChip("7 days", period == 0) { period = 0 }
+                PeriodChip("30 days", period == 1) { period = 1 }
+                PeriodChip("This year", period == 2) { period = 2 }
+            }
+        }
+
+        item {
+            Panel(Modifier.padding(horizontal = 20.dp, vertical = 10.dp).fillMaxWidth()) {
                 Column(Modifier.padding(18.dp)) {
-                    Text("Last 7 days", color = Ink.Text, fontSize = 13.5.sp, fontFamily = SoraFamily, fontWeight = FontWeight.Medium)
+                    Text(
+                        when (period) {
+                            0 -> "Last 7 days"
+                            1 -> "Last 30 days"
+                            else -> "By month, $year"
+                        },
+                        color = Ink.Text, fontSize = 13.5.sp, fontFamily = SoraFamily, fontWeight = FontWeight.Medium,
+                    )
                     Spacer(Modifier.height(16.dp))
-                    WeekBars(stats.week)
+                    PeriodBars(bars, period)
                 }
             }
         }
 
-        if (stats.topArtists.isNotEmpty()) {
+        item {
+            Panel(Modifier.padding(horizontal = 20.dp).fillMaxWidth()) {
+                Column(Modifier.padding(18.dp)) {
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            "Listening clock",
+                            color = Ink.Text, fontSize = 13.5.sp, fontFamily = SoraFamily,
+                            fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f),
+                        )
+                        Listening.peakHour(window, offset)?.let { peak ->
+                            Text(
+                                "%02d:00".format(peak),
+                                color = Ink.Faint, fontSize = 11.sp, fontFamily = SoraFamily,
+                            )
+                        }
+                    }
+                    Spacer(Modifier.height(14.dp))
+                    ClockBars(hours)
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        "Every play in the window above, bucketed by the hour you started it.",
+                        color = Ink.Faint, fontSize = 11.sp, fontFamily = SoraFamily, lineHeight = 15.sp,
+                    )
+                }
+            }
+        }
+
+        if (topArtists.isNotEmpty()) {
             item { SectionHeader("Top artists") }
-            items(stats.topArtists) { pair ->
-                val max = stats.topArtists.first().second.coerceAtLeast(1)
+            items(topArtists) { pair ->
+                val max = topArtists.first().second.coerceAtLeast(1)
                 BarRow(pair.first, pair.second, pair.second.toFloat() / max, Ink.Lavender)
             }
         }
 
-        if (stats.topTracks.isNotEmpty()) {
+        if (topTracks.isNotEmpty()) {
             item { SectionHeader("Top tracks") }
-            items(stats.topTracks) { pair ->
-                val max = stats.topTracks.first().second.coerceAtLeast(1)
-                BarRow(pair.first, pair.second, pair.second.toFloat() / max, Ink.Mint)
+            items(topTracks) { (track, count) ->
+                val max = topTracks.first().second.coerceAtLeast(1)
+                BarRow(track.title, count, count.toFloat() / max, Ink.Mint)
             }
         }
 
-        if (stats.plays == 0) {
-            item { EmptyState(G.Chart, "No listening yet", "Play a few tracks and this page fills in.") }
+        if (window.isEmpty()) {
+            item {
+                EmptyState(
+                    G.Chart,
+                    if (stats.plays == 0) "No listening yet" else "Nothing in this window",
+                    if (stats.plays == 0) "Play a few tracks and this page fills in."
+                    else "Try a longer period — this one is quiet.",
+                )
+            }
         }
+    }
+}
+
+@Composable
+private fun PeriodChip(label: String, active: Boolean, onClick: () -> Unit) {
+    Box(
+        Modifier
+            .clip(RoundedCornerShape(50))
+            .background(if (active) Ink.Lime else Ink.Field)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 14.dp, vertical = 7.dp),
+    ) {
+        Text(
+            label,
+            color = if (active) Ink.OnAccent else Ink.Muted,
+            fontSize = 12.sp, fontFamily = SoraFamily,
+            fontWeight = if (active) FontWeight.SemiBold else FontWeight.Normal,
+        )
     }
 }
 
@@ -127,24 +229,46 @@ private fun StatTile(label: String, value: String, modifier: Modifier = Modifier
     }
 }
 
+/**
+ * Bars for the selected window.
+ *
+ * Thirty bars at 8 dp spacing is a picket fence, so the gap shrinks with the
+ * count instead of being fixed. Labels only where they fit: seven days get every
+ * day, thirty get every fifth, a year gets every other month.
+ */
 @Composable
-private fun WeekBars(week: List<Int>) {
-    val max = (week.maxOrNull() ?: 0).coerceAtLeast(1)
-    val labels = remember {
+private fun PeriodBars(bars: List<Int>, period: Int) {
+    val max = (bars.maxOrNull() ?: 0).coerceAtLeast(1)
+    val gap = when {
+        bars.size <= 7 -> 8.dp
+        bars.size <= 12 -> 6.dp
+        else -> 3.dp
+    }
+    val monthLabels = remember {
+        val fmt = java.text.SimpleDateFormat("MMM", java.util.Locale.getDefault())
+        (0 until 12).map { m ->
+            val c = java.util.Calendar.getInstance()
+            c.set(java.util.Calendar.DAY_OF_MONTH, 1)
+            c.set(java.util.Calendar.MONTH, m)
+            fmt.format(c.time)
+        }
+    }
+    val dayLabels = remember(bars.size) {
         val fmt = java.text.SimpleDateFormat("EEEEE", java.util.Locale.getDefault())
         val cal = java.util.Calendar.getInstance()
-        (6 downTo 0).map { back ->
+        (bars.size - 1 downTo 0).map { back ->
             val c = cal.clone() as java.util.Calendar
             c.add(java.util.Calendar.DAY_OF_YEAR, -back)
             fmt.format(c.time)
         }
     }
+
     Row(
-        Modifier.fillMaxWidth().height(96.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        Modifier.fillMaxWidth().height(104.dp),
+        horizontalArrangement = Arrangement.spacedBy(gap),
         verticalAlignment = Alignment.Bottom,
     ) {
-        week.forEachIndexed { i, v ->
+        bars.forEachIndexed { i, v ->
             Column(
                 Modifier.weight(1f),
                 horizontalAlignment = Alignment.CenterHorizontally,
@@ -153,12 +277,51 @@ private fun WeekBars(week: List<Int>) {
                 Box(
                     Modifier
                         .fillMaxWidth()
-                        .height((8 + (v.toFloat() / max) * 62).dp)
-                        .clip(RoundedCornerShape(6.dp))
+                        .height((6 + (v.toFloat() / max) * 62).dp)
+                        .clip(RoundedCornerShape(4.dp))
                         .background(if (v > 0) Ink.Lime.copy(alpha = 0.85f) else Ink.Hairline)
                 )
                 Spacer(Modifier.height(6.dp))
-                Text(labels.getOrElse(i) { "" }, color = Ink.Faint, fontSize = 10.sp, fontFamily = SoraFamily)
+                val label = when {
+                    period == 2 -> if (i % 2 == 0) monthLabels.getOrElse(i) { "" } else ""
+                    bars.size <= 7 -> dayLabels.getOrElse(i) { "" }
+                    else -> if (i % 5 == 4 || i == bars.size - 1) dayLabels.getOrElse(i) { "" } else ""
+                }
+                Text(label, color = Ink.Faint, fontSize = 9.sp, fontFamily = SoraFamily)
+            }
+        }
+    }
+}
+
+/** 24 thin bars. No labels except 0, 6, 12, 18 — the shape is the point. */
+@Composable
+private fun ClockBars(hours: List<Int>) {
+    val max = (hours.maxOrNull() ?: 0).coerceAtLeast(1)
+    Row(
+        Modifier.fillMaxWidth().height(72.dp),
+        horizontalArrangement = Arrangement.spacedBy(3.dp),
+        verticalAlignment = Alignment.Bottom,
+    ) {
+        hours.forEachIndexed { i, v ->
+            Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Bottom) {
+                Box(
+                    Modifier
+                        .fillMaxWidth()
+                        .height((4 + (v.toFloat() / max) * 52).dp)
+                        .clip(RoundedCornerShape(3.dp))
+                        .background(
+                            when {
+                                v == 0 -> Ink.Hairline
+                                i >= 22 || i <= 3 -> Ink.Lavender.copy(alpha = 0.85f)
+                                else -> Ink.Mint.copy(alpha = 0.75f)
+                            }
+                        )
+                )
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    if (i % 6 == 0) "$i" else "",
+                    color = Ink.Faint, fontSize = 9.sp, fontFamily = SoraFamily,
+                )
             }
         }
     }

@@ -208,11 +208,27 @@ fun buildCommands(host: CommandHost): List<Command> {
     tab(Route.Hotlist, "Hotlist", "What is climbing", G.Flame)
     tab(Route.Settings, "Settings", "", G.Gear)
     tab(Route.Stats, "Listening stats", "Minutes and top artists", G.Chart)
+    tab(Route.YearReview, "Year in review", "Your year as a reel", G.Sparkle)
     tab(Route.Downloads, "Downloads", "", G.Download)
     tab(Route.Equalizer, "Equaliser", "", G.Sliders)
     tab(Route.Buns, "Buns", "Change the skin", G.Grid)
     tab(Route.Profile, "Profile", "Account", G.User)
     tab(Route.About, "About BunMusic", "What changed", G.Sparkle)
+
+    // Sharing is a command too: the image is drawn from the same summary the
+    // screen shows, so there is no second path to keep in sync.
+    add("Share", "share.year", "Share my year", "A 1080 × 1350 image", G.Share, "wrapped recap receipt") {
+        val year = java.util.Calendar.getInstance().get(java.util.Calendar.YEAR)
+        val summary = app.bunmusic.data.Wrapped.summarise(
+            Store.events(), Store::track, year, app.bunmusic.data.Listening.zoneOffset(),
+        )
+        if (!summary.hasStory) {
+            host.toast("Not enough listening yet")
+        } else {
+            host.close()
+            ShareCard.shareWrapped(host.context, summary)
+        }
+    }
 
     // ----------------------------------------------------------- appearance
     BunSkin.entries.forEach { bun ->
@@ -500,6 +516,7 @@ private fun routeName(route: Route): String = when (route) {
     Route.Search -> "search"
     Route.Settings -> "settings"
     Route.Stats -> "stats"
+    Route.YearReview -> "year"
     Route.Downloads -> "downloads"
     Route.Profile -> "profile"
     Route.Equalizer -> "equalizer"

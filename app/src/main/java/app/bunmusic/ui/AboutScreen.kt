@@ -54,7 +54,19 @@ fun AboutScreen(onBack: () -> Unit) {
             }
         }
 
-        item { GroupTitle("What's new") }
+        item { GroupTitle("New in 1.4.0") }
+        item {
+            AboutCard {
+                Change("Your year, from your own log", "The app counted totals but threw the timestamps away, so it could say \"41 plays of this artist\" and not \"March\" or \"2 am\". Every play now lands in a timestamped log, capped at 1,200 entries — about 45 KB — so the questions that need a date finally have an answer")
+                Change("A year in review", "Ten cards built from that log: minutes, top artist, the track you actually meant it about, busiest day, longest streak, the share of plays after midnight, and the tracks you tried exactly once. Under ten plays it says so instead of congratulating you for nothing")
+                Change("Share the year as one image", "1080 × 1350, drawn with android.graphics from the same summary the screen renders, so the picture and the screen can never disagree. Settings → Year in review, or the command deck")
+                Change("Stats you can scope", "The old screen was all-time or nothing. 7 days, 30 days and this year now scope the chart, the top lists and the clock together — one window, so the numbers above a chart always add up to it")
+                Change("A listening clock", "24 bars, with the night hours tinted differently, and the peak hour printed in the corner. It is the one chart that is about you rather than about the music")
+                Change("Clearing history clears the log", "One switch removes both, because a year in review that keeps showing plays you asked to forget is a bug with good typography")
+            }
+        }
+
+        item { GroupTitle("Earlier") }
         item {
             AboutCard {
                 Change("227 tests, from 65", "The suite pins the arithmetic the app is built out of: LRC parsing and query cleaning, the four formatters on every row, the equaliser's preset spread across five to ten bands, which audio stream a quality setting picks, both track encoders, the queue trimming that decides what comes back after a cold start, the window breakpoints, the command ranking, and the colour extractor's edge cases. Two of them found bugs — both below")

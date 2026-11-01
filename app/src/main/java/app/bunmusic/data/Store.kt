@@ -38,7 +38,7 @@ object Store {
     private val SCOPED_KEYS = listOf(
         KEY_REG, KEY_LIKES, KEY_HISTORY, KEY_RECENT, KEY_PLAYLISTS,
         KEY_TOTAL_MS, KEY_PLAYS, KEY_ARTISTS, KEY_TRACKS, KEY_DAYS, KEY_QUERIES,
-        KEY_DISLIKE, KEY_FOLLOWS, KEY_PLAY_IDS,
+        KEY_DISLIKE, KEY_FOLLOWS, KEY_PLAY_IDS, KEY_EVENTS,
     )
 
     /**
@@ -106,6 +106,7 @@ object Store {
     private const val KEY_TRACKS = "stats_tracks"
     private const val KEY_DAYS = "stats_days"
     private const val KEY_PLAY_IDS = "stats_play_ids"
+    private const val KEY_EVENTS = "play_events"
     private const val KEY_DISLIKE = "disliked_ids"
     private const val KEY_FOLLOWS = "followed_artists"
 
@@ -284,7 +285,13 @@ object Store {
 
     @Synchronized
     fun clearHistory() {
-        prefs.edit().remove(k(KEY_HISTORY)).remove(k(KEY_RECENT)).apply()
+        prefs.edit()
+            .remove(k(KEY_HISTORY))
+            .remove(k(KEY_RECENT))
+            // The log is history too. Leaving it behind would let the year in
+            // review keep showing plays the user just asked to forget.
+            .remove(k(KEY_EVENTS))
+            .apply()
     }
 
     // -------------------------------------------------------------- playlists
@@ -436,15 +443,27 @@ object Store {
         val days = (prefs.getStringSet(k(KEY_DAYS), emptySet()) ?: emptySet()).toMutableSet()
         days.add(epochDay().toString())
 
+        // The counters above answer "top six of all time". The log below answers
+        // "March" and "2 am", which is what the period charts and the year in
+        // review need. Both are written here so they cannot drift apart.
+        val log = Listening.append(events(), Listening.Event(track.id, System.currentTimeMillis(), track.durationMs))
+
         prefs.edit()
             .putInt(k(KEY_PLAYS), plays)
             .putLong(k(KEY_TOTAL_MS), totalMs)
             .putString(k(KEY_ARTISTS), writeCounter(artists))
             .putString(k(KEY_TRACKS), writeCounter(tracks))
             .putString(k(KEY_PLAY_IDS), writeCounter(byId))
+            .putString(k(KEY_EVENTS), log.joinToString(R.toString()) { Listening.encode(it) })
             .putStringSet(k(KEY_DAYS), days)
             .apply()
     }
+
+    /** The raw play log, newest first. See [Listening] for the arithmetic over it. */
+    fun events(): List<Listening.Event> =
+        (prefs.getString(k(KEY_EVENTS), null) ?: "")
+            .split(R)
+            .mapNotNull { Listening.decode(it) }
 
     fun stats(): LibraryStats {
         val days = prefs.getStringSet(k(KEY_DAYS), emptySet()) ?: emptySet()

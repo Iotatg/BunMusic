@@ -13,6 +13,7 @@ import android.graphics.Typeface
 import androidx.core.content.FileProvider
 import app.bunmusic.data.LibraryStats
 import app.bunmusic.data.Store
+import app.bunmusic.data.Wrapped
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -131,6 +132,115 @@ object ShareCard {
 
     private fun trim(s: String, max: Int): String =
         if (s.length <= max) s else s.take(max - 1).trimEnd() + "…"
+
+    /**
+     * The year in review as one image.
+     *
+     * Same fixed canvas as the receipt and the same reason: a screenshot of the
+     * reel would capture whatever card happened to be on screen. Everything here
+     * comes from the same [Wrapped.Summary] the screen renders, so the numbers in
+     * the picture are the numbers the user just read.
+     */
+    fun renderWrapped(s: Wrapped.Summary): Bitmap {
+        val bmp = Bitmap.createBitmap(W, H, Bitmap.Config.ARGB_8888)
+        val c = Canvas(bmp)
+        c.drawColor(AColor.rgb(10, 9, 13))
+
+        val glow = Paint().apply {
+            shader = LinearGradient(
+                0f, 0f, 0f, H * 0.6f,
+                AColor.rgb(34, 58, 52), AColor.rgb(10, 9, 13),
+                Shader.TileMode.CLAMP,
+            )
+        }
+        c.drawRect(0f, 0f, W.toFloat(), H * 0.6f, glow)
+
+        var y = 190f
+        fun text(s: String, size: Float, color: Int, bold: Boolean = false, x: Float = 96f): Float {
+            val p = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                this.color = color
+                textSize = size
+                typeface = Typeface.create("sans-serif", if (bold) Typeface.BOLD else Typeface.NORMAL)
+            }
+            c.drawText(s, x, y, p)
+            return p.measureText(s)
+        }
+
+        text("BUNMUSIC", 30f, lime, bold = true)
+        y += 74
+        text("${s.year}", 132f, ink, bold = true)
+        y += 46
+        text("in review", 40f, dim)
+        y += 96
+
+        val rule = Paint().apply { color = AColor.rgb(46, 42, 58); strokeWidth = 2f }
+        c.drawLine(96f, y, W - 96f, y, rule)
+        y += 76
+
+        // Two headline numbers, then the three names that carry the year.
+        text(Wrapped.fmtMinutes(s.minutes), 66f, ink, bold = true)
+        text("${s.plays}", 66f, ink, bold = true, x = W / 2f + 10f)
+        y += 32
+        text("listened", 26f, dim)
+        text("plays", 26f, dim, x = W / 2f + 10f)
+        y += 88
+
+        s.topArtist?.let { (name, n) ->
+            text("TOP ARTIST", 22f, lime, bold = true)
+            y += 46
+            text(trim(name, 26), 40f, ink, bold = true)
+            text("$n plays", 24f, dim, x = W - 96f - 90f)
+            y += 66
+        }
+
+        s.topTrack?.let { (track, n) ->
+            text("ON REPEAT", 22f, lime, bold = true)
+            y += 46
+            text(trim(track.title, 24), 40f, ink, bold = true)
+            y += 34
+            text(trim(track.artist, 34) + " · $n plays", 24f, dim)
+            y += 62
+        }
+
+        s.topAlbum?.let { (album, n) ->
+            text("ALBUM", 22f, lime, bold = true)
+            y += 44
+            text(trim(album, 30), 34f, ink, bold = true)
+            text("$n", 24f, dim, x = W - 96f - 40f)
+            y += 56
+        }
+
+        y = H - 250f
+        c.drawLine(96f, y, W - 96f, y, rule)
+        y += 54
+        val tail = buildString {
+            append("${s.tracks} tracks · ${s.artists} artists")
+            if (s.streak >= 3) append(" · ${s.streak}-day streak")
+        }
+        text(tail, 26f, dim)
+        y += 46
+        text("BunMusic · a quiet place for loud music", 26f, lime)
+
+        return bmp
+    }
+
+    /** Writes the Wrapped card and opens the share sheet. */
+    fun shareWrapped(context: Context, summary: Wrapped.Summary) {
+        val dir = File(context.cacheDir, "shared").apply { mkdirs() }
+        val file = File(dir, "bunmusic-${summary.year}-wrapped.png")
+        runCatching {
+            file.outputStream().use { out -> renderWrapped(summary).compress(Bitmap.CompressFormat.PNG, 100, out) }
+        }.onFailure { return }
+
+        val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
+        val send = Intent(Intent.ACTION_SEND).apply {
+            type = "image/png"
+            putExtra(Intent.EXTRA_STREAM, uri)
+            putExtra(Intent.EXTRA_TEXT, "My ${summary.year} in music — BunMusic")
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
+        context.startActivity(Intent.createChooser(send, "Share your year"))
+    }
 
     /** Writes the card and opens the system share sheet. */
     fun share(context: Context) {

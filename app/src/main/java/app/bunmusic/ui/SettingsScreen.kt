@@ -71,6 +71,7 @@ import kotlinx.coroutines.withContext
 fun SettingsScreen(
     onBack: () -> Unit,
     onOpenStats: () -> Unit,
+    onOpenWrapped: () -> Unit,
     onOpenDownloads: () -> Unit,
     onOpenProfile: () -> Unit,
     onOpenEqualizer: () -> Unit,
@@ -509,6 +510,8 @@ fun SettingsScreen(
                 ) { onOpenDownloads() }
                 Divider()
                 NavRow("Listening stats", "Time, top artists, weekly bars", G.Chart) { onOpenStats() }
+                Divider()
+                NavRow("Year in review", "Your year as a scrollable reel", G.Sparkle) { onOpenWrapped() }
                 Divider()
                 NavRow("Clear search history", "Removes saved queries", G.Search) {
                     Store.clearQueries()
