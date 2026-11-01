@@ -31,6 +31,13 @@ import kotlinx.coroutines.launch
  *
  * [SessionBridge] fixes the first, [BunNotificationProvider] the second, and the
  * media button preferences below the third.
+ *
+ * There was a fourth, and it was the one that mattered most: nothing ever
+ * started this service. A `MediaSessionService` is not created by the manifest
+ * entry alone — a controller has to connect or the app has to start it. BunMusic
+ * plays in its own process on an ExoPlayer the system never sees, so the session
+ * that the notification, the lock screen and the Bluetooth buttons are all built
+ * from simply did not exist. [ServiceLauncher] now starts it on every play path.
  */
 class PlaybackService : MediaSessionService() {
 
@@ -42,6 +49,10 @@ class PlaybackService : MediaSessionService() {
         Playback.init(this)
 
         val intent = Intent(this, app.bunmusic.MainActivity::class.java)
+            // Tapping the card should land on the player, not on the home feed —
+            // the notification is the player, as far as a locked phone is
+            // concerned, and MainActivity already knows this extra.
+            .putExtra("open_player", true)
         val pending = PendingIntent.getActivity(
             this, 0, intent,
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
@@ -49,10 +60,13 @@ class PlaybackService : MediaSessionService() {
 
         // The bun belongs in the status bar, not a generic play glyph.
         setMediaNotificationProvider(BunNotificationProvider(this))
-        // Keep the controls after a track ends or is paused: a notification that
-        // vanishes on pause takes the lock-screen buttons with it, and the next
-        // thing you want to do is press play.
-        setShowNotificationForIdlePlayer(SHOW_NOTIFICATION_FOR_IDLE_PLAYER_ALWAYS)
+        // Deliberately NEVER: an idle player has no title, no artist and no
+        // length, so showing a card for it means a notification that says
+        // "Nothing playing" the moment the service starts — before a track has
+        // been chosen. Pausing is not idle, so a paused player keeps its
+        // controls; only a full stop takes the card away, and Playback.stop()
+        // stops the service as well.
+        setShowNotificationForIdlePlayer(SHOW_NOTIFICATION_FOR_IDLE_PLAYER_NEVER)
 
         session = MediaSession.Builder(this, SessionBridge(Playback.player))
             .setSessionActivity(pending)
@@ -69,6 +83,7 @@ class PlaybackService : MediaSessionService() {
         // Swiping the app away should not stop the music; a media service that
         // dies with its task is a music player that stops when you look at it.
         if (!Playback.player.isPlaying) stopSelf()
+        super.onTaskRemoved(rootIntent)
     }
 
     override fun onDestroy() {
@@ -89,6 +104,13 @@ class PlaybackService : MediaSessionService() {
      * animation to attach to and no callback to receive, so the bar only moves
      * if we redraw it. Once a second is the cheapest rate that still reads as
      * smooth at 3 dp tall, and it stops entirely when paused.
+     *
+     * `startInForegroundRequired` is passed as `isPlaying` on purpose.
+     * `triggerNotificationUpdate()` would be the shorter call, but it passes
+     * `false`, and a service that never asks to go foreground is a service the
+     * system is free to kill the moment the screen goes off — the music would
+     * die with the app in the background, which is the whole failure this class
+     * exists to avoid.
      */
     private fun watch() {
         scope.launch {
@@ -103,7 +125,8 @@ class PlaybackService : MediaSessionService() {
                 val second = s.positionMs / 1_000
                 if (s.isPlaying && second != lastSecond) {
                     lastSecond = second
-                    runCatching { triggerNotificationUpdate() }
+                    val current = session ?: return@collect
+                    runCatching { onUpdateNotification(current, true) }
                 }
             }
         }
@@ -149,7 +172,7 @@ class PlaybackService : MediaSessionService() {
             // The icons carry the state, so they have to be re-sent; otherwise the
             // heart stays hollow until the next track.
             session.setMediaButtonPreferences(buttons())
-            triggerNotificationUpdate()
+            runCatching { onUpdateNotification(session, Playback.state.value.isPlaying) }
             return Futures.immediateFuture(SessionResult(SessionResult.RESULT_SUCCESS))
         }
 

@@ -252,7 +252,15 @@ object Playback {
             p.pause()
             saveSession(force = true)
         } else {
-            if (p.playbackState == Player.STATE_IDLE) load(index, autoplay = true) else p.play()
+            if (p.playbackState == Player.STATE_IDLE) {
+                load(index, autoplay = true)
+            } else {
+                p.play()
+                // The service can be gone — killed for memory, or stopped when the
+                // task was swiped away while paused. Resuming has to bring the
+                // session back, or the notification never returns.
+                ServiceLauncher.start(appContext)
+            }
         }
         publish()
     }
@@ -542,6 +550,8 @@ object Playback {
         pendingSeekMs = 0L
         _state.value = PlayerState()
         Session.clear()
+        // Nothing left to control, so the notification goes with it.
+        if (::appContext.isInitialized) ServiceLauncher.stop(appContext)
     }
 
     // --------------------------------------------------------------- loading
@@ -649,6 +659,11 @@ object Playback {
                 pendingSeekMs = 0L
             }
             if (autoplay) p.play()
+            // The session lives in the service, and the session is the only thing
+            // the system can see: notification, lock screen, Bluetooth buttons.
+            // Started here, after play(), so the first notification Media3 builds
+            // already knows it is playing instead of flashing a paused card.
+            if (autoplay) ServiceLauncher.start(appContext)
             playStartedAt = System.currentTimeMillis()
             scrobbled = false
             _state.value = _state.value.copy(buffering = false, track = track)

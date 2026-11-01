@@ -132,6 +132,15 @@ notification controls, audio focus, becoming-noisy handling. Queue with remove /
 reorder, shuffle, three repeat modes, seek, speed (0.5×–2×), sleep timer (5–60 min or
 end-of-track), automatic advance.
 
+The service is started on the first play (`ServiceLauncher`) and stopped with the last track:
+without that the session the notification is built from does not exist at all, which is
+indistinguishable from a broken notification. The card itself is a `MediaNotification.Provider`
+with a RemoteViews layout — artwork, title, artist, elapsed/remaining and a real progress bar
+redrawn once a second while playing — plus like / shuffle / repeat as session commands whose
+icons carry their state. Headset and Bluetooth buttons reach the session through
+`MediaButtonReceiver`, and Settings → *Playback controls* reports the four things that can
+silence the card (permission, channel, service, battery rule) instead of guessing.
+
 **Autoplay radio**
 When the queue runs dry, `Playback` asks `YtMusic.radio()` for the current track's automix and
 keeps playing — no silence, no repeats. "Start radio" in the track sheet seeds a station on

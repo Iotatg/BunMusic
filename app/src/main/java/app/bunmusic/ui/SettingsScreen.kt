@@ -1,10 +1,12 @@
 package app.bunmusic.ui
 
+import android.content.Context
 import android.content.Intent
 import android.provider.Settings
-import androidx.core.app.NotificationManagerCompat
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -64,7 +66,9 @@ import app.bunmusic.data.Prefs
 import app.bunmusic.data.Scrobble
 import app.bunmusic.data.Session
 import app.bunmusic.data.Store
+import app.bunmusic.player.BunNotificationProvider
 import app.bunmusic.player.Playback
+import app.bunmusic.system.PlaybackControls
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -91,9 +95,12 @@ fun SettingsScreen(
 
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    // Re-read on every recomposition: the user may have just come back from the
-    // system page this row opens.
-    val notificationsOn = NotificationManagerCompat.from(context).areNotificationsEnabled()
+    // The four checks behind the lock screen, re-read whenever the screen comes
+    // back to the front — the usual way to fix one is to leave for the system
+    // settings and come back.
+    var controlTick by remember { mutableIntStateOf(0) }
+    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { controlTick++ }
+    val controls = remember(controlTick) { PlaybackControls.read(context) }
     var googleSheet by remember { mutableStateOf(false) }
     var tokenSheet by remember { mutableStateOf(false) }
     var cacheTick by remember { mutableIntStateOf(0) }
@@ -518,24 +525,32 @@ fun SettingsScreen(
                 Divider()
                 NavRow("Year in review", "Your year as a scrollable reel", G.Sparkle) { onOpenWrapped() }
                 Divider()
-                // The one switch that decides whether any of the lock-screen work
-                // is visible at all. On Android 13+ a denied permission means no
-                // notification, no bar, no controls — and the app can only point
-                // at the system page, it cannot grant itself.
+                // Four independent things decide whether the lock screen shows
+                // anything at all, and a failure in any of them looks identical
+                // from the outside: silence. The summary comes first and names
+                // the blocker; the four rows under it are the detail, each with
+                // the page that fixes it.
                 NavRow(
                     "Lock screen & notifications",
-                    if (notificationsOn) "Controls and the progress bar are allowed"
-                    else "Blocked in system settings — nothing can appear",
+                    PlaybackControls.headline(controls),
                     G.Bell,
-                ) {
-                    runCatching {
-                        context.startActivity(
-                            Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
-                                .putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
-                        )
-                    }.onFailure { onToast("Could not open system settings") }
-                }
+                ) { openNotificationSettings(context, null) }
                 Divider()
+                controls.forEach { check ->
+                    CheckRow(check.title, check.detail, check.state) {
+                        when (check.fix) {
+                            PlaybackControls.Fix.NOTIFICATIONS -> openNotificationSettings(context, null)
+                            PlaybackControls.Fix.CHANNEL ->
+                                openNotificationSettings(context, BunNotificationProvider.CHANNEL_ID)
+                            PlaybackControls.Fix.BATTERY -> openBatterySettings(context)
+                            null -> onToast(
+                                if (check.ok) "Nothing to fix here"
+                                else "Play a track — the service starts with the first one"
+                            )
+                        }
+                    }
+                    Divider()
+                }
                 NavRow("Clear search history", "Removes saved queries", G.Search) {
                     Store.clearQueries()
                     onToast("Search history cleared")
@@ -756,6 +771,67 @@ private fun NavRow(title: String, subtitle: String, glyph: G, bun: BunSkin? = nu
         }
         Glyph(G.Forward, Ink.Faint, 14.dp)
     }
+}
+
+/**
+ * One line of the lock-screen diagnostics: a coloured dot, what was checked, and
+ * what to do about it. The dot carries the verdict, so the row can be read
+ * without parsing the sentence — green means nothing to do.
+ */
+@Composable
+private fun CheckRow(title: String, detail: String, state: PlaybackControls.State, onClick: () -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().clickable { onClick() }.padding(horizontal = 16.dp, vertical = 13.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(
+            Modifier
+                .size(8.dp)
+                .clip(CircleShape)
+                .background(
+                    when (state) {
+                        PlaybackControls.State.OK -> Ink.Lime
+                        PlaybackControls.State.WARN -> Ink.Faint
+                        PlaybackControls.State.FAIL -> Ink.Rose
+                    }
+                )
+        )
+        Spacer(Modifier.width(14.dp))
+        Column(Modifier.weight(1f)) {
+            Text(title, color = Ink.Text, fontSize = 13.5.sp, fontFamily = SoraFamily, fontWeight = FontWeight.Medium)
+            Text(detail, color = Ink.Faint, fontSize = 11.sp, fontFamily = SoraFamily)
+        }
+        if (state != PlaybackControls.State.OK) {
+            Text(
+                "Fix",
+                color = Ink.Lime,
+                fontSize = 11.5.sp,
+                fontFamily = SoraFamily,
+                fontWeight = FontWeight.SemiBold,
+            )
+        }
+    }
+}
+
+/** The app's notification page, or the playback channel's own page when asked. */
+private fun openNotificationSettings(context: Context, channelId: String?) {
+    runCatching {
+        val intent = if (channelId == null) {
+            Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
+                .putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
+        } else {
+            Intent(Settings.ACTION_CHANNEL_NOTIFICATION_SETTINGS)
+                .putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
+                .putExtra(Settings.EXTRA_CHANNEL_ID, channelId)
+        }
+        context.startActivity(intent)
+    }
+}
+
+/** The battery-optimisation list. Not the per-app request dialog: that needs a
+ *  permission Google Play refuses to apps that are not "battery critical". */
+private fun openBatterySettings(context: Context) {
+    runCatching { context.startActivity(Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)) }
 }
 
 /**
