@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Long-press the launcher icon. Four things worth a single tap. -->
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <shortcut
+        android:shortcutId="now_playing"
+        android:enabled="true"
+        android:icon="@drawable/ic_w_play"
+        android:shortcutShortLabel="@string/shortcut_now_short"
+        android:shortcutLongLabel="@string/shortcut_now_long">
+        <intent
+            android:action="app.bunmusic.OPEN_PLAYER"
+            android:targetPackage="app.bunmusic"
+            android:targetClass="app.bunmusic.MainActivity" />
+    </shortcut>
+
+    <shortcut
+        android:shortcutId="shuffle"
+        android:enabled="true"
+        android:icon="@drawable/ic_shortcut_shuffle"
+        android:shortcutShortLabel="@string/shortcut_shuffle_short"
+        android:shortcutLongLabel="@string/shortcut_shuffle_long">
+        <intent
+            android:action="app.bunmusic.SHUFFLE"
+            android:targetPackage="app.bunmusic"
+            android:targetClass="app.bunmusic.MainActivity" />
+    </shortcut>
+
+    <shortcut
+        android:shortcutId="search"
+        android:enabled="true"
+        android:icon="@drawable/ic_w_note"
+        android:shortcutShortLabel="@string/shortcut_search_short"
+        android:shortcutLongLabel="@string/shortcut_search_long">
+        <intent
+            android:action="app.bunmusic.SEARCH"
+            android:targetPackage="app.bunmusic"
+            android:targetClass="app.bunmusic.MainActivity" />
+    </shortcut>
+
+    <shortcut
+        android:shortcutId="commands"
+        android:enabled="true"
+        android:icon="@drawable/ic_shortcut_commands"
+        android:shortcutShortLabel="@string/shortcut_commands_short"
+        android:shortcutLongLabel="@string/shortcut_commands_long">
+        <intent
+            android:action="app.bunmusic.COMMANDS"
+            android:targetPackage="app.bunmusic"
+            android:targetClass="app.bunmusic.MainActivity" />
+    </shortcut>
+</shortcuts>

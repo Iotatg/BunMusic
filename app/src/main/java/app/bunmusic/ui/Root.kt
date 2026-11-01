@@ -83,6 +83,7 @@ sealed interface Route {
     data object Hotlist : Route
     data object Buns : Route
     data object About : Route
+    data object Widgets : Route
     data class Detail(
         val title: String,
         val artUrl: String?,
@@ -101,7 +102,7 @@ private val Route.depth: Int
     }
 
 @Composable
-fun Root(openPlayerOnStart: Boolean = false) {
+fun Root(launch: Launch = Launch()) {
     val account by Auth.account.collectAsState()
     var guest by remember { mutableStateOf(Auth.guest) }
 
@@ -113,11 +114,11 @@ fun Root(openPlayerOnStart: Boolean = false) {
         return
     }
 
-    Shell(guest = guest, onLeaveGuest = { guest = false }, openPlayerOnStart = openPlayerOnStart)
+    Shell(guest = guest, onLeaveGuest = { guest = false }, launch = launch)
 }
 
 @Composable
-private fun Shell(guest: Boolean, onLeaveGuest: () -> Unit, openPlayerOnStart: Boolean = false) {
+private fun Shell(guest: Boolean, onLeaveGuest: () -> Unit, launch: Launch = Launch()) {
     val state by Playback.state.collectAsState()
     val downloads by Downloads.entries.collectAsState()
     val window = LocalBunWindow.current
@@ -128,8 +129,8 @@ private fun Shell(guest: Boolean, onLeaveGuest: () -> Unit, openPlayerOnStart: B
     val chrome by remember { derivedStateOf { state.copy(positionMs = 0L) } }
     var stack by remember { mutableStateOf<List<Route>>(listOf(Route.Home)) }
     var playerOpen by remember { mutableStateOf(false) }
-    // A tap on the home-screen widget drops the user straight into the player.
-    LaunchedEffect(openPlayerOnStart) { if (openPlayerOnStart) playerOpen = true }
+    var queueOnStart by remember { mutableStateOf(false) }
+    var paletteOpen by remember { mutableStateOf(false) }
     var sheetTrack by remember { mutableStateOf<Track?>(null) }
     var toast by remember { mutableStateOf<String?>(null) }
     // Measured, not guessed: the toast used to be lifted by a hard-coded 120 dp,
@@ -142,6 +143,23 @@ private fun Shell(guest: Boolean, onLeaveGuest: () -> Unit, openPlayerOnStart: B
     val push: (Route) -> Unit = { stack = stack + it }
     val pop: () -> Unit = { if (stack.size > 1) stack = stack.dropLast(1) }
     val tab: (Route) -> Unit = { stack = listOf(it) }
+
+    // A tap on a widget, a shortcut or the tile drops the user where they asked
+    // to be. `seq` makes a second tap while the app is open count as a new
+    // request; before this, extras were read once in onCreate and then ignored.
+    LaunchedEffect(launch.seq) {
+        if (launch.player) playerOpen = true
+        if (launch.queue) {
+            queueOnStart = true
+            playerOpen = true
+        }
+        if (launch.search) tab(Route.Search)
+        if (launch.commands) paletteOpen = true
+        if (launch.shuffle) {
+            val liked = Store.likedTracks()
+            if (liked.isEmpty()) toast = "Like a few songs first" else Playback.shufflePlay(liked)
+        }
+    }
 
     val downloadedIds = remember(downloads) { downloads.map { it.trackId }.toSet() }
 
@@ -260,6 +278,8 @@ private fun Shell(guest: Boolean, onLeaveGuest: () -> Unit, openPlayerOnStart: B
                             onOpenEqualizer = { push(Route.Equalizer) },
                             onOpenBuns = { push(Route.Buns) },
                             onOpenAbout = { push(Route.About) },
+                            onOpenWidgets = { push(Route.Widgets) },
+                            onOpenCommands = { paletteOpen = true },
                             onToast = { toast = it },
                         )
 
@@ -277,6 +297,11 @@ private fun Shell(guest: Boolean, onLeaveGuest: () -> Unit, openPlayerOnStart: B
                         Route.Buns -> BunsScreen(onBack = pop)
 
                         Route.About -> AboutScreen(onBack = pop)
+
+                        Route.Widgets -> WidgetsScreen(
+                            onBack = pop,
+                            onToast = { toast = it },
+                        )
 
                         Route.Hotlist -> HotlistScreen(
                             state = chrome,
@@ -342,8 +367,12 @@ private fun Shell(guest: Boolean, onLeaveGuest: () -> Unit, openPlayerOnStart: B
         ) {
             PlayerScreen(
                 state = state,
-                onClose = { playerOpen = false },
+                onClose = {
+                    playerOpen = false
+                    queueOnStart = false
+                },
                 onMore = { sheetTrack = state.track },
+                openQueueOnStart = queueOnStart,
             )
         }
 
@@ -363,6 +392,34 @@ private fun Shell(guest: Boolean, onLeaveGuest: () -> Unit, openPlayerOnStart: B
                 bottom = with(density) { chromePx.toDp() } + 12.dp,
                 onDone = { toast = null },
             )
+        }
+
+        if (paletteOpen) {
+            val context = androidx.compose.ui.platform.LocalContext.current
+            val host = remember(context) {
+                object : CommandHost {
+                    override val context: android.content.Context = context
+                    override fun go(route: Route) {
+                        if (route.depth == 0) tab(route) else push(route)
+                    }
+                    override fun openPlayer() {
+                        if (Playback.state.value.hasTrack) playerOpen = true
+                    }
+                    override fun openQueue() {
+                        if (Playback.state.value.hasTrack) {
+                            queueOnStart = true
+                            playerOpen = true
+                        }
+                    }
+                    override fun toast(message: String) {
+                        toast = message
+                    }
+                    override fun close() {
+                        paletteOpen = false
+                    }
+                }
+            }
+            CommandPalette(host = host, onDismiss = { paletteOpen = false })
         }
     }
 }

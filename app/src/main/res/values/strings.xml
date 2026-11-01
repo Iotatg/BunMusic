@@ -3,5 +3,20 @@
     <string name="app_name">BunMusic</string>
     <string name="channel_playback">Playback</string>
     <string name="widget_label">BunMusic now playing</string>
-    <string name="widget_description">Control playback without opening the app.</string>
+    <string name="widget_description">Cover, progress and controls in one card.</string>
+    <string name="widget_compact_label">BunMusic cover</string>
+    <string name="widget_compact_description">Just the cover and one play button.</string>
+    <string name="widget_bar_label">BunMusic strip</string>
+    <string name="widget_bar_description">A one-row strip for a crowded page.</string>
+    <string name="widget_queue_label">BunMusic queue</string>
+    <string name="widget_queue_description">What is playing and what comes next.</string>
+    <string name="tile_label">BunMusic</string>
+    <string name="shortcut_now_short">Now playing</string>
+    <string name="shortcut_now_long">Open the player</string>
+    <string name="shortcut_shuffle_short">Shuffle likes</string>
+    <string name="shortcut_shuffle_long">Shuffle everything you liked</string>
+    <string name="shortcut_search_short">Search</string>
+    <string name="shortcut_search_long">Search YouTube Music</string>
+    <string name="shortcut_commands_short">Commands</string>
+    <string name="shortcut_commands_long">Open the command deck</string>
 </resources>

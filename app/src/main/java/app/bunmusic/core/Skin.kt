@@ -332,7 +332,7 @@ object Skin {
         // The home-screen widget is drawn by the launcher, not by us, so it has to
         // be repainted now — nothing in the new process will touch it until the
         // next track change.
-        runCatching { app.bunmusic.widget.Bar.pushAll(context.applicationContext) }
+        runCatching { app.bunmusic.widget.Widgets.pushAll(context.applicationContext, force = true) }
         restart(context)
     }
 

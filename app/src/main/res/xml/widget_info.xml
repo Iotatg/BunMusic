@@ -1,12 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- 4x2 now-playing card. The default one, and the one the screenshot asked for. -->
 <appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
     android:minWidth="250dp"
-    android:minHeight="70dp"
+    android:minHeight="110dp"
     android:targetCellWidth="4"
-    android:targetCellHeight="1"
+    android:targetCellHeight="2"
     android:updatePeriodMillis="0"
     android:initialLayout="@layout/widget_player"
-    android:description="@string/widget_description"
     android:previewLayout="@layout/widget_player"
-    android:resizeMode="horizontal"
-    android:widgetCategory="home_screen" />
+    android:description="@string/widget_description"
+    android:configure="app.bunmusic.widget.WidgetConfigActivity"
+    android:resizeMode="horizontal|vertical"
+    android:widgetCategory="home_screen"
+    android:widgetFeatures="reconfigurable" />

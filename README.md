@@ -7,7 +7,7 @@ saved offline.
 
 ```
 package   app.bunmusic
-version   1.0.12 (13)
+version   1.1.0 (14)
 minSdk    26  ·  target/compile 37
 author    Iota Coder · iota14934@gmail.com
 ```
@@ -229,6 +229,34 @@ home, album pages, Explore, Charts, mood pages and the automix radio queue.
 ---
 
 ## Changelog
+
+**1.1.0** — on the home screen, and in one search box.
+
+- **Four widgets.** A 4×2 card (cover, progress, elapsed/total, like, prev · play ·
+  next, queue), a 2×2 cover, a 4×1 strip, and a 4×4 queue whose rows jump to the
+  track. The 1.0.x widget was a single 4×1 bar with three buttons.
+- **The widget wears the bun.** Match the current bun, or pin Midnight, Charcoal,
+  Cloud, Pink or smoked glass. Three corner shapes, and each element — progress,
+  times, like, queue — can be switched off per widget. Long-press to reconfigure.
+- **It resizes instead of clipping.** Below 118 dp the time row goes; below 96 dp
+  the bar goes; below 200 dp wide the like and queue buttons go. A cell that is one
+  row shorter than expected no longer cuts the card in half.
+- **It survives a reboot.** Cover art is cached on disk under `cacheDir/widget_art`,
+  because the launcher asks for a redraw before the phone has rejoined Wi-Fi.
+- **Progress is a bitmap, not a ProgressBar.** RemoteViews cannot tint a ProgressBar
+  below API 31 (`setProgressTintList` takes a `ColorStateList`, which `setInt` cannot
+  pass), and the bar has to be lime on Midnight and blue on Cloud. Drawing 480 × 12 px
+  is cheaper than fifteen tinted drawables and scales exactly.
+- **The command deck — 115 commands.** Playback, queue, library, navigation,
+  appearance, audio, data, widgets and system, all searchable from one field.
+  Settings → Command deck, or the launcher shortcut.
+- **A widget tap now arrives.** The app is `singleTop`, so a second tap went to
+  `onNewIntent`, which was never overridden: extras were read once in `onCreate` and
+  then ignored. Tapping the widget with the app open did nothing.
+- **Quick Settings tile and four shortcuts** — play/pause that mirrors the session,
+  plus now playing, shuffle likes, search and the deck.
+- **No widgets, no cost.** With nothing placed, the twice-a-second playback tick
+  skips the launcher instead of asking four providers whether they exist.
 
 **1.0.12** — the bottom of the screen, fixed properly.
 

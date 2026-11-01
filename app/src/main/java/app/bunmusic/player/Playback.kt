@@ -165,7 +165,7 @@ object Playback {
             }
         })
         _player = p
-        app.bunmusic.widget.Bar.attach(appContext)
+        app.bunmusic.widget.Widgets.attach(appContext)
         publish()
     }
 
@@ -385,6 +385,48 @@ object Playback {
         index = 0
         rebuildShuffle()
         publish()
+    }
+
+    /** Back to the top of the current track. */
+    fun restart() {
+        _player?.seekTo(0)
+        publish()
+    }
+
+    /** Drop the track that is playing and move to whatever is next. */
+    fun removeCurrent() {
+        if (index in queue.indices) removeAt(index)
+    }
+
+    /** Nudge the current track up or down the queue. */
+    fun moveCurrent(by: Int) {
+        if (index !in queue.indices) return
+        val to = (index + by).coerceIn(0, queue.lastIndex)
+        moveInQueue(index, to)
+    }
+
+    /**
+     * Shuffle what is *left*, keeping the current track where it is.
+     *
+     * Toggling shuffle re-orders the whole queue from the top, which is wrong
+     * when you are three songs into a playlist and only want the rest of it
+     * mixed up. This leaves everything before the cursor alone.
+     */
+    fun shuffleQueueOrder() {
+        if (queue.size - index < 3) return
+        val head = queue.take(index + 1)
+        val tail = queue.drop(index + 1).shuffled()
+        queue = head + tail
+        rebuildShuffle()
+        publish()
+    }
+
+    /** Like or unlike the current track. Returns the new state. */
+    fun likeCurrent(): Boolean {
+        val track = _state.value.track ?: return false
+        val liked = Store.toggleLike(track.id)
+        publish()
+        return liked
     }
 
     // ------------------------------------------------------------ sleep timer
@@ -624,7 +666,7 @@ object Playback {
         )
         // Keep the home-screen bar in step. It throttles internally, so calling it
         // twice a second is cheap.
-        app.bunmusic.widget.Bar.onPlaybackState()
+        app.bunmusic.widget.Widgets.onPlayback()
     }
 
     private fun startTicker() {

@@ -82,7 +82,12 @@ import kotlin.math.roundToInt
 import kotlinx.coroutines.launch
 
 @Composable
-fun PlayerScreen(state: PlayerState, onClose: () -> Unit, onMore: () -> Unit) {
+fun PlayerScreen(
+    state: PlayerState,
+    onClose: () -> Unit,
+    onMore: () -> Unit,
+    openQueueOnStart: Boolean = false,
+) {
     val track = state.track
     val settings by Prefs.settings.collectAsState()
     var showQueue by remember { mutableStateOf(false) }
@@ -91,6 +96,9 @@ fun PlayerScreen(state: PlayerState, onClose: () -> Unit, onMore: () -> Unit) {
     var showSpeed by remember { mutableStateOf(false) }
     var inlineLyrics by remember { mutableStateOf(false) }
     val window = LocalBunWindow.current
+    // The widget's queue button opens the player *and* the queue. It used to
+    // open the player and leave the listener to find the button themselves.
+    LaunchedEffect(openQueueOnStart) { if (openQueueOnStart) showQueue = true }
 
     val tint = Ambient.colorFor(track)
     val glowAlpha = when (settings.glow) {

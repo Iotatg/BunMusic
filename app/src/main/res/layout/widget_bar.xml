@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 4x1 strip: artwork, title, play, next. The thin one for a crowded page. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="horizontal"
+    android:gravity="center_vertical"
+    android:background="@drawable/widget_card_midnight_round"
+    android:paddingStart="9dp"
+    android:paddingEnd="8dp"
+    android:paddingTop="6dp"
+    android:paddingBottom="6dp">
+
+    <ImageView
+        android:id="@+id/widget_art"
+        android:layout_width="40dp"
+        android:layout_height="40dp"
+        android:scaleType="centerCrop"
+        android:contentDescription="@null" />
+
+    <LinearLayout
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:layout_marginStart="10dp"
+        android:layout_marginEnd="6dp"
+        android:orientation="vertical">
+
+        <TextView
+            android:id="@+id/widget_title"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:fontFamily="sans-serif-medium"
+            android:textSize="13sp"
+            android:textColor="#F4F1E9"
+            android:maxLines="1"
+            android:ellipsize="end"
+            android:text="BunMusic" />
+
+        <TextView
+            android:id="@+id/widget_artist"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:fontFamily="sans-serif"
+            android:textSize="10.5sp"
+            android:textColor="#A8A2B4"
+            android:maxLines="1"
+            android:ellipsize="end"
+            android:text="Nothing playing" />
+    </LinearLayout>
+
+    <ImageView
+        android:id="@+id/widget_toggle"
+        android:layout_width="36dp"
+        android:layout_height="36dp"
+        android:padding="10dp"
+        android:background="@drawable/widget_play_midnight"
+        android:src="@drawable/ic_w_play"
+        android:contentDescription="Play or pause" />
+
+    <ImageView
+        android:id="@+id/widget_next"
+        android:layout_width="34dp"
+        android:layout_height="34dp"
+        android:layout_marginStart="2dp"
+        android:padding="8dp"
+        android:src="@drawable/ic_w_next"
+        android:contentDescription="Next" />
+</LinearLayout>

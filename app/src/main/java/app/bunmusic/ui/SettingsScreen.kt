@@ -41,6 +41,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import app.bunmusic.core.AppVersion
 import app.bunmusic.core.BunSkin
 import app.bunmusic.core.G
 import app.bunmusic.core.Glyph
@@ -68,6 +69,8 @@ fun SettingsScreen(
     onOpenEqualizer: () -> Unit,
     onOpenBuns: () -> Unit,
     onOpenAbout: () -> Unit,
+    onOpenWidgets: () -> Unit,
+    onOpenCommands: () -> Unit,
     onToast: (String) -> Unit,
 ) {
     val settings by Prefs.settings.collectAsState()
@@ -145,7 +148,7 @@ fun SettingsScreen(
                 Display("Settings", 30)
                 Spacer(Modifier.height(4.dp))
                 Text(
-                    "BunMusic 1.0.9 · Iota Coder",
+                    "BunMusic ${AppVersion.VERSION} · Iota Coder",
                     color = Ink.Muted, fontSize = 12.sp, fontFamily = SoraFamily,
                 )
             }
@@ -301,6 +304,23 @@ fun SettingsScreen(
             }
         }
 
+        item { GroupLabel("Home screen") }
+        item {
+            SettingsCard {
+                NavRow(
+                    "Widgets",
+                    "Four sizes · put one on your home screen",
+                    G.Grid,
+                ) { onOpenWidgets() }
+                Divider()
+                NavRow(
+                    "Command deck",
+                    "Every action in the app, searchable",
+                    G.Search,
+                ) { onOpenCommands() }
+            }
+        }
+
         item { GroupLabel("Storage") }
         item {
             SettingsCard {
@@ -452,7 +472,11 @@ fun SettingsScreen(
         item { GroupLabel("About") }
         item {
             SettingsCard {
-                NavRow("About BunMusic", "1.0.9 (build 10) · what changed", G.Sparkle) { onOpenAbout() }
+                NavRow(
+                    "About BunMusic",
+                    "${AppVersion.VERSION} (build ${AppVersion.CODE}) · what changed",
+                    G.Sparkle,
+                ) { onOpenAbout() }
                 Divider()
                 NavRow("Built by", "Iota Coder · iota14934@gmail.com", G.User) { }
                 Divider()

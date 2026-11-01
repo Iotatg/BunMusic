@@ -27,6 +27,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import app.bunmusic.core.AppVersion
 import app.bunmusic.core.G
 import app.bunmusic.core.Glyph
 import app.bunmusic.core.Ink
@@ -47,7 +48,7 @@ fun AboutScreen(onBack: () -> Unit) {
                 Display("BunMusic", 32)
                 Spacer(Modifier.height(4.dp))
                 Text(
-                    "1.0.12 · build 13 · ${Skin.current.title} bun",
+                    "${AppVersion.VERSION} · build ${AppVersion.CODE} · ${Skin.current.title} bun",
                     color = Ink.Muted, fontSize = 12.sp, fontFamily = SoraFamily,
                 )
             }
@@ -56,6 +57,14 @@ fun AboutScreen(onBack: () -> Unit) {
         item { GroupTitle("What's new") }
         item {
             AboutCard {
+                Change("Four widgets, not one", "A 4×2 card with cover, progress, elapsed/total, like, transport and queue; a 2×2 cover; a 4×1 strip; and a 4×4 queue whose rows jump to the track. The old widget was a single 4×1 bar with three buttons")
+                Change("The widget wears the bun", "Match the bun, or pin Midnight, Charcoal, Cloud, Pink, or smoked glass. Three corner shapes, and every element can be switched off per widget — long-press it to reconfigure")
+                Change("It resizes instead of clipping", "Below 118 dp the time row goes, below 96 dp the bar goes, below 200 dp wide the like and queue buttons go. Nothing is ever cut in half by a cell that is one row shorter than expected")
+                Change("It survives a reboot", "Cover art is cached on disk, because the launcher asks for a redraw before the phone has finished connecting. A widget with no art looks broken, not loading")
+                Change("The command deck", "115 commands — playback, queue, library, navigation, appearance, audio, data, widgets, system — in one searchable sheet. Settings → Command deck, or the shortcut")
+                Change("A widget tap now arrives", "The app is singleTop, so a second tap landed in onNewIntent, which was never overridden. Extras were read once in onCreate and then ignored — tapping the widget with the app open did nothing")
+                Change("Quick Settings, four shortcuts", "A play/pause tile that mirrors the session, and long-press shortcuts for now playing, shuffle likes, search and the deck")
+                Change("No widgets, no cost", "When nothing is placed, the twice-a-second playback tick skips the launcher entirely instead of asking four providers whether they exist")
                 Change("The playing bar is no longer cut in half", "The light buns packed the now-playing strip (62 dp) and the tab bar (87 dp) into a hard-coded 122 dp box, so the bar was drawn straight over the bottom half of the strip. The bottom of the screen is a Column that is exactly as tall as what it holds now, and the system inset is applied once, at the container")
                 Change("Pause pauses", "The pill on the home card was decoration inside a card that opened the player — the most obvious button in the app did something else. It toggles playback; tapping the card still opens the player")
                 Change("The heart saves", "In the mini player the heart filled while the song played and paused the track when tapped. It is a like button now, and it says so")
@@ -107,7 +116,7 @@ fun AboutScreen(onBack: () -> Unit) {
         item { GroupTitle("Build") }
         item {
             AboutCard {
-                Fact("Version", "1.0.12 (13)")
+                Fact("Version", AppVersion.LABEL)
                 Fact("Package", "app.bunmusic")
                 Fact("Min SDK", "26 · Android 8.0")
                 Fact("Target SDK", "37")

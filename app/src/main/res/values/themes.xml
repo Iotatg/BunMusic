@@ -31,4 +31,15 @@
         <item name="android:navigationBarColor">#FDF2F6</item>
         <item name="android:windowBackground">#FDF2F6</item>
     </style>
+
+    <!-- The widget configuration sheet. Translucent so the launcher stays visible
+         behind it — configuring a home-screen widget should feel like adjusting
+         the thing you are looking at, not like entering the app. -->
+    <style name="Theme.BunMusic.Widget" parent="Theme.BunMusic">
+        <item name="android:windowBackground">@android:color/transparent</item>
+        <item name="android:windowIsTranslucent">true</item>
+        <item name="android:windowNoTitle">true</item>
+        <item name="android:backgroundDimEnabled">false</item>
+        <item name="android:windowAnimationStyle">@android:style/Animation.Dialog</item>
+    </style>
 </resources>

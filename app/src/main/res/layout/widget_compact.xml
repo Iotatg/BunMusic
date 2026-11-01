@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 2x2 cover card: artwork edge to edge, scrim, title, one transport button. -->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/widget_card_midnight_round">
+
+    <ImageView
+        android:id="@+id/widget_art"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:scaleType="centerCrop"
+        android:contentDescription="@null" />
+
+    <!-- A LinearLayout, not a View: RemoteViews can only inflate classes
+         annotated @RemoteView, and plain View is not one of them. -->
+    <LinearLayout
+        android:id="@+id/widget_scrim"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="horizontal"
+        android:background="@drawable/widget_scrim_round" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom|start"
+        android:layout_marginStart="11dp"
+        android:layout_marginEnd="44dp"
+        android:layout_marginBottom="11dp"
+        android:orientation="vertical">
+
+        <!-- At the 110dp minimum the text column is 55dp wide, so the title is
+             11.5sp over two lines rather than 13sp over one: "The Last Letter"
+             then reads in full instead of turning into "The Las…". -->
+        <TextView
+            android:id="@+id/widget_title"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:fontFamily="sans-serif-medium"
+            android:textSize="11.5sp"
+            android:textColor="#FFFFFF"
+            android:maxLines="2"
+            android:ellipsize="end"
+            android:text="BunMusic" />
+
+        <TextView
+            android:id="@+id/widget_artist"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="1dp"
+            android:fontFamily="sans-serif"
+            android:textSize="10sp"
+            android:textColor="#D9FFFFFF"
+            android:maxLines="1"
+            android:ellipsize="end"
+            android:text="Nothing playing" />
+    </LinearLayout>
+
+    <ImageView
+        android:id="@+id/widget_toggle"
+        android:layout_width="34dp"
+        android:layout_height="34dp"
+        android:layout_gravity="bottom|end"
+        android:layout_marginEnd="8dp"
+        android:layout_marginBottom="10dp"
+        android:padding="10dp"
+        android:background="@drawable/widget_play_midnight"
+        android:src="@drawable/ic_w_play"
+        android:contentDescription="Play or pause" />
+</FrameLayout>

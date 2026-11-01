@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 4x4 queue: what is playing, then the next ten tracks. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="@drawable/widget_card_midnight_round"
+    android:paddingStart="12dp"
+    android:paddingEnd="12dp"
+    android:paddingTop="10dp"
+    android:paddingBottom="6dp">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical">
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/widget_queue_title"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:fontFamily="sans-serif-medium"
+                android:textSize="13sp"
+                android:textColor="#F4F1E9"
+                android:maxLines="1"
+                android:ellipsize="end"
+                android:text="Up next" />
+
+            <TextView
+                android:id="@+id/widget_queue_sub"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:fontFamily="sans-serif"
+                android:textSize="10.5sp"
+                android:textColor="#A8A2B4"
+                android:maxLines="1"
+                android:ellipsize="end"
+                android:text="Nothing playing" />
+        </LinearLayout>
+
+        <ImageView
+            android:id="@+id/widget_toggle"
+            android:layout_width="34dp"
+            android:layout_height="34dp"
+            android:padding="9dp"
+            android:background="@drawable/widget_play_midnight"
+            android:src="@drawable/ic_w_play"
+            android:contentDescription="Play or pause" />
+    </LinearLayout>
+
+    <ListView
+        android:id="@+id/widget_list"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:layout_marginTop="6dp"
+        android:divider="@null"
+        android:dividerHeight="0dp"
+        android:scrollbars="none" />
+</LinearLayout>

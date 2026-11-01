@@ -30,7 +30,11 @@
             android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden|uiMode"
             android:resizeableActivity="true"
             android:theme="@style/Theme.BunMusic"
-            android:windowSoftInputMode="adjustResize" />
+            android:windowSoftInputMode="adjustResize">
+            <meta-data
+                android:name="android.app.shortcuts"
+                android:resource="@xml/shortcuts" />
+        </activity>
 
         <activity-alias
             android:name=".LauncherMidnight"
@@ -101,22 +105,98 @@
             </intent-filter>
         </service>
 
+        <!-- Four home-screen widgets. Each needs its own receiver, because that
+             is how the launcher identifies which widget is which. -->
         <receiver
             android:name=".widget.PlayerWidget"
             android:exported="true"
             android:label="@string/widget_label">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
-                <action android:name="app.bunmusic.widget.TOGGLE" />
-                <action android:name="app.bunmusic.widget.NEXT" />
-                <action android:name="app.bunmusic.widget.PREV" />
-                <action android:name="app.bunmusic.widget.REFRESH" />
-                <action android:name="android.intent.action.CONFIGURATION_CHANGED" />
             </intent-filter>
             <meta-data
                 android:name="android.appwidget.provider"
                 android:resource="@xml/widget_info" />
         </receiver>
+
+        <receiver
+            android:name=".widget.CompactWidget"
+            android:exported="true"
+            android:label="@string/widget_compact_label">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_compact_info" />
+        </receiver>
+
+        <receiver
+            android:name=".widget.BarWidget"
+            android:exported="true"
+            android:label="@string/widget_bar_label">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_bar_info" />
+        </receiver>
+
+        <receiver
+            android:name=".widget.QueueWidget"
+            android:exported="true"
+            android:label="@string/widget_queue_label">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_queue_info" />
+        </receiver>
+
+        <!-- Every widget button. Not exported: the PendingIntents that reach it
+             were created by this app, so they run with this app's identity. -->
+        <receiver
+            android:name=".widget.WidgetActionReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="app.bunmusic.widget.TOGGLE" />
+                <action android:name="app.bunmusic.widget.NEXT" />
+                <action android:name="app.bunmusic.widget.PREV" />
+                <action android:name="app.bunmusic.widget.LIKE" />
+                <action android:name="app.bunmusic.widget.JUMP" />
+                <action android:name="app.bunmusic.widget.REFRESH" />
+            </intent-filter>
+        </receiver>
+
+        <service
+            android:name=".system.PlaybackTileService"
+            android:exported="true"
+            android:icon="@drawable/ic_w_play"
+            android:label="@string/tile_label"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+        </service>
+
+        <service
+            android:name=".widget.QueueWidgetService"
+            android:exported="true"
+            android:permission="android.permission.BIND_REMOTEVIEWS" />
+
+        <activity
+            android:name=".widget.WidgetConfigActivity"
+            android:exported="true"
+            android:theme="@style/Theme.BunMusic.Widget"
+            android:excludeFromRecents="true"
+            android:taskAffinity=""
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden|uiMode">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_CONFIGURE" />
+            </intent-filter>
+        </activity>
 
     </application>
 </manifest>
