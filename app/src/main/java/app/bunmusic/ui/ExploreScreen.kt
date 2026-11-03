@@ -165,7 +165,7 @@ private fun MoodTile(mood: Mood, modifier: Modifier = Modifier, onClick: () -> U
             .height(74.dp)
             .clip(RoundedCornerShape(18.dp))
             .background(Brush.linearGradient(listOf(tint.copy(alpha = 0.30f), tint.copy(alpha = 0.08f))))
-            .clickable { onClick() }
+            .tapable(scale = 0.97f) { onClick() }
             .padding(14.dp),
     ) {
         Box(
@@ -199,7 +199,7 @@ private fun ChartsCard(onClick: () -> Unit, modifier: Modifier = Modifier) {
         modifier
             .clip(RoundedCornerShape(20.dp))
             .background(if (Ink.isLight) Brush.linearGradient(listOf(Ink.Field, Ink.Card)) else Brush.linearGradient(listOf(Color(0xFF2A2135), Color(0xFF1A1524))))
-            .clickable { onClick() }
+            .tapable(scale = 0.97f) { onClick() }
             .padding(16.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {

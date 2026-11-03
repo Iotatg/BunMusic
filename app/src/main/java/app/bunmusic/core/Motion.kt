@@ -1,6 +1,12 @@
 package app.bunmusic.core
 
 import android.provider.Settings
+import androidx.compose.animation.core.CubicBezierEasing
+import androidx.compose.animation.core.Easing
+import androidx.compose.animation.core.FiniteAnimationSpec
+import androidx.compose.animation.core.SpringSpec
+import androidx.compose.animation.core.snap
+import androidx.compose.animation.core.spring
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
@@ -58,3 +64,76 @@ fun BunMotion(content: @Composable () -> Unit) {
 /** A duration that collapses to zero when motion is reduced. */
 @Composable
 fun motionMs(full: Int): Int = if (LocalReducedMotion.current) 0 else full
+
+// ------------------------------------------------------------------- curves
+
+/**
+ * The three curves everything in BunMusic moves on.
+ *
+ * Material's motion spec calls these *emphasised*, *standard* and *accelerate*,
+ * and the reason to name them here rather than write `tween(300)` at forty call
+ * sites is that a screen with forty slightly different timings does not feel
+ * fast — it feels unsettled. One vocabulary means a page change, a sheet and a
+ * button press all read as the same hand moving.
+ *
+ *  - **Emphasised** starts fast and lands slowly. For things entering.
+ *  - **Standard** is symmetric. For things moving from A to B.
+ *  - **Accelerate** starts slowly and leaves. For things going away.
+ */
+object BunEase {
+    val Emphasised: Easing = CubicBezierEasing(0.05f, 0.7f, 0.1f, 1f)
+    val Standard: Easing = CubicBezierEasing(0.2f, 0f, 0f, 1f)
+    val Decelerate: Easing = CubicBezierEasing(0f, 0f, 0.2f, 1f)
+    val Accelerate: Easing = CubicBezierEasing(0.3f, 0f, 1f, 1f)
+}
+
+/**
+ * Springs, by job.
+ *
+ * Stiffness numbers are written out rather than taken from `Spring.Stiffness*`
+ * because those constants collapse two of the five names onto the same value,
+ * and the difference between "a thumb pressed this" and "a page arrived" is
+ * exactly the difference that constant cannot express.
+ *
+ *  - [snappy] — press feedback. Settles before the finger lifts.
+ *  - [smooth] — layout changes. No visible overshoot.
+ *  - [bouncy] — a hero moment. Overshoots once, deliberately.
+ *  - [gentle] — ambient drift. Never finishes, never draws attention.
+ */
+object BunSpring {
+    fun <T> snappy(): SpringSpec<T> = spring(dampingRatio = 0.75f, stiffness = 900f)
+    fun <T> smooth(): SpringSpec<T> = spring(dampingRatio = 0.86f, stiffness = 420f)
+    fun <T> bouncy(): SpringSpec<T> = spring(dampingRatio = 0.55f, stiffness = 700f)
+    fun <T> gentle(): SpringSpec<T> = spring(dampingRatio = 0.92f, stiffness = 260f)
+}
+
+/**
+ * How long a row waits before it appears.
+ *
+ * A list that fades in all at once reads as a page load; the same list with a
+ * 26 ms head start per row reads as a deck being dealt. The cap matters more
+ * than the step: without it the fortieth row waits a full second, which is the
+ * difference between "animated" and "slow".
+ */
+object BunStagger {
+    const val STEP = 26
+    const val CAP = 160
+
+    fun delayFor(index: Int, step: Int = STEP, cap: Int = CAP): Int {
+        if (index <= 0 || step <= 0 || cap <= 0) return 0
+        // Compared before multiplying, not after: `index * step` overflows to a
+        // negative number somewhere past 82 million rows, and a negative delay
+        // is not a delay. The comparison costs one division.
+        return if (index > cap / step) cap else index * step
+    }
+}
+
+/** [spec], or a snap when the listener has asked for less motion. */
+@Composable
+fun <T> motionOr(spec: FiniteAnimationSpec<T>): FiniteAnimationSpec<T> =
+    if (LocalReducedMotion.current) snap() else spec
+
+/** A tween on [BunEase.Emphasised] that collapses under reduced motion. */
+@Composable
+fun eased(durationMs: Int = 300, easing: Easing = BunEase.Emphasised): FiniteAnimationSpec<Float> =
+    androidx.compose.animation.core.tween(motionMs(durationMs), easing = easing)

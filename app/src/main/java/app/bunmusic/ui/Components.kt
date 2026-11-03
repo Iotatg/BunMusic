@@ -2,6 +2,7 @@ package app.bunmusic.ui
 
 import android.graphics.BitmapFactory
 import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
@@ -65,6 +66,7 @@ import app.bunmusic.core.Haptics
 import app.bunmusic.core.Icons
 import app.bunmusic.core.Ink
 import app.bunmusic.core.LocalBunWindow
+import app.bunmusic.core.LocalReducedMotion
 import app.bunmusic.core.SerifFamily
 import app.bunmusic.core.Skin
 import app.bunmusic.core.SoraFamily
@@ -260,7 +262,7 @@ fun ScreenTitle(title: String, subtitle: String? = null, trailing: @Composable (
 @Composable
 fun CircleCard(collection: Collection, onClick: () -> Unit, width: Dp? = null) {
     val w = width ?: LocalBunWindow.current.tile(124.dp)
-    Column(Modifier.width(w).clickable { onClick() }) {
+    Column(Modifier.width(w).tapable { onClick() }) {
         ArtImage(
             url = collection.artUrl,
             asset = collection.artAsset,
@@ -293,7 +295,7 @@ fun CircleCard(collection: Collection, onClick: () -> Unit, width: Dp? = null) {
 @Composable
 fun SquareCard(collection: Collection, onClick: () -> Unit, width: Dp? = null) {
     val w = width ?: LocalBunWindow.current.tile(152.dp)
-    Column(Modifier.width(w).clickable { onClick() }) {
+    Column(Modifier.width(w).tapable { onClick() }) {
         ArtImage(
             url = collection.artUrl,
             asset = collection.artAsset,
@@ -370,7 +372,7 @@ private fun MidnightTrackRow(
         Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(16.dp))
-            .combinedClickable(onClick = onPlay, onLongClick = onLongPress)
+            .longTapable(onLongClick = onLongPress, onClick = onPlay)
             .padding(horizontal = 12.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -485,7 +487,7 @@ private fun CharcoalTrackRow(
             .padding(horizontal = 10.dp, vertical = 2.dp)
             .clip(RoundedCornerShape(14.dp))
             .background(if (isCurrent) Ink.Field else Color.Transparent)
-            .combinedClickable(onClick = onPlay, onLongClick = onLongPress)
+            .longTapable(onLongClick = onLongPress, onClick = onPlay)
             .padding(start = 10.dp, end = 6.dp, top = 10.dp, bottom = 10.dp),
         // Top-aligned so the number sits on the title's baseline instead of
         // floating halfway between the title and the artist line.
@@ -629,7 +631,7 @@ fun Chip(
                     else -> Ink.Card
                 }
             )
-            .clickable { onClick() }
+            .tapable { onClick() }
             .padding(horizontal = 14.dp, vertical = 9.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -650,7 +652,7 @@ fun Chip(
 @Composable
 fun IconBtn(glyph: G, tint: Color = Ink.Text, size: Dp = 40.dp, glyphSize: Dp = 18.dp, onClick: () -> Unit) {
     Box(
-        Modifier.size(size).clip(CircleShape).clickable { onClick() },
+        Modifier.size(size).clip(CircleShape).tapable { onClick() },
         contentAlignment = Alignment.Center,
     ) { Glyph(glyph, tint, glyphSize) }
 }
@@ -668,7 +670,7 @@ fun FilledBtn(
         Modifier
             .clip(shape)
             .background(color)
-            .clickable { onClick() }
+            .tapable { onClick() }
             .padding(horizontal = 18.dp, vertical = if (Ink.isLight) 13.dp else 11.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -689,7 +691,7 @@ fun GhostBtn(text: String, glyph: G? = null, onClick: () -> Unit) {
             .clip(shape)
             .background(if (light) Ink.Field else Color.White.copy(alpha = 0.06f))
             .border(1.dp, if (light) Ink.Hairline else Color.White.copy(alpha = 0.08f), shape)
-            .clickable { onClick() }
+            .tapable { onClick() }
             .padding(horizontal = 16.dp, vertical = if (light) 13.dp else 10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -719,7 +721,10 @@ fun Modifier.tapTarget(): Modifier = this.minimumInteractiveComponentSize()
 @Composable
 fun EmptyState(glyph: G, title: String, body: String, action: String? = null, onAction: (() -> Unit)? = null) {
     Column(
-        Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 48.dp),
+        Modifier
+            .fillMaxWidth()
+            .reveal(distance = 8.dp)
+            .padding(horizontal = 24.dp, vertical = 48.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Box(
@@ -748,17 +753,27 @@ fun EmptyState(glyph: G, title: String, body: String, action: String? = null, on
 
 @Composable
 fun shimmerBrush(): Brush {
+    // A skeleton that does not move is a grey box; one that moves is a promise
+    // that something is coming. Under reduced motion it settles for the box.
+    if (LocalReducedMotion.current) return Brush.linearGradient(listOf(Ink.Card, Ink.Card))
     val t = rememberInfiniteTransition(label = "shimmer")
     val x by t.animateFloat(
-        initialValue = -420f,
-        targetValue = 900f,
-        animationSpec = infiniteRepeatable(tween(1500), RepeatMode.Restart),
+        initialValue = -560f,
+        targetValue = 1180f,
+        animationSpec = infiniteRepeatable(tween(1450, easing = LinearEasing), RepeatMode.Restart),
         label = "x",
     )
+    // Mixed rather than layered: a translucent stop would let the page colour
+    // through the box and the skeleton would change shade as it scrolled.
+    val sheen = androidx.compose.ui.graphics.lerp(
+        Ink.Card,
+        if (Ink.isLight) Color.Black else Color.White,
+        if (Ink.isLight) 0.055f else 0.075f,
+    )
     return Brush.linearGradient(
-        colors = listOf(Ink.Card, Ink.Raised, Ink.Card),
+        colors = listOf(Ink.Card, sheen, Ink.Card),
         start = Offset(x, 0f),
-        end = Offset(x + 420f, 260f),
+        end = Offset(x + 460f, 280f),
     )
 }
 
@@ -820,7 +835,7 @@ private fun CharcoalMiniPlayer(
             .padding(horizontal = 14.dp)
             .clip(RoundedCornerShape(24.dp))
             .background(Ink.MiniBg)
-            .clickable { onOpen() }
+            .tapable(scale = 0.99f) { onOpen() }
             .padding(start = 10.dp, end = 10.dp, top = 9.dp, bottom = 9.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -853,7 +868,7 @@ private fun CharcoalMiniPlayer(
             )
         }
         Box(
-            Modifier.tapTarget().size(34.dp).clip(CircleShape).clickable {
+            Modifier.tapTarget().size(34.dp).clip(CircleShape).tapable {
                 liked = Store.toggleLike(track.id)
                 Haptics.tick()
             },
@@ -871,7 +886,7 @@ private fun CharcoalMiniPlayer(
                 .size(44.dp)
                 .clip(RoundedCornerShape(15.dp))
                 .background(Color.White)
-                .clickable { onToggle() },
+                .tapable { onToggle() },
             contentAlignment = Alignment.Center,
         ) {
             Glyph(
@@ -903,7 +918,7 @@ private fun MidnightMiniPlayer(
             .clip(RoundedCornerShape(20.dp))
             .background(Brush.linearGradient(listOf(Ink.MiniBg, Ink.Void)))
             .border(1.dp, Color.White.copy(alpha = 0.07f), RoundedCornerShape(20.dp))
-            .clickable { onOpen() }
+            .tapable(scale = 0.99f) { onOpen() }
     ) {
         Row(
             Modifier.fillMaxWidth().padding(start = 8.dp, end = 10.dp, top = 8.dp, bottom = 8.dp),
@@ -936,13 +951,13 @@ private fun MidnightMiniPlayer(
                 )
             }
             Box(
-                Modifier.tapTarget().size(36.dp).clip(CircleShape).clickable { onToggle() },
+                Modifier.tapTarget().size(36.dp).clip(CircleShape).tapable { onToggle() },
                 contentAlignment = Alignment.Center,
             ) {
                 Glyph(if (state.isPlaying) G.Pause else G.Play, Ink.Text, 18.dp)
             }
             Box(
-                Modifier.tapTarget().size(36.dp).clip(CircleShape).clickable { onNext() },
+                Modifier.tapTarget().size(36.dp).clip(CircleShape).tapable { onNext() },
                 contentAlignment = Alignment.Center,
             ) { Glyph(G.Next, Ink.Text, 18.dp) }
         }
@@ -968,6 +983,35 @@ private fun MidnightMiniPlayer(
 
 // ------------------------------------------------------------------- seekbar
 
+/**
+ * A progress fraction that moves continuously between playback ticks.
+ *
+ * The player publishes its position twice a second. A bar drawn straight from
+ * that value advances in half-second steps, which is the single most "unfinished"
+ * thing a music app can show — the eye is very good at spotting a stalled bar.
+ * A linear tween across the tick interval turns those steps into motion.
+ *
+ * Two cases must not be smoothed: the thumb under the finger (it has to be
+ * exactly where the finger is), and a jump backwards or a long jump forwards —
+ * a new track or a seek. Those snap, because a bar rewinding over half a second
+ * looks like a bug rather than like a transition.
+ */
+@Composable
+private fun smoothProgress(value: Float, dragging: Boolean, local: Float): Float {
+    val anim = remember { androidx.compose.animation.core.Animatable(value) }
+    androidx.compose.runtime.LaunchedEffect(value, dragging) {
+        when {
+            dragging -> anim.snapTo(local)
+            value < anim.value - 0.02f || value > anim.value + 0.35f -> anim.snapTo(value)
+            else -> anim.animateTo(
+                value,
+                androidx.compose.animation.core.tween(520, easing = LinearEasing),
+            )
+        }
+    }
+    return if (dragging) local else anim.value
+}
+
 @Composable
 fun SeekBar(
     positionMs: Long,
@@ -987,7 +1031,7 @@ fun SeekBar(
     val value = if (durationMs > 0) (positionMs.toFloat() / durationMs).coerceIn(0f, 1f) else 0f
     var dragging by remember { mutableStateOf(false) }
     var local by remember { mutableFloatStateOf(0f) }
-    val shown = if (dragging) local else value
+    val shown = smoothProgress(value, dragging, local)
 
     Slider(
         value = shown,
@@ -1022,7 +1066,7 @@ fun WaveSeekBar(
     val value = if (durationMs > 0) (positionMs.toFloat() / durationMs).coerceIn(0f, 1f) else 0f
     var dragging by remember { mutableStateOf(false) }
     var local by remember { mutableFloatStateOf(0f) }
-    val shown = if (dragging) local else value
+    val shown = smoothProgress(value, dragging, local)
     var widthPx by remember { mutableStateOf(1f) }
 
     Canvas(
@@ -1098,7 +1142,7 @@ fun LineSeekBar(
     val value = if (durationMs > 0) (positionMs.toFloat() / durationMs).coerceIn(0f, 1f) else 0f
     var dragging by remember { mutableStateOf(false) }
     var local by remember { mutableFloatStateOf(0f) }
-    val shown = if (dragging) local else value
+    val shown = smoothProgress(value, dragging, local)
     val animated by animateFloatAsState(shown, tween(180), label = "line")
 
     Canvas(

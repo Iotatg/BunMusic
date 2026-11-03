@@ -173,13 +173,13 @@ fun SearchScreen(
                 )
                 if (query.isNotEmpty()) {
                     Box(
-                        Modifier.size(22.dp).clip(CircleShape).clickable { query = "" },
+                        Modifier.size(22.dp).clip(CircleShape).tapable { query = "" },
                         contentAlignment = Alignment.Center,
                     ) { Glyph(G.Close, Ink.Faint, 13.dp) }
                     Spacer(Modifier.width(6.dp))
                 }
                 Box(
-                    Modifier.size(26.dp).clip(CircleShape).clickable { listen() },
+                    Modifier.size(26.dp).clip(CircleShape).tapable { listen() },
                     contentAlignment = Alignment.Center,
                 ) { Glyph(G.Mic, Ink.Muted, 15.dp) }
             }
@@ -200,7 +200,7 @@ fun SearchScreen(
                                 Modifier
                                     .fillMaxWidth()
                                     .clip(RoundedCornerShape(12.dp))
-                                    .clickable { runSearch(q) }
+                                    .tapable(scale = 0.99f) { runSearch(q) }
                                     .padding(vertical = 10.dp),
                                 verticalAlignment = Alignment.CenterVertically,
                             ) {
@@ -231,7 +231,7 @@ fun SearchScreen(
                             Modifier
                                 .fillMaxWidth()
                                 .clip(RoundedCornerShape(12.dp))
-                                .clickable { runSearch(s) }
+                                .tapable(scale = 0.99f) { runSearch(s) }
                                 .padding(vertical = 10.dp),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {

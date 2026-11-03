@@ -1,6 +1,15 @@
 package app.bunmusic.ui
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.togetherWith
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -35,14 +44,17 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import app.bunmusic.core.BunSpring
 import app.bunmusic.core.G
 import app.bunmusic.core.Glyph
 import app.bunmusic.core.Ink
 import app.bunmusic.core.LocalBunWindow
+import app.bunmusic.core.LocalReducedMotion
 import app.bunmusic.core.SerifFamily
 import app.bunmusic.core.SoraFamily
 import app.bunmusic.data.Collection
@@ -89,13 +101,26 @@ fun HomeScreen(
         loading = false
     }
 
+    Box(Modifier.fillMaxSize()) {
+    // The page has its own weather: three soft hues derived from whatever is
+    // playing, drifting slowly behind the list. It is the same field the player
+    // uses, so opening a song does not feel like changing apps.
+    AuroraBackdrop(
+        seed = state.track?.id ?: recents.firstOrNull()?.id,
+        modifier = Modifier.fillMaxSize(),
+        intensity = if (Ink.isLight) 0.75f else 0.9f,
+    )
+
     LazyColumn(
         Modifier.fillMaxSize().statusBarsPadding(),
         contentPadding = PaddingValues(bottom = 24.dp),
     ) {
         item {
             Row(
-                Modifier.fillMaxWidth().padding(start = gutter, end = gutter - 6.dp, top = 10.dp, bottom = 2.dp),
+                Modifier
+                    .fillMaxWidth()
+                    .reveal(0)
+                    .padding(start = gutter, end = gutter - 6.dp, top = 10.dp, bottom = 2.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(
@@ -112,7 +137,7 @@ fun HomeScreen(
         }
 
         item {
-            Column(Modifier.padding(horizontal = gutter, vertical = 10.dp)) {
+            Column(Modifier.reveal(1).padding(horizontal = gutter, vertical = 10.dp)) {
                 Display(greeting(), 33)
                 Spacer(Modifier.height(4.dp))
                 Text(
@@ -129,7 +154,12 @@ fun HomeScreen(
             }
         }
 
-        item { SearchPill(onClick = onOpenSearch, modifier = Modifier.padding(horizontal = gutter)) }
+        item {
+            SearchPill(
+                onClick = onOpenSearch,
+                modifier = Modifier.reveal(2).padding(horizontal = gutter),
+            )
+        }
 
         // ---- made for you: computed on the device, so it is here before the
         // network shelves have answered
@@ -138,7 +168,7 @@ fun HomeScreen(
                 DiscoveryRow(
                     onPlay = onPlay,
                     onSeeAll = onOpenDiscovery,
-                    modifier = Modifier.padding(top = 6.dp),
+                    modifier = Modifier.reveal(3).padding(top = 6.dp),
                 )
             }
         }
@@ -147,15 +177,17 @@ fun HomeScreen(
 
         item {
             val hero = state.track ?: recents.firstOrNull()
-            if (hero != null) {
-                HeroCard(
-                    track = hero,
-                    playing = state.isPlaying,
-                    onOpen = { onOpenPlayer() },
-                    onToggle = onTogglePlay,
-                )
-            } else {
-                StartCard(onOpenSearch = onOpenSearch)
+            Box(Modifier.reveal(4)) {
+                if (hero != null) {
+                    HeroCard(
+                        track = hero,
+                        playing = state.isPlaying,
+                        onOpen = { onOpenPlayer() },
+                        onToggle = onTogglePlay,
+                    )
+                } else {
+                    StartCard(onOpenSearch = onOpenSearch)
+                }
             }
         }
 
@@ -260,6 +292,7 @@ fun HomeScreen(
             }
         }
     }
+    }
 }
 
 private fun greeting(): String {
@@ -282,7 +315,7 @@ private fun SearchPill(onClick: () -> Unit, modifier: Modifier = Modifier) {
             .background(Ink.Card)
             // On a chalk page a white pill needs an edge, or it dissolves.
             .then(if (Ink.isLight) Modifier.border(1.dp, Ink.Hairline, RoundedCornerShape(16.dp)) else Modifier)
-            .clickable { onClick() }
+            .tapable(scale = 0.985f) { onClick() }
             .padding(horizontal = 16.dp, vertical = 14.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -311,7 +344,7 @@ private fun StartCard(onOpenSearch: () -> Unit) {
             .fillMaxWidth()
             .clip(RoundedCornerShape(28.dp))
             .background(Ink.Card)
-            .clickable { onOpenSearch() }
+            .tapable(scale = 0.985f) { onOpenSearch() }
             .padding(22.dp),
     ) {
         Text(
@@ -337,16 +370,28 @@ private fun StartCard(onOpenSearch: () -> Unit) {
 
 @Composable
 private fun HeroCard(track: Track, playing: Boolean, onOpen: () -> Unit, onToggle: () -> Unit) {
-    val pulse by animateFloatAsState(if (playing) 1f else 0.92f, label = "pulse")
+    val reduced = LocalReducedMotion.current
+    // The disc holds its angle when paused. Resetting to zero — which is what
+    // `if (playing) rotation else 0f` does — reads as the record being yanked off
+    // the platter and put back a second later.
+    val spin = remember { Animatable(0f) }
+    LaunchedEffect(playing, track.id) {
+        if (playing && !reduced) {
+            while (true) spin.animateTo(spin.value + 360f, tween(38_000, easing = LinearEasing))
+        }
+    }
+    val settle by animateFloatAsState(
+        targetValue = if (playing) 1f else 0.94f,
+        animationSpec = BunSpring.smooth(),
+        label = "settle",
+    )
     Box(
         Modifier
             .padding(horizontal = LocalBunWindow.current.gutter)
             .fillMaxWidth()
             .clip(RoundedCornerShape(28.dp))
-            .background(
-                Brush.linearGradient(Ink.Hero)
-            )
-            .clickable { onOpen() }
+            .background(Brush.linearGradient(Ink.Hero))
+            .tapable(scale = 0.985f) { onOpen() }
             .padding(20.dp)
     ) {
         Column {
@@ -395,11 +440,25 @@ private fun HeroCard(track: Track, playing: Boolean, onOpen: () -> Unit, onToggl
                         Modifier
                             .clip(CircleShape)
                             .background(Ink.HeroBtn)
-                            .clickable { onToggle() }
+                            .tapable(scale = 0.94f) { onToggle() }
                             .padding(horizontal = 16.dp, vertical = 9.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Glyph(if (playing) G.Pause else G.Play, Ink.HeroBtnInk, 13.dp)
+                        AnimatedContent(
+                            targetState = playing,
+                            transitionSpec = {
+                                (
+                                    fadeIn(tween(if (reduced) 0 else 130)) +
+                                        scaleIn(initialScale = 0.5f, animationSpec = tween(if (reduced) 0 else 180))
+                                    ) togetherWith (
+                                    fadeOut(tween(if (reduced) 0 else 90)) +
+                                        scaleOut(targetScale = 0.5f, animationSpec = tween(if (reduced) 0 else 90))
+                                    )
+                            },
+                            label = "heroGlyph",
+                        ) { on ->
+                            Glyph(if (on) G.Pause else G.Play, Ink.HeroBtnInk, 13.dp)
+                        }
                         Spacer(Modifier.width(7.dp))
                         Text(
                             if (playing) "Pause" else "Play",
@@ -411,8 +470,33 @@ private fun HeroCard(track: Track, playing: Boolean, onOpen: () -> Unit, onToggl
                     }
                 }
                 Spacer(Modifier.width(14.dp))
-                Box(Modifier.size(104.dp * pulse)) {
-                    ArtImage(track.artUrl, track.artAsset, Modifier.fillMaxSize(), CircleShape)
+                Box(
+                    Modifier
+                        .size(104.dp)
+                        .graphicsLayer {
+                            scaleX = settle
+                            scaleY = settle
+                        },
+                ) {
+                    Box(
+                        Modifier
+                            .fillMaxSize()
+                            .graphicsLayer { rotationZ = spin.value }
+                    ) {
+                        ArtImage(track.artUrl, track.artAsset, Modifier.fillMaxSize(), CircleShape)
+                    }
+                    Box(
+                        Modifier
+                            .align(Alignment.Center)
+                            .size(12.dp)
+                            .clip(CircleShape)
+                            .background(Ink.HeroInk.copy(alpha = 0.18f))
+                    )
+                    Box(
+                        Modifier
+                            .fillMaxSize()
+                            .border(1.dp, Ink.HeroInk.copy(alpha = 0.16f), CircleShape)
+                    )
                 }
             }
         }
@@ -421,7 +505,7 @@ private fun HeroCard(track: Track, playing: Boolean, onOpen: () -> Unit, onToggl
 
 @Composable
 private fun RecentTile(track: Track, downloaded: Boolean, size: androidx.compose.ui.unit.Dp, onClick: () -> Unit) {
-    Column(Modifier.width(size).clickable { onClick() }) {
+    Column(Modifier.width(size).tapable { onClick() }) {
         Box {
             ArtImage(
                 url = track.artUrl,
@@ -509,7 +593,7 @@ private fun MiniMixCard(mix: Discovery.Mix, onPlay: () -> Unit) {
             .width(150.dp)
             .clip(RoundedCornerShape(16.dp))
             .background(Brush.linearGradient(listOf(tint.copy(alpha = 0.34f), Ink.Card)))
-            .clickable { onPlay() }
+            .tapable(scale = 0.96f) { onPlay() }
             .padding(12.dp),
     ) {
         Box(

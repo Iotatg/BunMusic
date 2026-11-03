@@ -519,20 +519,15 @@ private fun TransportRow(state: PlayerState, tint: Color, modifier: Modifier = M
             tint = tint,
             track = Ink.Hairline,
         ) {
-            Box(
-                Modifier
-                    .size(66.dp)
-                    .clip(CircleShape)
-                    .background(tint)
-                    .clickable { Playback.toggle() },
-                contentAlignment = Alignment.Center,
-            ) {
-                if (state.buffering && !state.isPlaying) {
-                    Glyph(G.Wave, buttonInk, 26.dp)
-                } else {
-                    Glyph(if (state.isPlaying) G.Pause else G.Play, buttonInk, 26.dp)
-                }
-            }
+            MorphPlayButton(
+                playing = state.isPlaying,
+                tint = tint,
+                ink = buttonInk,
+                size = 66.dp,
+                glyphSize = 26.dp,
+                busy = state.buffering,
+                stroke = 2.4.dp,
+            ) { Playback.toggle() }
         }
         IconBtn(G.Next, Ink.Text, 48.dp, 24.dp) { Playback.next() }
         IconBtn(
@@ -864,34 +859,28 @@ private fun ColumnScope.CharcoalPlayer(
         horizontalArrangement = Arrangement.SpaceBetween,
     ) {
         Box(
-            Modifier.size(40.dp).clip(CircleShape).clickable { Playback.toggleShuffle() },
+            Modifier.size(40.dp).clip(CircleShape).tapable { Playback.toggleShuffle() },
             contentAlignment = Alignment.Center,
         ) { Glyph(G.Shuffle, if (state.shuffle) Ink.Text else Ink.Faint, 20.dp, 1.9.dp) }
         Box(
-            Modifier.size(44.dp).clip(CircleShape).clickable { Playback.previous() },
+            Modifier.size(44.dp).clip(CircleShape).tapable { Playback.previous() },
             contentAlignment = Alignment.Center,
         ) { Glyph(G.Prev, Ink.Text, 26.dp, 2.2.dp) }
+        MorphPlayButton(
+            playing = state.isPlaying,
+            tint = Ink.Lime,
+            ink = Ink.OnAccent,
+            size = 68.dp,
+            glyphSize = 25.dp,
+            busy = state.buffering,
+            stroke = 2.4.dp,
+        ) { Playback.toggle() }
         Box(
-            Modifier
-                .size(68.dp)
-                .clip(CircleShape)
-                .background(Ink.Lime)
-                .clickable { Playback.toggle() },
-            contentAlignment = Alignment.Center,
-        ) {
-            Glyph(
-                if (state.buffering && !state.isPlaying) G.Wave else if (state.isPlaying) G.Pause else G.Play,
-                Ink.OnAccent,
-                25.dp,
-                2.4.dp,
-            )
-        }
-        Box(
-            Modifier.size(44.dp).clip(CircleShape).clickable { Playback.next() },
+            Modifier.size(44.dp).clip(CircleShape).tapable { Playback.next() },
             contentAlignment = Alignment.Center,
         ) { Glyph(G.Next, Ink.Text, 26.dp, 2.2.dp) }
         Box(
-            Modifier.size(40.dp).clip(CircleShape).clickable { Playback.cycleRepeat() },
+            Modifier.size(40.dp).clip(CircleShape).tapable { Playback.cycleRepeat() },
             contentAlignment = Alignment.Center,
         ) {
             Glyph(
@@ -938,20 +927,27 @@ private fun DiscArt(track: Track, playing: Boolean, tint: Color) {
             while (true) {
                 rotation.animateTo(rotation.value + 360f, tween(26000, easing = LinearEasing))
             }
+        } else {
+            // Coast, then stop. Snapping back to 0° on pause made the record look
+            // like it had been lifted off and put back between two frames.
+            rotation.animateTo(
+                rotation.value + 12f,
+                tween(1100, easing = androidx.compose.animation.core.FastOutSlowInEasing),
+            )
         }
     }
     Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-        Box(
-            Modifier
-                .fillMaxWidth(0.86f)
-                .aspectRatio(1f)
-                .background(Brush.radialGradient(listOf(tint.copy(alpha = 0.18f), Color.Transparent)))
+        SoftGlow(
+            color = tint,
+            modifier = Modifier.fillMaxWidth(0.94f).aspectRatio(1f),
+            active = playing,
+            alpha = 0.34f,
         )
         Box(
             Modifier
                 .fillMaxWidth(0.70f)
                 .aspectRatio(1f)
-                .rotate(if (playing) rotation.value else 0f)
+                .rotate(rotation.value)
         ) {
             ArtImage(track.artUrl, track.artAsset, Modifier.fillMaxSize(), CircleShape)
             Box(
@@ -972,14 +968,25 @@ private fun VinylArt(track: Track, playing: Boolean, tint: Color) {
             while (true) {
                 rotation.animateTo(rotation.value + 360f, tween(22000, easing = LinearEasing))
             }
+        } else {
+            rotation.animateTo(
+                rotation.value + 10f,
+                tween(1100, easing = androidx.compose.animation.core.FastOutSlowInEasing),
+            )
         }
     }
     Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+        SoftGlow(
+            color = tint,
+            modifier = Modifier.fillMaxWidth(0.92f).aspectRatio(1f),
+            active = playing,
+            alpha = 0.28f,
+        )
         Box(
             Modifier
                 .fillMaxWidth(0.80f)
                 .aspectRatio(1f)
-                .rotate(if (playing) rotation.value else 0f)
+                .rotate(rotation.value)
                 .clip(CircleShape)
                 .background(Color(0xFF0B0A0E))
                 .border(1.dp, Ink.Hairline, CircleShape),

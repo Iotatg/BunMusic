@@ -88,12 +88,12 @@ private fun CharcoalDetailHeader(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Box(
-                Modifier.tapTarget().size(40.dp).clip(CircleShape).clickable { onBack() },
+                Modifier.tapTarget().size(40.dp).clip(CircleShape).tapable { onBack() },
                 contentAlignment = Alignment.Center,
             ) { Glyph(G.Back, Ink.Text, 21.dp, 2.2.dp) }
             Spacer(Modifier.weight(1f))
             Box(
-                Modifier.tapTarget().size(40.dp).clip(CircleShape).clickable { onMore() },
+                Modifier.tapTarget().size(40.dp).clip(CircleShape).tapable { onMore() },
                 contentAlignment = Alignment.Center,
             ) { Glyph(G.Search, Ink.Text, 20.dp, 2.dp) }
         }
@@ -169,7 +169,7 @@ private fun CharcoalDetailHeader(
                         .size(36.dp)
                         .clip(CircleShape)
                         .border(1.dp, Ink.Hairline, CircleShape)
-                        .clickable { if (i == 2) onMore() },
+                        .tapable(scale = 0.96f) { if (i == 2) onMore() },
                     contentAlignment = Alignment.Center,
                 ) { Glyph(g, Ink.Muted, 16.dp, 1.9.dp) }
             }
@@ -184,7 +184,7 @@ private fun CharcoalDetailHeader(
                     .weight(1f)
                     .clip(RoundedCornerShape(15.dp))
                     .background(Ink.Text)
-                    .clickable { onPlayAll() }
+                    .tapable(scale = 0.96f) { onPlayAll() }
                     .padding(vertical = 15.dp),
                 horizontalArrangement = Arrangement.Center,
                 verticalAlignment = Alignment.CenterVertically,
@@ -204,7 +204,7 @@ private fun CharcoalDetailHeader(
                     .weight(1f)
                     .clip(RoundedCornerShape(15.dp))
                     .background(Ink.Field)
-                    .clickable { onShuffle() }
+                    .tapable(scale = 0.96f) { onShuffle() }
                     .padding(vertical = 15.dp),
                 horizontalArrangement = Arrangement.Center,
                 verticalAlignment = Alignment.CenterVertically,

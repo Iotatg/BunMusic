@@ -54,6 +54,23 @@ fun AboutScreen(onBack: () -> Unit) {
             }
         }
 
+        item { GroupTitle("New in 2.2.0") }
+        item {
+            AboutCard {
+                Change("One motion vocabulary", "Three curves and four springs, named once in the core and used everywhere. Forty slightly different `tween(300)`s is not speed, it is noise — a page change, a sheet and a button now land on the same beat")
+                Change("Every tap answers", "Cards, rows, chips, buttons and tabs dip under the finger and spring back. Three per cent is enough for the thumb to know the tap registered; more and a grid of albums visibly wobbles as you scroll past it")
+                Change("Pages arrive instead of appearing", "A screen change now fades, slides a ninth of a page and scales 2.8 % in the direction of travel — back goes the other way. It is the same information, but the eye is told whether it went deeper or came back")
+                Change("The home page has weather", "Three hues derived from whatever is playing, drifting on a slow Lissajous behind the list. Not a blur: two overlapping gradients that look the same and cost nothing, because they sit behind a list that is also scrolling")
+                Change("The record keeps its angle", "Pausing used to reset the disc to 0°, which reads as the record being lifted off and put back between two frames. It coasts to a stop now, and holds wherever it stopped")
+                Change("The play button morphs", "Play, pause and buffering swap with a scale-and-fade instead of a cut, the disc dips under the thumb, and the haptic fires on press rather than release — the order a physical button works in")
+                Change("Numbers count, bars grow", "Plays, days, the seven-day chart and the listening clock animate from zero with a 14 ms head start per bar. The one page whose whole subject is the shape of the data now draws that shape")
+                Change("Lists are dealt, not loaded", "The greeting, the search pill, the hero card and the made-for-you row arrive in sequence. The stagger is capped at 160 ms: without a cap the fortieth row waits a second, which is the difference between animated and slow")
+                Change("The chrome arrives with the music", "The now-playing strip slides up the first time a track exists instead of blinking into place, and toasts enter from below and leave the way they came")
+                Change("Skeletons that move", "The loading rows had a shimmer mixed from two card tones that are nearly the same colour on Midnight, so it read as a grey box. The sheen is a measured mix toward white or black now, and it travels further")
+                Change("All of it yields", "Every effect above checks the reduced-motion switch — in the app and in the phone's own developer settings — and collapses to a still frame. An aurora is not worth a migraine")
+            }
+        }
+
         item { GroupTitle("New in 2.1.0") }
         item {
             AboutCard {

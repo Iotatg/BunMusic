@@ -7,10 +7,39 @@ saved offline.
 
 ```
 package   app.bunmusic
-version   2.1.0 (23)
+version   2.2.0 (24)
 minSdk    26  ·  target/compile 37
 author    Iota Coder · iota14934@gmail.com
 ```
+
+---
+
+## 2.2.0 — everything moves
+
+The release that gave the app a motion vocabulary instead of forty ad-hoc tweens.
+Same screens, same information — but the interface now answers the finger and
+tells the eye where it went.
+
+| System | What landed |
+|---|---|
+| **Motion core** | Three named curves (`Emphasised`, `Standard`, `Accelerate`) and four named springs (`snappy`, `smooth`, `bouncy`, `gentle`) in `core/Motion.kt`, plus `BunStagger` for list delays. One vocabulary, so a page change, a sheet and a button press land on the same beat |
+| **Press feedback** | `Modifier.tapable` / `longTapable`: cards, rows, chips, buttons, tabs, nav items and mini-player controls dip 3 % under the finger and spring back on `BunSpring.snappy`. The ripple alone fires on release, by which time the eye has moved on |
+| **Page transitions** | Screen changes fade, slide a ninth of a page and scale 2.8 % in the direction of travel — deeper pushes right, back pulls left. `depth` already existed; it now drives the direction |
+| **Aurora** | `AuroraBackdrop`: three hues derived deterministically from the playing track's id, drifting on a slow Lissajous behind Home. Not a blur — two overlapping radial gradients that look the same and cost nothing, because they sit behind a scrolling list |
+| **The record** | The hero disc and the player's vinyl/disc now spin while playing and *hold their angle* when paused. They used to reset to 0°, which reads as the record being lifted off and put back between two frames |
+| **Morphing transport** | `MorphPlayButton`: play / pause / buffering swap with a scale-and-fade, the disc dips under the thumb, the haptic fires on press rather than release. Used in both player layouts and the hero card |
+| **Numbers and bars** | `AnimatedCount` on the stats tiles; the seven-day chart, the year chart and the 24-hour clock grow from their baseline with a 14 ms head start per bar |
+| **Seek smoothing** | The player publishes its position twice a second, so the seek bar used to advance in half-second steps. A linear tween across the tick makes it continuous; the thumb under the finger and any backwards jump snap instead of gliding |
+| **Entrances** | Greeting, search pill, hero card and the made-for-you row arrive in sequence; the now-playing strip slides up the first time a track exists; toasts enter from below and leave the way they came; empty states fade in |
+| **Skeletons** | The shimmer was mixed from two card tones that are nearly identical on Midnight, so it read as a grey box. It is a measured mix toward white or black now, and travels further |
+| **Reduced motion** | Every effect above collapses to a still frame when the app switch or the phone's animator scale says so — including the aurora, the disc, the stagger and the shimmer |
+
+422 unit tests, 0 failures. Same signing key.
+
+Honest limit, unchanged: no phone and no emulator here. The curves, the springs,
+the stagger and the colour derivation are pinned by tests, and every screen
+compiles — but nobody has watched these animations on a display. If a transition
+feels slow on your device, the numbers to change are in `core/Motion.kt`.
 
 ---
 

@@ -277,7 +277,7 @@ fun LibraryScreen(
                     )
                 }
                 if (query.isNotEmpty()) {
-                    Box(Modifier.clickable { query = "" }.padding(2.dp)) {
+                    Box(Modifier.tapable { query = "" }.padding(2.dp)) {
                         Glyph(G.Close, Ink.Faint, 14.dp)
                     }
                 }
@@ -695,7 +695,7 @@ private fun AutoRow(
     Row(
         Modifier
             .fillMaxWidth()
-            .clickable { onClick() }
+            .tapable(scale = 0.97f) { onClick() }
             .padding(horizontal = gutter, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -743,7 +743,7 @@ private fun ShortcutCard(
         modifier
             .clip(RoundedCornerShape(18.dp))
             .background(if (Ink.isLight) Brush.linearGradient(listOf(Ink.Field, Ink.Card)) else Brush.linearGradient(listOf(Color(0xFF1E1A28), Color(0xFF171320))))
-            .clickable { onClick() }
+            .tapable(scale = 0.97f) { onClick() }
             .padding(14.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -773,7 +773,7 @@ private fun PlaylistRow(
     Row(
         Modifier
             .fillMaxWidth()
-            .clickable { onClick() }
+            .tapable(scale = 0.97f) { onClick() }
             .padding(horizontal = gutter, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -828,7 +828,7 @@ private fun PlaylistRow(
             }
         }
         Box(
-            Modifier.size(34.dp).clip(RoundedCornerShape(10.dp)).clickable { onPin() },
+            Modifier.size(34.dp).clip(RoundedCornerShape(10.dp)).tapable { onPin() },
             contentAlignment = Alignment.Center,
         ) {
             Glyph(G.Pin, if (pinned) Ink.Lime else Ink.Faint, 15.dp)
@@ -862,7 +862,7 @@ private fun TrackGrid(
                 pair.forEachIndexed { col, t ->
                     val index = rowIndex * 2 + col
                     Column(
-                        Modifier.weight(1f).clickable { onPlayAt(index) },
+                        Modifier.weight(1f).tapable(scale = 0.99f) { onPlayAt(index) },
                     ) {
                         // The silhouette comes from the track's id, so the same
                         // album never appears in two shapes.

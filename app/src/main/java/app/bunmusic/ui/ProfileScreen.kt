@@ -399,7 +399,7 @@ private fun ProfileDivider() {
 @Composable
 private fun ProfileRow(title: String, subtitle: String, glyph: G, onClick: () -> Unit) {
     Row(
-        Modifier.fillMaxWidth().clickable { onClick() }.padding(horizontal = 16.dp, vertical = 13.dp),
+        Modifier.fillMaxWidth().tapable(scale = 0.99f) { onClick() }.padding(horizontal = 16.dp, vertical = 13.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Box(

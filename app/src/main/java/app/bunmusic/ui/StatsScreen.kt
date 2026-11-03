@@ -2,6 +2,7 @@ package app.bunmusic.ui
 
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
@@ -29,9 +30,11 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.remember
@@ -48,6 +51,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import java.util.Calendar
+import app.bunmusic.core.BunEase
 import app.bunmusic.core.G
 import app.bunmusic.core.Glyph
 import app.bunmusic.core.Ink
@@ -127,9 +131,9 @@ fun StatsScreen(onBack: () -> Unit) {
 
         item {
             Row(Modifier.padding(horizontal = 20.dp, vertical = 14.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                StatTile("Time", fmtDuration(stats.totalMs), Modifier.weight(1f))
-                StatTile("Plays", "${stats.plays}", Modifier.weight(1f))
-                StatTile("Days", "${stats.days}", Modifier.weight(1f))
+                StatTile("Time", fmtDuration(stats.totalMs), modifier = Modifier.weight(1f))
+                StatTile("Plays", count = stats.plays, modifier = Modifier.weight(1f))
+                StatTile("Days", count = stats.days, modifier = Modifier.weight(1f))
             }
         }
 
@@ -218,7 +222,12 @@ fun StatsScreen(onBack: () -> Unit) {
 }
 
 @Composable
-private fun StatTile(label: String, value: String, modifier: Modifier = Modifier) {
+private fun StatTile(
+    label: String,
+    value: String = "",
+    count: Int? = null,
+    modifier: Modifier = Modifier,
+) {
     Column(
         modifier
             .clip(RoundedCornerShape(18.dp))
@@ -227,7 +236,13 @@ private fun StatTile(label: String, value: String, modifier: Modifier = Modifier
     ) {
         Text(label.uppercase(), color = Ink.Faint, fontSize = 10.sp, fontFamily = SoraFamily, letterSpacing = 0.9.sp)
         Spacer(Modifier.height(6.dp))
-        Text(value, color = Ink.Text, fontSize = 18.sp, fontFamily = SoraFamily, fontWeight = FontWeight.SemiBold)
+        // A count that lands on its number reads as something that was counted;
+        // a number that is simply there reads as something that was typed.
+        if (count != null) {
+            AnimatedCount(count, size = 18, weight = FontWeight.SemiBold)
+        } else {
+            Text(value, color = Ink.Text, fontSize = 18.sp, fontFamily = SoraFamily, fontWeight = FontWeight.SemiBold)
+        }
     }
 }
 
@@ -265,12 +280,24 @@ private fun PeriodBars(bars: List<Int>, period: Int) {
         }
     }
 
+    // The bars grow once, from the baseline, with a 14 ms head start each. It is
+    // the same deal-a-deck idea as the lists, applied to the one page whose whole
+    // subject is the shape of the data.
+    var grown by remember(bars) { mutableStateOf(false) }
+    LaunchedEffect(bars) { grown = true }
+
     Row(
         Modifier.fillMaxWidth().height(104.dp),
         horizontalArrangement = Arrangement.spacedBy(gap),
         verticalAlignment = Alignment.Bottom,
     ) {
         bars.forEachIndexed { i, v ->
+            val target = (6 + (v.toFloat() / max) * 62).dp
+            val h by animateDpAsState(
+                targetValue = if (grown) target else 6.dp,
+                animationSpec = tween(460, delayMillis = i * 14, easing = BunEase.Emphasised),
+                label = "bar$i",
+            )
             Column(
                 Modifier.weight(1f),
                 horizontalAlignment = Alignment.CenterHorizontally,
@@ -279,7 +306,7 @@ private fun PeriodBars(bars: List<Int>, period: Int) {
                 Box(
                     Modifier
                         .fillMaxWidth()
-                        .height((6 + (v.toFloat() / max) * 62).dp)
+                        .height(h)
                         .clip(RoundedCornerShape(4.dp))
                         .background(if (v > 0) Ink.Lime.copy(alpha = 0.85f) else Ink.Hairline)
                 )
@@ -299,17 +326,25 @@ private fun PeriodBars(bars: List<Int>, period: Int) {
 @Composable
 private fun ClockBars(hours: List<Int>) {
     val max = (hours.maxOrNull() ?: 0).coerceAtLeast(1)
+    var grown by remember(hours) { mutableStateOf(false) }
+    LaunchedEffect(hours) { grown = true }
     Row(
         Modifier.fillMaxWidth().height(72.dp),
         horizontalArrangement = Arrangement.spacedBy(3.dp),
         verticalAlignment = Alignment.Bottom,
     ) {
         hours.forEachIndexed { i, v ->
+            val target = (4 + (v.toFloat() / max) * 52).dp
+            val h by animateDpAsState(
+                targetValue = if (grown) target else 4.dp,
+                animationSpec = tween(420, delayMillis = i * 12, easing = BunEase.Emphasised),
+                label = "hour$i",
+            )
             Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Bottom) {
                 Box(
                     Modifier
                         .fillMaxWidth()
-                        .height((4 + (v.toFloat() / max) * 52).dp)
+                        .height(h)
                         .clip(RoundedCornerShape(3.dp))
                         .background(
                             when {

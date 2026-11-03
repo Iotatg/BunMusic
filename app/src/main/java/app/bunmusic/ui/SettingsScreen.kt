@@ -194,7 +194,7 @@ fun SettingsScreen(
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(20.dp))
                     .background(Ink.Card)
-                    .clickable { onOpenProfile() }
+                    .tapable(scale = 0.985f) { onOpenProfile() }
                     .padding(horizontal = 14.dp, vertical = 12.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
@@ -894,7 +894,7 @@ private fun ChoiceRow(title: String, subtitle: String, chips: @Composable () -> 
 @Composable
 private fun NavRow(title: String, subtitle: String, glyph: G, bun: BunSkin? = null, onClick: () -> Unit) {
     Row(
-        Modifier.fillMaxWidth().clickable { onClick() }.padding(horizontal = 16.dp, vertical = 13.dp),
+        Modifier.fillMaxWidth().tapable(scale = 0.99f) { onClick() }.padding(horizontal = 16.dp, vertical = 13.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         if (bun != null) {
@@ -930,7 +930,7 @@ private fun NavRow(title: String, subtitle: String, glyph: G, bun: BunSkin? = nu
 @Composable
 private fun CheckRow(title: String, detail: String, state: PlaybackControls.State, onClick: () -> Unit) {
     Row(
-        Modifier.fillMaxWidth().clickable { onClick() }.padding(horizontal = 16.dp, vertical = 13.dp),
+        Modifier.fillMaxWidth().tapable(scale = 0.99f) { onClick() }.padding(horizontal = 16.dp, vertical = 13.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Box(
@@ -1058,7 +1058,7 @@ private fun ShapeChip(label: String, shapeId: String, selected: Boolean, onPick:
         Modifier
             .clip(RoundedCornerShape(50))
             .background(if (selected) Ink.Lime else Ink.Field)
-            .clickable { onPick() }
+            .tapable(scale = 0.98f) { onPick() }
             .padding(horizontal = 10.dp, vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {

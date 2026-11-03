@@ -3,9 +3,14 @@ package app.bunmusic.ui
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.MutableTransitionState
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutHorizontally
@@ -52,17 +57,22 @@ import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import app.bunmusic.core.BunEase
+import app.bunmusic.core.BunSpring
 import app.bunmusic.core.BunWindow
 import app.bunmusic.core.G
 import app.bunmusic.core.Glyph
 import app.bunmusic.core.Ink
 import app.bunmusic.core.LocalBunWindow
+import app.bunmusic.core.LocalReducedMotion
 import app.bunmusic.core.Network
 import app.bunmusic.core.Skin
 import app.bunmusic.core.SoraFamily
+import app.bunmusic.core.motionMs
 import app.bunmusic.data.Auth
 import app.bunmusic.data.Collection
 import app.bunmusic.data.CollectionKind
@@ -135,6 +145,7 @@ private fun Shell(
     val state by Playback.state.collectAsState()
     val downloads by Downloads.entries.collectAsState()
     val window = LocalBunWindow.current
+    val reduced = LocalReducedMotion.current
     // Playback ticks twice a second with positionMs. Every screen used to be
     // handed that object, so the whole visible page recomposed at 2 Hz to draw a
     // number none of them show. Screens get the tick-free copy; the mini player
@@ -146,6 +157,10 @@ private fun Shell(
     var paletteOpen by remember { mutableStateOf(false) }
     var sheetTrack by remember { mutableStateOf<Track?>(null) }
     var toast by remember { mutableStateOf<String?>(null) }
+    // The message outlives the flag by one animation, so the toast can leave the
+    // way it arrived instead of vanishing on the frame the state clears.
+    var lastToast by remember { mutableStateOf("") }
+    LaunchedEffect(toast) { toast?.let { lastToast = it } }
     // Measured, not guessed: the toast used to be lifted by a hard-coded 120 dp,
     // which cleared the bar on a phone and floated in the middle of a tablet.
     var chromePx by remember { mutableIntStateOf(0) }
@@ -245,18 +260,25 @@ private fun Shell(
                     modifier = Modifier.widthIn(max = window.contentMax).fillMaxSize(),
                     targetState = route,
                     transitionSpec = {
+                        // Depth decides direction: going deeper pushes in from the
+                        // right, coming back pulls in from the left. The scale is
+                        // small on purpose — 3.5 % is enough to read as a change
+                        // of place, and anything more turns every tap into a zoom.
                         val forward = targetState.depth >= initialState.depth
-                        val enter = if (forward) {
-                            slideInHorizontally(tween(280)) { it / 8 } + fadeIn(tween(240))
+                        val dir = if (forward) 1 else -1
+                        if (reduced) {
+                            fadeIn(tween(0)) togetherWith fadeOut(tween(0))
                         } else {
-                            slideInHorizontally(tween(280)) { -it / 8 } + fadeIn(tween(240))
+                            (
+                                fadeIn(tween(230, easing = BunEase.Decelerate)) +
+                                    slideInHorizontally(tween(340, easing = BunEase.Emphasised)) { it / 9 * dir } +
+                                    scaleIn(initialScale = 0.972f, animationSpec = tween(340, easing = BunEase.Emphasised))
+                                ) togetherWith (
+                                fadeOut(tween(150)) +
+                                    slideOutHorizontally(tween(260, easing = BunEase.Accelerate)) { -it / 14 * dir } +
+                                    scaleOut(targetScale = 0.988f, animationSpec = tween(260, easing = BunEase.Accelerate))
+                                )
                         }
-                        val exit = if (forward) {
-                            slideOutHorizontally(tween(220)) { -it / 12 } + fadeOut(tween(180))
-                        } else {
-                            slideOutHorizontally(tween(220)) { it / 12 } + fadeOut(tween(180))
-                        }
-                        enter togetherWith exit
                     },
                     label = "screen",
                 ) { r ->
@@ -467,9 +489,15 @@ private fun Shell(
             )
         }
 
-        toast?.let { msg ->
+        AnimatedVisibility(
+            visible = toast != null,
+            enter = fadeIn(tween(motionMs(170))) +
+                slideInVertically(tween(motionMs(260), easing = BunEase.Emphasised)) { it / 3 },
+            exit = fadeOut(tween(motionMs(130))) +
+                slideOutVertically(tween(motionMs(170), easing = BunEase.Accelerate)) { it / 4 },
+        ) {
             Toast(
-                message = msg,
+                message = lastToast,
                 bottom = with(density) { chromePx.toDp() } + 12.dp,
                 onDone = { toast = null },
             )
@@ -535,13 +563,24 @@ private fun Toast(message: String, bottom: androidx.compose.ui.unit.Dp, onDone: 
         Modifier.fillMaxSize().padding(bottom = bottom),
         contentAlignment = Alignment.BottomCenter,
     ) {
-        Box(
+        Row(
             Modifier
-                .clip(RoundedCornerShape(14.dp))
+                .shadow(14.dp, RoundedCornerShape(16.dp), clip = false, ambientColor = Ink.Shadow, spotColor = Ink.Shadow)
+                .clip(RoundedCornerShape(16.dp))
                 .background(Ink.Sheet)
-                .border(1.dp, Ink.Hairline, RoundedCornerShape(14.dp))
-                .padding(horizontal = 16.dp, vertical = 10.dp)
+                .border(1.dp, Ink.Hairline, RoundedCornerShape(16.dp))
+                .padding(start = 12.dp, end = 16.dp, top = 10.dp, bottom = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
+            // One accent stroke is the difference between a system toast and a
+            // note from the app that sent it.
+            Box(
+                Modifier
+                    .size(width = 3.dp, height = 14.dp)
+                    .clip(RoundedCornerShape(2.dp))
+                    .background(Ink.Lime)
+            )
+            Spacer(Modifier.width(10.dp))
             Text(message, color = Ink.Text, fontSize = 12.sp, fontFamily = SoraFamily)
         }
     }
@@ -582,15 +621,26 @@ private fun BottomChrome(
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         if (state.hasTrack) {
-            // Capped: on a tablet the strip was a full-width 1400 dp bar with a
-            // 44 dp thumbnail at one end and a play button a metre away.
-            Box(Modifier.widthIn(max = window.miniMax).fillMaxWidth()) {
-                MiniPlayer(
-                    state = state,
-                    onOpen = onOpen,
-                    onToggle = onToggle,
-                    onNext = onNext,
-                )
+            // The strip arrives with the first track and stays put afterwards.
+            // `MutableTransitionState(false)` is what makes that first frame
+            // animate: a plain `AnimatedVisibility(visible = true)` starts
+            // already finished and the bar would simply appear.
+            val appear = remember { MutableTransitionState(false).apply { targetState = true } }
+            AnimatedVisibility(
+                visibleState = appear,
+                enter = fadeIn(tween(motionMs(200))) +
+                    slideInVertically(tween(motionMs(320), easing = BunEase.Emphasised)) { it / 2 },
+            ) {
+                // Capped: on a tablet the strip was a full-width 1400 dp bar with a
+                // 44 dp thumbnail at one end and a play button a metre away.
+                Box(Modifier.widthIn(max = window.miniMax).fillMaxWidth()) {
+                    MiniPlayer(
+                        state = state,
+                        onOpen = onOpen,
+                        onToggle = onToggle,
+                        onNext = onNext,
+                    )
+                }
             }
         }
         if (!window.wide) {
@@ -637,6 +687,7 @@ private fun BottomNav(
 
 @Composable
 private fun DarkNav(current: Route, onSelect: (Route) -> Unit, modifier: Modifier = Modifier) {
+    val reduced = LocalReducedMotion.current
     Box(
         modifier
             .fillMaxWidth()
@@ -654,22 +705,42 @@ private fun DarkNav(current: Route, onSelect: (Route) -> Unit, modifier: Modifie
         ) {
             tabsFor(false).forEach { t ->
                 val selected = current == t.route
+                // The selected pill fades between states instead of switching,
+                // and the glyph lifts a hair — two cheap properties that make a
+                // tab bar feel like it noticed the tap.
+                val fill by animateColorAsState(
+                    targetValue = if (selected) Ink.Lime.copy(alpha = 0.14f) else Color.Transparent,
+                    animationSpec = tween(if (reduced) 0 else 240, easing = BunEase.Standard),
+                    label = "navFill",
+                )
+                val lift by animateFloatAsState(
+                    targetValue = if (selected) 1.07f else 1f,
+                    animationSpec = BunSpring.snappy(),
+                    label = "navLift",
+                )
                 Column(
                     Modifier
                         .weight(1f)
                         .clip(RoundedCornerShape(18.dp))
-                        .clickable { onSelect(t.route) }
+                        .tapable(scale = 0.94f) { onSelect(t.route) }
                         .padding(vertical = 6.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
                     Box(
                         Modifier
                             .clip(RoundedCornerShape(12.dp))
-                            .background(if (selected) Ink.Lime.copy(alpha = 0.14f) else Color.Transparent)
+                            .background(fill)
                             .padding(horizontal = 12.dp, vertical = 5.dp),
                         contentAlignment = Alignment.Center,
                     ) {
-                        Glyph(t.glyph, if (selected) Ink.Lime else Ink.Faint, 19.dp)
+                        Box(
+                            Modifier.graphicsLayer {
+                                scaleX = lift
+                                scaleY = lift
+                            }
+                        ) {
+                            Glyph(t.glyph, if (selected) Ink.Lime else Ink.Faint, 19.dp)
+                        }
                     }
                     Spacer(Modifier.height(3.dp))
                     Text(
@@ -687,6 +758,7 @@ private fun DarkNav(current: Route, onSelect: (Route) -> Unit, modifier: Modifie
 
 @Composable
 private fun LightNav(current: Route, onSelect: (Route) -> Unit, modifier: Modifier = Modifier) {
+    val reduced = LocalReducedMotion.current
     val shape = RoundedCornerShape(30.dp)
     Row(
         modifier
@@ -701,11 +773,21 @@ private fun LightNav(current: Route, onSelect: (Route) -> Unit, modifier: Modifi
     ) {
         tabsFor(true).forEach { t ->
             val selected = current == t.route
+            val fill by animateColorAsState(
+                targetValue = if (selected) Ink.NavActiveBg else Color.Transparent,
+                animationSpec = tween(if (reduced) 0 else 240, easing = BunEase.Standard),
+                label = "navFill",
+            )
+            val lift by animateFloatAsState(
+                targetValue = if (selected) 1.06f else 1f,
+                animationSpec = BunSpring.snappy(),
+                label = "navLift",
+            )
             Column(
                 Modifier
                     .weight(1f)
                     .clip(RoundedCornerShape(20.dp))
-                    .clickable { onSelect(t.route) }
+                    .tapable(scale = 0.94f) { onSelect(t.route) }
                     .padding(vertical = 2.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
@@ -713,15 +795,22 @@ private fun LightNav(current: Route, onSelect: (Route) -> Unit, modifier: Modifi
                     Modifier
                         .size(34.dp)
                         .clip(RoundedCornerShape(12.dp))
-                        .background(if (selected) Ink.NavActiveBg else Color.Transparent),
+                        .background(fill),
                     contentAlignment = Alignment.Center,
                 ) {
-                    Glyph(
-                        t.glyph,
-                        if (selected) Ink.NavActiveInk else Ink.Faint,
-                        19.dp,
-                        if (selected) 2.1.dp else 1.7.dp,
-                    )
+                    Box(
+                        Modifier.graphicsLayer {
+                            scaleX = lift
+                            scaleY = lift
+                        }
+                    ) {
+                        Glyph(
+                            t.glyph,
+                            if (selected) Ink.NavActiveInk else Ink.Faint,
+                            19.dp,
+                            if (selected) 2.1.dp else 1.7.dp,
+                        )
+                    }
                 }
                 Spacer(Modifier.height(4.dp))
                 Text(
@@ -797,7 +886,7 @@ private fun RailItem(label: String, glyph: G, selected: Boolean, onClick: () -> 
             .fillMaxWidth()
             .clip(RoundedCornerShape(16.dp))
             .background(if (selected) Ink.NavActiveBg else Color.Transparent)
-            .clickable { onClick() }
+            .tapable(scale = 0.95f) { onClick() }
             .padding(vertical = 10.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
