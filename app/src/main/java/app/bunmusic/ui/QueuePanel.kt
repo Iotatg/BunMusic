@@ -67,6 +67,25 @@ fun QueuePanel(
     val played = remember(state.queue, state.index) { QueueMath.played(state.queue, state.index) }
     val upcoming = remember(state.queue, state.index) { QueueMath.upcoming(state.queue, state.index) }
     val totalMs = remember(state.queue) { QueueMath.totalMs(state.queue) }
+    var query by remember { mutableStateOf("") }
+
+    /**
+     * A filter over what is next, keeping each track's real position.
+     *
+     * A radio queue runs to hundreds of songs and the only way to reach the
+     * twenty-second one was to scroll. Indices are carried through rather than
+     * recomputed, so tapping a filtered row still jumps to the right slot.
+     */
+    val shownUpcoming = remember(upcoming, query) {
+        val q = query.trim()
+        if (q.isEmpty()) {
+            upcoming.withIndex().toList()
+        } else {
+            upcoming.withIndex().filter { (_, t) ->
+                t.title.contains(q, ignoreCase = true) || t.artist.contains(q, ignoreCase = true)
+            }
+        }
+    }
 
     Column(
         Modifier
@@ -94,6 +113,44 @@ fun QueuePanel(
             }
             Spacer(Modifier.width(8.dp))
             IconBtn(G.Close, Ink.Text, 38.dp, 16.dp, onClose)
+        }
+
+        // Only worth showing once the list is longer than a screenful.
+        if (state.queue.size > 8) {
+            Row(
+                Modifier
+                    .padding(horizontal = 16.dp, vertical = 2.dp)
+                    .fillMaxWidth()
+                    .clip(CircleShape)
+                    .background(Ink.Field)
+                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Glyph(G.Search, Ink.Faint, 13.dp)
+                Spacer(Modifier.width(8.dp))
+                Box(Modifier.weight(1f)) {
+                    if (query.isEmpty()) {
+                        Text("Find in queue", color = Ink.Faint, fontSize = 11.5.sp, fontFamily = SoraFamily)
+                    }
+                    androidx.compose.foundation.text.BasicTextField(
+                        value = query,
+                        onValueChange = { query = it },
+                        singleLine = true,
+                        textStyle = androidx.compose.ui.text.TextStyle(
+                            color = Ink.Text,
+                            fontSize = 11.5.sp,
+                            fontFamily = SoraFamily,
+                        ),
+                        cursorBrush = androidx.compose.ui.graphics.SolidColor(Ink.Lime),
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
+                if (query.isNotEmpty()) {
+                    Box(Modifier.clickable { query = "" }.padding(2.dp)) {
+                        Glyph(G.Close, Ink.Faint, 12.dp)
+                    }
+                }
+            }
         }
 
         LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 20.dp)) {
@@ -150,15 +207,29 @@ fun QueuePanel(
                         modifier = Modifier.padding(horizontal = 18.dp, vertical = 14.dp),
                     )
                 }
+            } else if (shownUpcoming.isEmpty()) {
+                item {
+                    Text(
+                        "Nothing matches \u201c$query\u201d",
+                        color = Ink.Faint,
+                        fontSize = 11.5.sp,
+                        fontFamily = SoraFamily,
+                        modifier = Modifier.padding(horizontal = 18.dp, vertical = 14.dp),
+                    )
+                }
             } else {
-                itemsIndexed(upcoming) { i, t ->
+                items(shownUpcoming) { (i, t) ->
                     val real = state.index + 1 + i
                     DraggableQueueRow(
                         track = t,
                         isPlaying = state.isPlaying,
                         onPlay = { Playback.jumpTo(real) },
+                        // Dragging is disabled while a filter is on: the row's
+                        // neighbour on screen is not its neighbour in the queue.
                         onMove = { shift ->
-                            Playback.moveInQueue(real, (real + shift).coerceIn(0, state.queue.lastIndex))
+                            if (query.isBlank()) {
+                                Playback.moveInQueue(real, (real + shift).coerceIn(0, state.queue.lastIndex))
+                            }
                         },
                         onRemove = { Playback.removeAt(real) },
                     )

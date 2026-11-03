@@ -289,7 +289,8 @@ private fun MixCard(mix: Discovery.Mix, onPlay: () -> Unit) {
     ) {
         // A 2x2 collage built from the first four covers: cheaper than one big
         // image and it reads as "several songs", which is what a mix is.
-        Box(Modifier.size(66.dp).clip(RoundedCornerShape(12.dp)).background(Ink.Field)) {
+        // The collage follows the cover-shape setting like every other artwork.
+        Box(Modifier.size(66.dp).clip(bunShape(coverShape(mix.id), 66.dp)).background(Ink.Field)) {
             val arts = mix.tracks.take(4)
             Column(Modifier.fillMaxSize()) {
                 Row(Modifier.weight(1f)) {

@@ -99,7 +99,10 @@ object Downloads {
     private lateinit var sp: SharedPreferences
     private lateinit var appContext: Context
 
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    // Same reason as Cache: a broken response must not take the app with it.
+    private val scope = CoroutineScope(
+        SupervisorJob() + Dispatchers.IO + app.bunmusic.core.CrashGuard.handler("downloads"),
+    )
     private val lock = Any()
 
     /** Insertion-ordered so the queue reads in the order it was asked for. */

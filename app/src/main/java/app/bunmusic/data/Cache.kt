@@ -51,7 +51,11 @@ object Cache {
     private var stream: SimpleCache? = null
     private var database: StandaloneDatabaseProvider? = null
     private val prefetching = ConcurrentHashMap.newKeySet<String>()
-    private val io = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    // A throw inside a background coroutine used to reach the default handler
+    // and kill the process. A failed cache write is a log line now.
+    private val io = CoroutineScope(
+        SupervisorJob() + Dispatchers.IO + app.bunmusic.core.CrashGuard.handler("cache"),
+    )
 
     private val http: OkHttpClient by lazy {
         OkHttpClient.Builder()

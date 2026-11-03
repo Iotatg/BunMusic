@@ -58,6 +58,7 @@ object Store {
             prefs.contains("$next/$KEY_LIKES") || prefs.contains("$next/$KEY_PLAYLISTS") || prefs.contains("$next/$KEY_HISTORY")
             )
         scope = next
+        regCache = null
         if (next.isNotEmpty() && hadGuestData && !accountHasData) copyScope("", next)
     }
 
@@ -70,6 +71,7 @@ object Store {
         val editor = prefs.edit()
         SCOPED_KEYS.forEach { editor.remove("$prefix/$it") }
         editor.apply()
+        regCache = null
         if (scope == prefix) scope = ""
     }
 
@@ -116,14 +118,31 @@ object Store {
 
     private fun regRaw(): String = prefs.getString(k(KEY_REG), null) ?: ""
 
+    /**
+     * The registry, parsed once and kept.
+     *
+     * This used to be rebuilt on every call — up to six hundred `split` +
+     * decode cycles per lookup. One `Store.track(id)` is cheap; the screens that
+     * resolve a whole play log through `Store::track` were doing that thousands
+     * of times, which is why the stats page opened with a visible stall. The map
+     * is invalidated whenever the stored blob is rewritten or the library scope
+     * changes.
+     */
+    private var regCache: LinkedHashMap<String, Track>? = null
+
     private fun registry(): LinkedHashMap<String, Track> {
+        regCache?.let { return it }
         val map = LinkedHashMap<String, Track>()
         for (line in regRaw().split(R)) {
             val t = decodeTrack(line) ?: continue
             map[t.id] = t
         }
+        regCache = map
         return map
     }
+
+    /** Everything the registry knows, as a map — for callers resolving many ids. */
+    fun tracksById(): Map<String, Track> = registry()
 
     @Synchronized
     fun remember(track: Track) {
@@ -134,6 +153,7 @@ object Store {
             val first = map.keys.first()
             map.remove(first)
         }
+        regCache = map
         prefs.edit().putString(k(KEY_REG), map.values.joinToString(R.toString()) { encodeTrack(it) }).apply()
     }
 
@@ -329,8 +349,13 @@ object Store {
     @Synchronized
     fun createPlaylist(name: String): Playlist {
         val p = Playlist(
-            id = "pl_" + System.currentTimeMillis().toString(36),
-            name = name.trim().ifBlank { "New playlist" },
+            // A timestamp alone collides when two playlists are made in the same
+            // millisecond — "add all to a new playlist" twice in a row did exactly
+            // that. Two rows with one id is a duplicate-key crash in the library
+            // and a playlist that loses half its songs, so the id gets a suffix.
+            id = "pl_" + System.currentTimeMillis().toString(36) + "_" +
+                (1 + (Math.random() * 0x7FFF).toInt()).toString(36),
+            name = clean(name.trim()).ifBlank { "New playlist" },
             createdAt = System.currentTimeMillis(),
         )
         writePlaylists(playlists() + p)
@@ -339,7 +364,9 @@ object Store {
 
     @Synchronized
     fun renamePlaylist(id: String, name: String) {
-        writePlaylists(playlists().map { if (it.id == id) it.copy(name = name.trim()) else it })
+        val next = clean(name.trim())
+        if (next.isBlank()) return
+        writePlaylists(playlists().map { if (it.id == id) it.copy(name = next) else it })
     }
 
     @Synchronized
@@ -443,7 +470,7 @@ object Store {
         val kept = (prefs.getString(k(KEY_NOTES), null) ?: "")
             .split(R)
             .filter { it.isNotBlank() && it.substringBefore(F) != playlistId }
-        val next = if (text.isBlank()) kept else kept + "$playlistId$F${text.replace('\n', ' ')}"
+        val next = if (text.isBlank()) kept else kept + "$playlistId$F${clean(text)}"
         prefs.edit().putString(k(KEY_NOTES), next.joinToString(R.toString())).apply()
     }
 
@@ -460,7 +487,9 @@ object Store {
         if (text.isBlank()) return
         val list = queries().filterNot { it.equals(text, true) }.toMutableList()
         list.add(0, text)
-        prefs.edit().putString(k(KEY_QUERIES), list.take(10).joinToString(R.toString())).apply()
+        prefs.edit()
+            .putString(k(KEY_QUERIES), list.take(10).joinToString(R.toString()) { clean(it) })
+            .apply()
     }
 
     fun clearQueries() {
@@ -573,14 +602,45 @@ object Store {
     }
 
     private fun writeCounter(map: Map<String, Int>): String =
-        map.entries.sortedByDescending { it.value }.joinToString(R.toString()) { "${it.key}$F${it.value}" }
+        map.entries.sortedByDescending { it.value }
+            .joinToString(R.toString()) { "${clean(it.key)}$F${it.value}" }
 
     // ---------------------------------------------------------------- codec
+
+    /**
+     * The store is one string per record, split on control characters. A track
+     * whose title contains one of those characters — a local file with a line
+     * break in its ID3 tag, a YouTube title with a stray 0x01 — used to split
+     * its own row and silently truncate everything after it, and in the worst
+     * case the playlist row it lived in.
+     *
+     * The characters are replaced rather than escaped: a title is shown, not
+     * round-tripped, and a space is a fairer rendering of a line break than a
+     * record that no longer parses.
+     */
+    private fun clean(value: String): String =
+        value.replace(F, ' ').replace(R, ' ').replace(L, ' ').replace('\u0002', ' ')
+
+    /**
+     * A track field, which is allowed to contain a line break.
+     *
+     * An ID3 title can hold one, and the queue is a single string of rows: a raw
+     * newline used to split one track into two broken rows and silently truncate
+     * the restore. The newline is escaped rather than deleted — "First\nsecond"
+     * came back as "First second", which is a different song.
+     *
+     * The escape is `\u0004`, not `\u0002`: Session joins rows with `\u0002`, so
+     * reusing it would trade one split for another.
+     */
+    private fun cleanField(value: String): String =
+        value.replace(F, ' ').replace(L, ' ').replace(R, '\u0004')
+
+    private fun restoreField(value: String): String = value.replace('\u0004', R)
 
     fun encodeTrack(t: Track): String = listOf(
         t.id, t.title, t.artist, t.album, t.artUrl ?: "", t.artAsset ?: "",
         t.durationMs.toString(), t.source.name, t.videoId, t.assetAudio ?: "",
-    ).joinToString(F.toString())
+    ).joinToString(F.toString()) { cleanField(it) }
 
     fun decodeTrack(s: String): Track? {
         val p = s.split(F)
@@ -588,15 +648,15 @@ object Store {
         if (p[1].isBlank()) return null
         return Track(
             id = p[0],
-            title = p[1],
-            artist = p[2],
-            album = p[3],
-            artUrl = p[4].ifBlank { null },
+            title = restoreField(p[1]),
+            artist = restoreField(p[2]),
+            album = restoreField(p[3]),
+            artUrl = p[4].ifBlank { null }?.let { restoreField(it) },
             artAsset = p[5].ifBlank { null },
             durationMs = p[6].toLongOrNull() ?: 0L,
             source = if (p[7] == Source.LOCAL.name) Source.LOCAL else Source.YOUTUBE,
             videoId = p[8],
-            assetAudio = p[9].ifBlank { null },
+            assetAudio = p[9].ifBlank { null }?.let { restoreField(it) },
         )
     }
 }

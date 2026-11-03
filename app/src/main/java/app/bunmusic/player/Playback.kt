@@ -8,6 +8,7 @@ import androidx.media3.common.MediaMetadata
 import androidx.media3.common.PlaybackParameters
 import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
+import app.bunmusic.core.CrashGuard
 import app.bunmusic.data.Cache
 import app.bunmusic.data.Downloads
 import app.bunmusic.data.Eq
@@ -64,10 +65,30 @@ data class PlayerState(
 object Playback {
 
     private lateinit var appContext: Context
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main + CrashGuard.handler("playback"))
+
+    /**
+     * Everything that touches a preference file or the disk.
+     *
+     * `load()` used to write the play history and the stats counters inline, on
+     * the main thread, on every track change: a registry parse of up to six
+     * hundred tracks, the whole play-event log, five `putString`s. That is a
+     * dropped frame at best and a janky first press at worst, and none of it is
+     * something the listener is waiting to see.
+     */
+    private val io = CoroutineScope(SupervisorJob() + Dispatchers.IO + CrashGuard.handler("playback-io"))
 
     private var _player: ExoPlayer? = null
     val player: ExoPlayer get() = _player ?: error("Playback.init() not called")
+
+    /**
+     * Whether the player exists.
+     *
+     * A service, a widget or a tile can be woken in a process where `init` failed
+     * — no storage, a broken codec — and every one of those paths used to touch
+     * [player] directly and throw. They ask this first now.
+     */
+    val ready: Boolean get() = _player != null
 
     private val _state = MutableStateFlow(PlayerState())
     val state: StateFlow<PlayerState> = _state.asStateFlow()
@@ -222,7 +243,10 @@ object Playback {
         val now = System.currentTimeMillis()
         if (!force && now - lastSaveAt < 4_000) return
         lastSaveAt = now
-        Session.save(_state.value)
+        val snapshot = _state.value
+        // Off the main thread: this is a hundred-track join and a preferences
+        // write, twice a minute, and nothing on screen waits for it.
+        io.launch { runCatching { Session.save(snapshot) } }
     }
 
     // ------------------------------------------------------------- commands
@@ -255,16 +279,24 @@ object Playback {
         if (p.isPlaying) {
             p.pause()
             saveSession(force = true)
+            publish()
+            return
+        }
+        // Nothing chosen yet: a cold start with a saved queue can still be
+        // resumed, and pressing play on an empty player should do that rather
+        // than nothing at all.
+        if (_state.value.track == null) {
+            restoreSession()
+            if (_state.value.track == null) return
+        }
+        if (p.playbackState == Player.STATE_IDLE) {
+            load(index.coerceAtLeast(0), autoplay = true)
         } else {
-            if (p.playbackState == Player.STATE_IDLE) {
-                load(index, autoplay = true)
-            } else {
-                p.play()
-                // The service can be gone — killed for memory, or stopped when the
-                // task was swiped away while paused. Resuming has to bring the
-                // session back, or the notification never returns.
-                ServiceLauncher.start(appContext)
-            }
+            p.play()
+            // The service can be gone — killed for memory, or stopped when the
+            // task was swiped away while paused. Resuming has to bring the
+            // session back, or the notification never returns.
+            ServiceLauncher.start(appContext)
         }
         publish()
     }
@@ -285,7 +317,12 @@ object Playback {
         val nextIdx = when {
             shuffleOrder.isNotEmpty() && _state.value.shuffle -> {
                 val pos = shuffleOrder.indexOf(index)
-                shuffleOrder.getOrNull(pos + 1) ?: if (_state.value.repeat == 1 || auto) shuffleOrder.first() else -1
+                // `indexOf` is -1 for a cursor the shuffle order has never heard
+                // of — a queue edited while shuffled. `getOrNull(0)` then jumped to
+                // the top of the order, which looks like a random track skipping
+                // itself. Start the order again instead.
+                val at = if (pos < 0) 0 else pos + 1
+                shuffleOrder.getOrNull(at) ?: if (_state.value.repeat == 1 || auto) shuffleOrder.first() else -1
             }
             index < queue.lastIndex -> index + 1
             _state.value.repeat == 1 -> 0
@@ -360,7 +397,9 @@ object Playback {
     }
 
     fun seekTo(ms: Long) {
-        _player?.seekTo(ms.coerceAtLeast(0))
+        val p = _player ?: return
+        val ceiling = p.duration.takeIf { it > 0 && it != C.TIME_UNSET } ?: Long.MAX_VALUE
+        p.seekTo(ms.coerceIn(0L, ceiling))
         publish()
     }
 
@@ -393,6 +432,31 @@ object Playback {
     fun addToQueue(track: Track) {
         val q = queue.toMutableList()
         q.add(track)
+        queue = q
+        rebuildShuffle()
+        publish()
+    }
+
+    /**
+     * Queue a whole selection after the current track, keeping its order.
+     *
+     * One call instead of N: the list is assigned once, so the shuffle order is
+     * rebuilt once and the UI publishes one state instead of thirty.
+     */
+    fun enqueueNext(tracks: List<Track>) {
+        if (tracks.isEmpty()) return
+        val q = queue.toMutableList()
+        val at = (index + 1).coerceIn(0, q.size)
+        q.addAll(at, tracks)
+        queue = q
+        rebuildShuffle()
+        publish()
+    }
+
+    fun addToQueue(tracks: List<Track>) {
+        if (tracks.isEmpty()) return
+        val q = queue.toMutableList()
+        q.addAll(tracks)
         queue = q
         rebuildShuffle()
         publish()
@@ -606,9 +670,37 @@ object Playback {
     // ----------------------------------------------------------------- speed
 
     fun setSpeed(value: Float) {
+        // NaN survives `coerceIn` and would hand ExoPlayer a playback parameter it
+        // cannot undo — the song then plays at a speed nobody can change back.
+        if (value.isNaN() || value.isInfinite()) return
         val v = value.coerceIn(0.5f, 2f)
-        _player?.playbackParameters = PlaybackParameters(v)
+        runCatching { _player?.playbackParameters = PlaybackParameters(v) }
         _state.value = _state.value.copy(speed = v)
+    }
+
+    /**
+     * Try the current track again after an error.
+     *
+     * Every failure the player can hit — a dead socket, a stream URL that
+     * expired between resolve and play, a cache entry trimmed mid-song — is
+     * transient. Before this the only way out was to pick the song again from a
+     * list, which is a strange thing to ask of somebody who is already looking at
+     * a play button.
+     */
+    fun retry() {
+        val track = _state.value.track ?: return
+        if (queue.isEmpty()) {
+            queue = listOf(track)
+            index = 0
+            rebuildShuffle()
+        }
+        retrying = false
+        _state.value = _state.value.copy(error = null, buffering = true)
+        load(index.coerceIn(0, queue.lastIndex), autoplay = true)
+    }
+
+    fun clearError() {
+        if (_state.value.error != null) _state.value = _state.value.copy(error = null)
     }
 
     /**
@@ -649,8 +741,15 @@ object Playback {
             durationMs = track.durationMs,
             error = null,
         )
-        Store.pushRecent(track)
-        Store.recordPlay(track)
+        // History and stats are bookkeeping: they must not be able to stall the
+        // first frame of a song. They also must not be able to *stop* one, so a
+        // failure here is logged and forgotten.
+        io.launch {
+            runCatching {
+                Store.pushRecent(track)
+                Store.recordPlay(track)
+            }
+        }
 
         loadJob = scope.launch {
             val local = localUri(track)
@@ -673,11 +772,31 @@ object Playback {
                 local != null -> local
                 track.isLocal -> track.uri()
                 Cache.isComplete(track.videoId) -> {
-                    val entry = Cache.cached(track.videoId)!!
-                    cacheKey = "yt:${track.videoId}:${entry.itag}"
-                    // The URL is irrelevant when the bytes are on disk; the cache is
-                    // keyed on videoId+itag, so even an expired one never opens.
-                    "https://bunmusic.local/cache/${track.videoId}/${entry.itag}"
+                    // Not `!!`: `isComplete` and `cached` both consult the cache,
+                    // and a trim between the two calls used to be a NullPointer-
+                    // Exception at the exact moment a song started. The fallback
+                    // is the same path a partially-cached track takes.
+                    val entry = Cache.cached(track.videoId)
+                    if (entry == null) {
+                        try {
+                            val resolved = YtStream.resolve(track.videoId, Prefs.settings.value.quality)
+                            info = resolved
+                            cacheKey = resolved.key
+                            resolved.url
+                        } catch (t: Throwable) {
+                            _state.value = _state.value.copy(
+                                buffering = false,
+                                isPlaying = false,
+                                error = "The cached copy went away. Connect once to rebuild it.",
+                            )
+                            return@launch
+                        }
+                    } else {
+                        cacheKey = "yt:${track.videoId}:${entry.itag}"
+                        // The URL is irrelevant when the bytes are on disk; the cache is
+                        // keyed on videoId+itag, so even an expired one never opens.
+                        "https://bunmusic.local/cache/${track.videoId}/${entry.itag}"
+                    }
                 }
                 else -> try {
                     val resolved = YtStream.resolve(track.videoId, Prefs.settings.value.quality)

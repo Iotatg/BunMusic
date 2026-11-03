@@ -55,7 +55,18 @@ import java.util.Locale
 @Composable
 fun WrappedScreen(onBack: () -> Unit) {
     val context = LocalContext.current
-    val events = remember { Store.events() }
+    // Parsing the play log is a file read; doing it during composition made the
+    // reel appear a beat after the tap.
+    val loaded by androidx.compose.runtime.produceState<List<Listening.Event>?>(null) {
+        value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { Store.events() }
+    }
+    val events = loaded
+    if (events == null) {
+        androidx.compose.foundation.layout.Box(
+            Modifier.fillMaxSize().statusBarsPadding(),
+        ) { BackBar("Year in review", onBack) }
+        return
+    }
     val offset = remember { Listening.zoneOffset() }
 
     val years = remember(events) {
@@ -65,7 +76,10 @@ fun WrappedScreen(onBack: () -> Unit) {
     var year by remember { mutableIntStateOf(years.first()) }
 
     val summary = remember(year, events) {
-        Wrapped.summarise(events, Store::track, year, offset)
+        // `Store::track` re-parses the registry per lookup and this resolves every
+        // event in the year. One map, built once.
+        val byId = Store.tracksById()
+        Wrapped.summarise(events, { id -> byId[id] }, year, offset)
     }
     val cards = remember(summary) {
         val months = SimpleDateFormat("MMMM", Locale.getDefault())

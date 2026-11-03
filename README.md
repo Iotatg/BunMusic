@@ -7,10 +7,37 @@ saved offline.
 
 ```
 package   app.bunmusic
-version   2.0.0 (22)
+version   2.1.0 (23)
 minSdk    26  ·  target/compile 37
 author    Iota Coder · iota14934@gmail.com
 ```
+
+---
+
+## 2.1.0 — nothing takes it down
+
+Two releases in one: the crash-proofing pass, and the first pass at Material 3
+Expressive's actual components rather than its colours.
+
+| System | What landed |
+|---|---|
+| **Crash guard** | Every uncaught exception is written to a capped log and the app comes back on Home with its queue; two failures inside ninety seconds stop the relaunch instead of looping; every startup initialiser is wrapped so a corrupt preference file cannot close the app on launch and again on the next one |
+| **Background scopes** | Cache writes, downloads, widget redraws and the playback tick each carry a `CoroutineExceptionHandler` — a throw there used to reach the default handler and end the process |
+| **Stability page** | Settings › Stability: what failed, when, on which screen, the stack, copy / clear, and two buttons that make it happen on purpose |
+| **Shape** | Eight silhouettes (squircle, arch, leaf, gem, pill, clam, block, round) as fractions of the short side, a morph between any two, and `Auto` — a cover's shape from its own id, so an album always looks like itself. Applied to the grid, playlist rows, mixes and the settings preview |
+| **Expressive components** | A split button (Play all ▾), a segmented group with a travelling indicator (library tabs, stats periods), a morphing loading indicator, and swipe actions on rows: right plays next, left queues last |
+| **Selection** | Long press starts it, a second long press takes the run between, select-all / invert in the bar, and one bulk queue call instead of N |
+| **Contrast** | WCAG luminance, ratio, `bestInk`, `readable` and a solved scrim alpha. The play button no longer draws a black glyph on a dark cover; the active tint is lifted until it clears 4.5:1 |
+| **Smoothness** | The registry is parsed once and kept; downloaded, stats and command rows resolve ids through a map instead of re-splitting the store per row |
+| **Codec** | A newline in a title is escaped, not deleted — `First\nsecond` came back as `First second`, which is a different song |
+| **Queue** | A filter over "up next" that keeps each row's real position, so tapping a match still jumps to the right slot |
+| **Commands** | 156, twelve of them new |
+
+412 unit tests, 0 failures. Same signing key.
+
+Honest limit, again: no phone and no emulator here. Every screen compiles, every
+calculation has a test, and the crash guard has a button that proves itself on the
+device — but nobody has looked at these pixels on a display.
 
 ---
 

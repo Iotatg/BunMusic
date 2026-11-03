@@ -32,6 +32,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -59,9 +60,24 @@ import app.bunmusic.data.Wrapped
 
 @Composable
 fun StatsScreen(onBack: () -> Unit) {
-    val events = remember { Store.events() }
+    // The play log is a preference string that can be thousands of events long.
+    // Parsing it — twice — during composition was the reason this page took a
+    // visible beat to open on a phone with a year of listening on it.
+    val loaded by produceState<Pair<List<Listening.Event>, app.bunmusic.data.LibraryStats>?>(null) {
+        value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            Store.events() to Store.stats()
+        }
+    }
+    val data = loaded
+    if (data == null) {
+        Box(Modifier.fillMaxSize().statusBarsPadding()) {
+            BackBar("Stats", onBack)
+        }
+        return
+    }
+    val events = data.first
+    val stats = data.second
     val offset = remember { Listening.zoneOffset() }
-    val stats = remember { Store.stats() }
     var period by remember { mutableIntStateOf(1) }
 
     val now = remember(events) { System.currentTimeMillis() }
@@ -85,8 +101,12 @@ fun StatsScreen(onBack: () -> Unit) {
         }
     }
     val hours = remember(window) { Listening.hourly(window, offset) }
-    val topArtists = remember(window) { Listening.topArtists(window, Store::track) }
-    val topTracks = remember(window) { Listening.topTracks(window, Store::track) }
+    // One parse of the registry, then a map lookup per event. Passing
+    // `Store::track` here re-read and re-split the whole registry for every
+    // play in the window.
+    val byId = remember(events) { Store.tracksById() }
+    val topArtists = remember(window) { Listening.topArtists(window, resolve = { byId[it] }) }
+    val topTracks = remember(window) { Listening.topTracks(window, resolve = { byId[it] }) }
 
     LazyColumn(
         Modifier.fillMaxSize().statusBarsPadding(),
@@ -114,14 +134,14 @@ fun StatsScreen(onBack: () -> Unit) {
         }
 
         item {
-            Row(
-                Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 2.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                PeriodChip("7 days", period == 0) { period = 0 }
-                PeriodChip("30 days", period == 1) { period = 1 }
-                PeriodChip("This year", period == 2) { period = 2 }
-            }
+            // Three periods, one control with a travelling indicator. The chips
+            // were fine; a segmented group is what the choice actually is.
+            SegmentedGroup(
+                items = listOf("7 days", "30 days", "This year"),
+                selected = period,
+                onSelect = { period = it },
+                modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp),
+            )
         }
 
         item {
@@ -194,24 +214,6 @@ fun StatsScreen(onBack: () -> Unit) {
                 )
             }
         }
-    }
-}
-
-@Composable
-private fun PeriodChip(label: String, active: Boolean, onClick: () -> Unit) {
-    Box(
-        Modifier
-            .clip(RoundedCornerShape(50))
-            .background(if (active) Ink.Lime else Ink.Field)
-            .clickable(onClick = onClick)
-            .padding(horizontal = 14.dp, vertical = 7.dp),
-    ) {
-        Text(
-            label,
-            color = if (active) Ink.OnAccent else Ink.Muted,
-            fontSize = 12.sp, fontFamily = SoraFamily,
-            fontWeight = if (active) FontWeight.SemiBold else FontWeight.Normal,
-        )
     }
 }
 
@@ -369,7 +371,12 @@ fun DownloadsScreen(onBack: () -> Unit, onPlay: (List<Track>, Int) -> Unit) {
     val speed by Downloads.speed.collectAsState()
     val paused by Downloads.paused.collectAsState()
 
-    val tracks = remember(entries) { entries.mapNotNull { Store.track(it.trackId) } }
+    // One registry parse, then a map lookup. `Store.track()` re-reads and
+    // re-splits the whole registry on every call, so this loop was quadratic.
+    val tracks = remember(entries) {
+        val byId = Store.tracksById()
+        entries.mapNotNull { byId[it.trackId] }
+    }
     val active = queue.filter { it.state != Downloads.State.FAILED }
     val failed = queue.filter { it.state == Downloads.State.FAILED }
     val waiting = active.count { it.state == Downloads.State.WAITING }

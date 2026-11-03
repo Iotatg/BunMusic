@@ -35,6 +35,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
@@ -89,6 +90,7 @@ sealed interface Route {
     data object Widgets : Route
     data object Discovery : Route
     data object Storage : Route
+    data object Stability : Route
     /** Search opened from a credit, a mix or a long press — prefilled. */
     data class SearchFor(val query: String) : Route
     data class Detail(
@@ -108,7 +110,7 @@ private val Route.depth: Int
         else -> 1
     }
 @Composable
-fun Root(launch: Launch = Launch()) {
+fun Root(launch: Launch = Launch(), recovered: Boolean = false) {
     val account by Auth.account.collectAsState()
     var guest by remember { mutableStateOf(Auth.guest) }
 
@@ -120,11 +122,16 @@ fun Root(launch: Launch = Launch()) {
         return
     }
 
-    Shell(guest = guest, onLeaveGuest = { guest = false }, launch = launch)
+    Shell(guest = guest, onLeaveGuest = { guest = false }, launch = launch, recovered = recovered)
 }
 
 @Composable
-private fun Shell(guest: Boolean, onLeaveGuest: () -> Unit, launch: Launch = Launch()) {
+private fun Shell(
+    guest: Boolean,
+    onLeaveGuest: () -> Unit,
+    launch: Launch = Launch(),
+    recovered: Boolean = false,
+) {
     val state by Playback.state.collectAsState()
     val downloads by Downloads.entries.collectAsState()
     val window = LocalBunWindow.current
@@ -161,6 +168,12 @@ private fun Shell(guest: Boolean, onLeaveGuest: () -> Unit, launch: Launch = Lau
     val push: (Route) -> Unit = { stack = stack + it }
     val pop: () -> Unit = { if (stack.size > 1) stack = stack.dropLast(1) }
     val tab: (Route) -> Unit = { stack = listOf(it) }
+
+    // The app closed and came back. Said once, in the same toast the rest of the
+    // UI uses, with the place to look if it happens again.
+    LaunchedEffect(Unit) {
+        if (recovered) toast = "BunMusic reopened after a problem · Settings › Stability"
+    }
 
     // A tap on a widget, a shortcut or the tile drops the user where they asked
     // to be. `seq` makes a second tap while the app is open count as a new
@@ -247,6 +260,16 @@ private fun Shell(guest: Boolean, onLeaveGuest: () -> Unit, launch: Launch = Lau
                     },
                     label = "screen",
                 ) { r ->
+                    // Compose forbids a try/catch around a composable call, so a
+                    // screen cannot be fenced. What it can do is say who it is:
+                    // the tag is written into any crash that happens while this
+                    // page is up, and the app reopens on Home instead of back
+                    // into the page that failed.
+                    app.bunmusic.core.CrashGuard.markScreen(r::class.simpleName ?: "screen")
+                    // The cover-shape preference is read here, once, and handed
+                    // down: a `collectAsState` inside a list row would open one
+                    // subscription per row.
+                    CompositionLocalProvider(LocalCoverShape provides settings.coverShape) {
                     when (r) {
                         Route.Home -> HomeScreen(
                             state = chrome,
@@ -311,6 +334,7 @@ private fun Shell(guest: Boolean, onLeaveGuest: () -> Unit, launch: Launch = Lau
                             onOpenCommands = { paletteOpen = true },
                             onOpenStorage = { push(Route.Storage) },
                             onOpenDiscovery = { push(Route.Discovery) },
+                            onOpenStability = { push(Route.Stability) },
                             onToast = { toast = it },
                         )
 
@@ -345,6 +369,11 @@ private fun Shell(guest: Boolean, onLeaveGuest: () -> Unit, launch: Launch = Lau
                         Route.Storage -> StorageScreen(
                             onBack = pop,
                             onOpenDownloads = { push(Route.Downloads) },
+                            onToast = { toast = it },
+                        )
+
+                        Route.Stability -> StabilityScreen(
+                            onBack = pop,
                             onToast = { toast = it },
                         )
 
@@ -390,6 +419,7 @@ private fun Shell(guest: Boolean, onLeaveGuest: () -> Unit, launch: Launch = Lau
                             onMore = { sheetTrack = it },
                         )
                     }
+                    }
                 }
             }
 
@@ -413,6 +443,7 @@ private fun Shell(guest: Boolean, onLeaveGuest: () -> Unit, launch: Launch = Lau
             enter = slideInVertically(tween(320)) { it } + fadeIn(tween(200)),
             exit = slideOutVertically(tween(280)) { it } + fadeOut(tween(180)),
         ) {
+            app.bunmusic.core.CrashGuard.markScreen("Player")
             PlayerScreen(
                 state = state,
                 onClose = {

@@ -42,11 +42,21 @@ import kotlinx.coroutines.launch
 class PlaybackService : MediaSessionService() {
 
     private var session: MediaSession? = null
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
+    private val scope = CoroutineScope(
+        SupervisorJob() + Dispatchers.Main + app.bunmusic.core.CrashGuard.handler("service"),
+    )
 
     override fun onCreate() {
         super.onCreate()
         Playback.init(this)
+
+        // A session built on a player that does not exist is a crash inside a
+        // service, which takes the whole process with it. If the player could not
+        // be created there is nothing to control, so the service leaves quietly.
+        if (!Playback.ready) {
+            stopSelf()
+            return
+        }
 
         val intent = Intent(this, app.bunmusic.MainActivity::class.java)
             // Tapping the card should land on the player, not on the home feed —
@@ -82,7 +92,7 @@ class PlaybackService : MediaSessionService() {
     override fun onTaskRemoved(rootIntent: Intent?) {
         // Swiping the app away should not stop the music; a media service that
         // dies with its task is a music player that stops when you look at it.
-        if (!Playback.player.isPlaying) stopSelf()
+        if (!Playback.ready || !Playback.player.isPlaying) stopSelf()
         super.onTaskRemoved(rootIntent)
     }
 

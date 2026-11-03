@@ -36,7 +36,9 @@ object Widgets {
 
     const val EXTRA_INDEX = "app.bunmusic.widget.INDEX"
 
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+    private val scope = CoroutineScope(
+        SupervisorJob() + Dispatchers.Main.immediate + app.bunmusic.core.CrashGuard.handler("widgets"),
+    )
 
     private var appContext: Context? = null
     private var lastSignature = ""

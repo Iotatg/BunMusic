@@ -484,14 +484,7 @@ private fun SeekBlock(state: PlayerState, tint: Color, modifier: Modifier = Modi
         }
         if (state.error != null) {
             Spacer(Modifier.height(6.dp))
-            Text(
-                state.error ?: "",
-                color = Ink.Rose,
-                fontSize = 11.sp,
-                fontFamily = SoraFamily,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-            )
+            ErrorRow(state.error ?: "")
         }
     }
 }
@@ -499,12 +492,18 @@ private fun SeekBlock(state: PlayerState, tint: Color, modifier: Modifier = Modi
 /** Shuffle · previous · play · next · repeat. */
 @Composable
 private fun TransportRow(state: PlayerState, tint: Color, modifier: Modifier = Modifier) {
+    // Two different readability problems live in this row. The glyph inside the
+    // filled play button needs ink that contrasts with the cover's colour — a
+    // dark navy cover used to give a black glyph on near-black. The tint used as
+    // ink on the player's own backdrop needs the opposite check.
+    val buttonInk = inkOn(tint)
+    val active = readableOn(tint, Ink.Base)
     Row(
         modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween,
     ) {
-        IconBtn(G.Shuffle, if (state.shuffle) tint else Ink.Faint, 40.dp, 18.dp) { Playback.toggleShuffle() }
+        IconBtn(G.Shuffle, if (state.shuffle) active else Ink.Faint, 40.dp, 18.dp) { Playback.toggleShuffle() }
         IconBtn(G.Prev, Ink.Text, 48.dp, 24.dp) { Playback.previous() }
         // The ring around the button is the song's progress: the seek bar is a
         // fine instrument but it is two centimetres below your thumb, and this
@@ -529,16 +528,16 @@ private fun TransportRow(state: PlayerState, tint: Color, modifier: Modifier = M
                 contentAlignment = Alignment.Center,
             ) {
                 if (state.buffering && !state.isPlaying) {
-                    Glyph(G.Wave, Ink.Void, 26.dp)
+                    Glyph(G.Wave, buttonInk, 26.dp)
                 } else {
-                    Glyph(if (state.isPlaying) G.Pause else G.Play, Ink.Void, 26.dp)
+                    Glyph(if (state.isPlaying) G.Pause else G.Play, buttonInk, 26.dp)
                 }
             }
         }
         IconBtn(G.Next, Ink.Text, 48.dp, 24.dp) { Playback.next() }
         IconBtn(
             if (state.repeat == 2) G.RepeatOne else G.Repeat,
-            if (state.repeat != 0) tint else Ink.Faint,
+            if (state.repeat != 0) active else Ink.Faint,
             40.dp, 18.dp,
         ) { Playback.cycleRepeat() }
     }
@@ -853,14 +852,7 @@ private fun ColumnScope.CharcoalPlayer(
         }
         if (state.error != null) {
             Spacer(Modifier.height(4.dp))
-            Text(
-                state.error ?: "",
-                color = Ink.Rose,
-                fontSize = 11.sp,
-                fontFamily = SoraFamily,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-            )
+            ErrorRow(state.error ?: "")
         }
     }
 
@@ -1431,6 +1423,43 @@ private fun SpeedSheet(current: Float, onDismiss: () -> Unit, onPick: (Float) ->
                     onDismiss()
                 }
             }
+        }
+    }
+}
+
+
+/**
+ * A failure, with the one action that can fix it.
+ *
+ * Every error the player can show — a dead socket, an expired stream URL, a cache
+ * entry trimmed mid-song — is transient, so the message alone was a dead end: the
+ * only way out was to find the song again in a list. Retry re-resolves and plays
+ * from the same position.
+ */
+@Composable
+private fun ErrorRow(message: String) {
+    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        Text(
+            message,
+            color = Ink.Rose,
+            fontSize = 11.sp,
+            fontFamily = SoraFamily,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f),
+        )
+        Spacer(Modifier.width(10.dp))
+        Row(
+            Modifier
+                .clip(RoundedCornerShape(9.dp))
+                .background(Ink.Rose.copy(alpha = 0.16f))
+                .clickable { Playback.retry() }
+                .padding(horizontal = 10.dp, vertical = 5.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Glyph(G.Refresh, Ink.Rose, 11.dp)
+            Spacer(Modifier.width(5.dp))
+            Text("Retry", color = Ink.Rose, fontSize = 10.5.sp, fontFamily = SoraFamily, fontWeight = FontWeight.SemiBold)
         }
     }
 }
