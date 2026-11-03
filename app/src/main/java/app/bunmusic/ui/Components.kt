@@ -11,7 +11,9 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
@@ -337,14 +339,15 @@ fun TrackRow(
     onPlay: () -> Unit,
     onLike: (() -> Unit)? = null,
     onMore: (() -> Unit)? = null,
+    onLongPress: (() -> Unit)? = null,
 ) {
     if (Ink.isLight) {
         CharcoalTrackRow(
-            track, index, playing, isCurrent, liked, downloaded, onPlay, onLike, onMore,
+            track, index, playing, isCurrent, liked, downloaded, onPlay, onLike, onMore, onLongPress,
         )
     } else {
         MidnightTrackRow(
-            track, index, playing, isCurrent, liked, downloaded, onPlay, onLike, onMore,
+            track, index, playing, isCurrent, liked, downloaded, onPlay, onLike, onMore, onLongPress,
         )
     }
 }
@@ -360,13 +363,14 @@ private fun MidnightTrackRow(
     onPlay: () -> Unit,
     onLike: (() -> Unit)?,
     onMore: (() -> Unit)?,
+    onLongPress: (() -> Unit)?,
 ) {
     val cached = Cache.hasOffline(track.videoId)
     Row(
         Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(16.dp))
-            .clickable { onPlay() }
+            .combinedClickable(onClick = onPlay, onLongClick = onLongPress)
             .padding(horizontal = 12.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -472,6 +476,7 @@ private fun CharcoalTrackRow(
     onPlay: () -> Unit,
     onLike: (() -> Unit)?,
     onMore: (() -> Unit)?,
+    onLongPress: (() -> Unit)?,
 ) {
     val cached = Cache.hasOffline(track.videoId)
     Row(
@@ -480,7 +485,7 @@ private fun CharcoalTrackRow(
             .padding(horizontal = 10.dp, vertical = 2.dp)
             .clip(RoundedCornerShape(14.dp))
             .background(if (isCurrent) Ink.Field else Color.Transparent)
-            .clickable { onPlay() }
+            .combinedClickable(onClick = onPlay, onLongClick = onLongPress)
             .padding(start = 10.dp, end = 6.dp, top = 10.dp, bottom = 10.dp),
         // Top-aligned so the number sits on the title's baseline instead of
         // floating halfway between the title and the artist line.

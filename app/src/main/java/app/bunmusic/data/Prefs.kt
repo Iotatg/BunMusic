@@ -82,6 +82,12 @@ object Prefs {
         val sleepFade: Boolean = true,
         /** Show a banner when the queue runs offline. */
         val offlineBanner: Boolean = true,
+        /**
+         * Cover silhouette: a [app.bunmusic.core.BunShape] id, or `AUTO` to let
+         * each cover pick its own from its id. Shape was the one visual axis with
+         * no setting at all — every card was the same 14 dp corner.
+         */
+        val coverShape: String = "AUTO",
     )
 
     private lateinit var sp: SharedPreferences
@@ -131,6 +137,7 @@ object Prefs {
             discoveryHome = sp.getBoolean("discoveryHome", d.discoveryHome),
             sleepFade = sp.getBoolean("sleepFade", d.sleepFade),
             offlineBanner = sp.getBoolean("offlineBanner", d.offlineBanner),
+            coverShape = sp.getString("coverShape", d.coverShape) ?: d.coverShape,
         )
     }
 
@@ -173,6 +180,7 @@ object Prefs {
             .putBoolean("discoveryHome", next.discoveryHome)
             .putBoolean("sleepFade", next.sleepFade)
             .putBoolean("offlineBanner", next.offlineBanner)
+            .putString("coverShape", next.coverShape)
             .apply()
     }
 }

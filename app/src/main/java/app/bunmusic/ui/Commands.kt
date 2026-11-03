@@ -4,6 +4,7 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
+import app.bunmusic.core.BunShape
 import app.bunmusic.core.BunSkin
 import app.bunmusic.core.AppVersion
 import app.bunmusic.core.G
@@ -282,6 +283,24 @@ fun buildCommands(host: CommandHost): List<Command> {
         val next = !Prefs.settings.value.artColour
         Prefs.update { it.copy(artColour = next) }
         host.toast(if (next) "Tint follows the artwork" else "Tint is stable per track")
+    }
+    // Shape, the one visual axis that had no command and no setting. "Auto" is
+    // the interesting one: the silhouette comes from the cover's own id.
+    add(
+        "Appearance", "look.shape.AUTO", "Cover shape: automatic",
+        "Each cover picks its own", G.Grid, "shape corner silhouette radius",
+    ) {
+        Prefs.update { it.copy(coverShape = "AUTO") }
+        host.toast("Covers pick their own shape")
+    }
+    BunShape.entries.forEach { sh ->
+        add(
+            "Appearance", "look.shape.${sh.name}", "Cover shape: ${sh.label}",
+            "", G.Grid, "shape corner silhouette radius",
+        ) {
+            Prefs.update { it.copy(coverShape = sh.name) }
+            host.toast("Covers are ${sh.label.lowercase()}")
+        }
     }
 
     // ---------------------------------------------------------------- audio
@@ -565,17 +584,36 @@ fun buildCommands(host: CommandHost): List<Command> {
         host.close()
     }
     add("System", "sys.about", "About BunMusic", AppVersion.VERSION, G.Sparkle) { host.go(Route.About) }
+    add(
+        "System", "sys.stability", "Stability",
+        "Crash log, and two ways to test the guard", G.Shield, "crash bug log recover",
+    ) { host.go(Route.Stability) }
+    add("System", "sys.crash.report", "Copy the crash report", "", G.Copy, "stability bug log") {
+        val clip = host.context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+        clip.setPrimaryClip(
+            ClipData.newPlainText("BunMusic crash report", app.bunmusic.core.CrashGuard.report())
+        )
+        host.toast("Report copied")
+    }
+    add("System", "sys.crash.clear", "Clear the crash log", "", G.Trash, "stability bug") {
+        app.bunmusic.core.CrashGuard.clear()
+        host.toast("Crash log cleared")
+    }
 
     return out
 }
 
-private fun downloadedTracks(): List<Track> = Downloads.entries.value.mapNotNull { entry ->
-    Store.track(entry.trackId) ?: Track(
-        id = entry.trackId,
-        title = entry.title,
-        artist = entry.artist,
-        artUrl = entry.artUrl,
-    )
+private fun downloadedTracks(): List<Track> {
+    // One parse for the whole list — this used to re-read the registry per entry.
+    val byId = Store.tracksById()
+    return Downloads.entries.value.mapNotNull { entry ->
+        byId[entry.trackId] ?: Track(
+            id = entry.trackId,
+            title = entry.title,
+            artist = entry.artist,
+            artUrl = entry.artUrl,
+        )
+    }
 }
 
 private fun routeName(route: Route): String = when (route) {
@@ -595,6 +633,7 @@ private fun routeName(route: Route): String = when (route) {
     Route.Widgets -> "widgets"
     Route.Discovery -> "discovery"
     Route.Storage -> "storage"
+    Route.Stability -> "stability"
     is Route.SearchFor -> "search"
     is Route.Detail -> "detail"
     is Route.MoodPage -> "mood"

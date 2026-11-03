@@ -48,7 +48,11 @@ enum class WidgetKind(
  */
 internal object WidgetRenderer {
 
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+    // A widget redraw runs outside the activity: a throw here is a crashed app
+    // with no visible screen to blame.
+    private val scope = CoroutineScope(
+        SupervisorJob() + Dispatchers.Main.immediate + app.bunmusic.core.CrashGuard.handler("widget"),
+    )
     private val fetching = ConcurrentHashMap.newKeySet<String>()
 
     fun update(

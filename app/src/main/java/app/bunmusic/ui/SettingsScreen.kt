@@ -9,6 +9,8 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -52,6 +54,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.bunmusic.core.AppVersion
 import app.bunmusic.core.BunSkin
+import app.bunmusic.core.BunShape
 import app.bunmusic.core.G
 import app.bunmusic.core.Glyph
 import app.bunmusic.core.Ink
@@ -88,6 +91,7 @@ fun SettingsScreen(
     onOpenCommands: () -> Unit,
     onOpenStorage: () -> Unit = {},
     onOpenDiscovery: () -> Unit = {},
+    onOpenStability: () -> Unit = {},
     onToast: (String) -> Unit,
 ) {
     val settings by Prefs.settings.collectAsState()
@@ -95,6 +99,9 @@ fun SettingsScreen(
     val downloadQueue by Downloads.queue.collectAsState()
     val account by Auth.account.collectAsState()
     val eq by Eq.state.collectAsState()
+    // Read once per visit, not once per recomposition: the crash log is a file.
+    val crashCount = remember { app.bunmusic.core.CrashGuard.count() }
+    val crashHeadline = remember { app.bunmusic.core.CrashGuard.last()?.headline }
 
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -323,6 +330,35 @@ fun SettingsScreen(
                     }
                 }
                 Divider()
+                // Shape is the one visual axis that had no setting at all: every
+                // cover, playlist and shortcut was the same 14 dp corner. "Auto"
+                // gives each cover a silhouette from its own id, so a shelf looks
+                // like a shelf and an album always looks like itself.
+                Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp)) {
+                    Text("Cover shape", color = Ink.Text, fontSize = 13.5.sp, fontFamily = SoraFamily, fontWeight = FontWeight.Medium)
+                    Text(
+                        if (settings.coverShape.equals("AUTO", true)) "Each cover picks its own"
+                        else BunShape.byId(settings.coverShape).label + " everywhere",
+                        color = Ink.Faint,
+                        fontSize = 11.sp,
+                        fontFamily = SoraFamily,
+                    )
+                    Spacer(Modifier.height(10.dp))
+                    Row(
+                        Modifier.horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        ShapeChip("Auto", "AUTO", settings.coverShape.equals("AUTO", true)) {
+                            Prefs.update { it.copy(coverShape = "AUTO") }
+                        }
+                        BunShape.entries.forEach { sh ->
+                            ShapeChip(sh.label, sh.name, settings.coverShape.equals(sh.name, true)) {
+                                Prefs.update { it.copy(coverShape = sh.name) }
+                            }
+                        }
+                    }
+                }
+                Divider()
                 ToggleRow("Lyrics on player", "Show the current line under the artwork", settings.lyricsOnPlayer) { v ->
                     Prefs.update { it.copy(lyricsOnPlayer = v) }
                 }
@@ -465,6 +501,15 @@ fun SettingsScreen(
         item { GroupLabel("Listening") }
         item {
             SettingsCard {
+                // `showStats` has been in Prefs since 1.0 and nothing ever read
+                // it — a switch with no wire. It hides the stats entries in the
+                // library now, which is what it always claimed to do.
+                ToggleRow(
+                    "Show listening stats",
+                    "The Stats shortcut in your library and the year in review",
+                    settings.showStats,
+                ) { v -> Prefs.update { it.copy(showStats = v) } }
+                Divider()
                 ToggleRow(
                     "ListenBrainz scrobbling",
                     if (Scrobble.token.isBlank()) {
@@ -722,6 +767,13 @@ fun SettingsScreen(
                     "${AppVersion.VERSION} (build ${AppVersion.CODE}) · what changed",
                     G.Sparkle,
                 ) { onOpenAbout() }
+                Divider()
+                NavRow(
+                    "Stability",
+                    if (crashCount == 0) "No problems recorded" else
+                        "$crashCount recorded · last: ${crashHeadline?.take(46) ?: ""}",
+                    G.Shield,
+                ) { onOpenStability() }
                 Divider()
                 NavRow("Built by", "Iota Coder · iota14934@gmail.com", G.User) { }
                 Divider()
@@ -990,5 +1042,43 @@ private fun TokenSheet(initial: String, onDismiss: () -> Unit, onSave: (String) 
                 GhostBtn("Clear") { onSave("") }
             }
         }
+    }
+}
+
+
+/**
+ * One silhouette, as a chip.
+ *
+ * The swatch is the actual shape at 13 dp rather than an icon of it, so the list
+ * is a preview: what you tap is what every cover becomes.
+ */
+@Composable
+private fun ShapeChip(label: String, shapeId: String, selected: Boolean, onPick: () -> Unit) {
+    Row(
+        Modifier
+            .clip(RoundedCornerShape(50))
+            .background(if (selected) Ink.Lime else Ink.Field)
+            .clickable { onPick() }
+            .padding(horizontal = 10.dp, vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        if (shapeId == "AUTO") {
+            Glyph(G.Sparkle, if (selected) Ink.OnAccent else Ink.Muted, 12.dp, 2.dp)
+        } else {
+            Box(
+                Modifier
+                    .size(13.dp)
+                    .clip(bunShape(BunShape.byId(shapeId), 13.dp))
+                    .background(if (selected) Ink.OnAccent else Ink.Muted),
+            )
+        }
+        Spacer(Modifier.width(6.dp))
+        Text(
+            label,
+            color = if (selected) Ink.OnAccent else Ink.Muted,
+            fontSize = 11.sp,
+            fontFamily = SoraFamily,
+            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+        )
     }
 }

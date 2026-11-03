@@ -15,6 +15,7 @@ import androidx.compose.runtime.getValue
 import androidx.core.content.ContextCompat
 import app.bunmusic.core.BunTheme
 import app.bunmusic.core.BunWindowProvider
+import app.bunmusic.core.CrashGuard
 import app.bunmusic.core.Haptics
 import app.bunmusic.core.Skin
 import app.bunmusic.ui.Launch
@@ -59,6 +60,9 @@ class MainActivity : ComponentActivity() {
             }
         }
         readIntent(intent)
+        // A relaunch after a crash says so once, quietly. Anything louder would
+        // make a recovered bug feel like a second failure.
+        val recovered = intent?.getBooleanExtra(EXTRA_RECOVERED, false) == true || CrashGuard.consumeNotice()
         setContent {
             BunTheme {
                 // Motion and type scale are applied above every screen: reduced
@@ -69,7 +73,7 @@ class MainActivity : ComponentActivity() {
                     // and every shared component reads the same answer.
                     BunWindowProvider {
                         val request by launch.collectAsState()
-                        Root(launch = request)
+                        Root(launch = request, recovered = recovered)
                     }
                 }
             }
@@ -111,5 +115,8 @@ class MainActivity : ComponentActivity() {
         const val ACTION_SEARCH = "app.bunmusic.SEARCH"
         const val ACTION_COMMANDS = "app.bunmusic.COMMANDS"
         const val ACTION_SHUFFLE = "app.bunmusic.SHUFFLE"
+
+        /** Set by [app.bunmusic.core.CrashGuard] when it relaunches a dying process. */
+        const val EXTRA_RECOVERED = "app.bunmusic.RECOVERED"
     }
 }

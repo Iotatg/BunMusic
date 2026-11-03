@@ -135,12 +135,27 @@ private fun CharcoalDetailHeader(
                     overflow = TextOverflow.Ellipsis,
                 )
                 Spacer(Modifier.height(6.dp))
-                Text(
-                    if (loading) "Loading…" else if (count > 0) "BunMusic" else "",
-                    color = Ink.Muted,
-                    fontSize = 13.sp,
-                    fontFamily = SoraFamily,
-                )
+                if (loading) {
+                    // Three dots that breathe, rather than the word "Loading…" —
+                    // the word is a label, this is a sign of life.
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        BunLoader(dot = 5.dp)
+                        Spacer(Modifier.width(8.dp))
+                        Text(
+                            "Loading",
+                            color = Ink.Muted,
+                            fontSize = 13.sp,
+                            fontFamily = SoraFamily,
+                        )
+                    }
+                } else if (count > 0) {
+                    Text(
+                        "BunMusic",
+                        color = Ink.Muted,
+                        fontSize = 13.sp,
+                        fontFamily = SoraFamily,
+                    )
+                }
             }
         }
 

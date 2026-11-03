@@ -14,3 +14,4 @@ build/
 *.keystore
 *.apk
 !app/build/outputs/
+.kotlin/

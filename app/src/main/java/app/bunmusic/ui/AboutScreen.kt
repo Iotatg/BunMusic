@@ -54,6 +54,30 @@ fun AboutScreen(onBack: () -> Unit) {
             }
         }
 
+        item { GroupTitle("New in 2.1.0") }
+        item {
+            AboutCard {
+                Change("Nothing takes the app down", "An uncaught exception used to end the process and the listener's evening. It is written to a small file now, and the app comes back on Home with the queue where it was — one line at the bottom, not a dialog")
+                Change("Two crashes in ninety seconds stops trying", "A relaunch loop is worse than a crash: the phone gets warm and the bug never gets read. The second failure inside the window hands the process back to the system, honestly")
+                Change("Background work cannot kill it either", "Cache writes, downloads, widget redraws and the playback tick each run in their own scope. A throw in one used to reach the default handler and take everything with it; each scope has a handler now and a failure is a log line")
+                Change("Startup survives a corrupt file", "Every initialiser — store, prefs, auth, cache, downloads, session, scrobble, playback — is wrapped. A phone with a full disk opens a slightly empty app instead of closing on launch and closing again on the next one")
+                Change("Settings › Stability", "What went wrong, when, on which screen, and the stack. Copy the report, clear it, or press one of two buttons that make it happen on purpose — a claim about crash recovery is worth nothing until it has been made to happen on the phone in your hand")
+                Change("Retry, where the error is", "A dead socket, an expired stream URL or a cache entry trimmed mid-song used to leave a red sentence and no way out but to find the song again. The error row carries the retry")
+                Change("Shape, the axis that had no setting", "Every cover, playlist and shortcut was the same 14 dp corner. Eight silhouettes now — squircle, arch, leaf, gem, pill, clam — and “Auto” gives each cover one from its own id, so an album always looks like itself")
+                Change("A split button", "“Play all” and “Shuffle” were two pills of equal weight, which is a question the screen should have answered. One control leads with the action; shuffle, play-next and download sit behind the chevron")
+                Change("A segmented group", "The library's four tabs were chips that scrolled sideways, which is right for tags and wrong for a switch. One track, one travelling indicator — and the same control scopes the stats periods")
+                Change("Throw a row sideways", "Right queues it next, left queues it last. The row follows the finger, a labelled panel appears underneath, and the action fires past a threshold so a flick while scrolling costs nothing")
+                Change("Long press to select, twice for a range", "Selection needed the header button and then one tap per song. A long press starts it, a second long press takes the run between, and the bar gained select-all and play-next")
+                Change("Readable on any cover", "The play button drew its glyph in the player's own background colour, so a dark cover gave a black glyph on near-black. The tint is measured against the artwork and mixed until it clears 4.5:1 — the same arithmetic decides whether a scrim is needed at all")
+                Change("Find in queue", "A radio queue runs to hundreds of songs and the only way to reach one was to scroll. The queue has a filter now, and it keeps each row's real position so tapping still jumps to the right slot")
+                Change("The library stopped being quadratic", "Downloaded and stats rows resolved each track by re-reading and re-splitting the whole registry — a few hundred parses per scroll frame. The registry is parsed once and kept, and every bulk lookup goes through a map")
+                Change("A line break is a title, not a record separator", "Escaping the newline rather than deleting it: “First\\nsecond” came back as “First second”, which is a different song")
+                Change("156 commands", "Shape presets, the stability page, the crash report and its clear — the catalogue is the inventory of the app, so it grew with it")
+                Change("1.6: the notification that never appeared", "A media session service is not created by its manifest entry — something has to start it, and nothing did. So the session, the lock-screen card, the headset buttons and media resumption never existed. Every play path starts the service now, and it goes foreground honestly")
+                Change("2.0: fifty-eight things", "Daily mixes, taste profile, time capsule, smart shuffle, A–B loop, crossfade-friendly sleep, storage screen, duplicate finder, M3U import, cover grid, queue panel, visualiser, motion and contrast settings")
+            }
+        }
+
         item { GroupTitle("New in 1.5.0") }
         item {
             AboutCard {

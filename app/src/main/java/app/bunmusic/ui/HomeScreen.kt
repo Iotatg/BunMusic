@@ -166,7 +166,10 @@ fun HomeScreen(
                     contentPadding = PaddingValues(horizontal = gutter),
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    items(moods, key = { it.browseId + it.title }) { m ->
+                    // Indexed: two moods can share a browse id and a title (the API
+                    // repeats "Chill" across regions), and a duplicated LazyList key
+                    // is an IllegalArgumentException, not a cosmetic glitch.
+                    itemsIndexed(moods, key = { i, m -> "${m.browseId}#$i" }) { _, m ->
                         Chip(m.title, leading = G.Sparkle) { onOpenMood(m) }
                     }
                 }

@@ -1,6 +1,7 @@
 package app.bunmusic.ui
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
@@ -57,6 +58,7 @@ import app.bunmusic.data.Library
 import app.bunmusic.data.Playlist
 import app.bunmusic.data.PlaylistIo
 import app.bunmusic.data.Prefs
+import app.bunmusic.data.Selection
 import app.bunmusic.data.SortKey
 import app.bunmusic.data.SortSpec
 import app.bunmusic.data.Sorting
@@ -94,15 +96,32 @@ fun LibraryScreen(
     var sortDesc by remember { mutableStateOf(false) }
     var grid by remember { mutableStateOf(Prefs.settings.value.libraryGrid) }
     var openAuto by remember { mutableStateOf<String?>(null) }
-    // Selection mode: a long press is the usual gesture, but it has to be added to
-    // three different row implementations; a Select button in the header works
-    // identically everywhere and is discoverable without knowing the gesture.
+    // Selection mode. Both ways in work now: the header button, which is
+    // discoverable, and a long press on any row, which is what a thumb tries
+    // first. The model holds an anchor so a second long press takes a range.
     var selecting by remember { mutableStateOf(false) }
-    var selected by remember { mutableStateOf<Set<String>>(emptySet()) }
+    var selection by remember { mutableStateOf(Selection()) }
 
     val liked = remember(state.track?.id) { Store.likedTracks() }
     val recents = remember(state.track?.id) { Store.recent(50) }
     val downloads by Downloads.entries.collectAsState()
+    // One registry parse for the whole tab. This used to call Store.track() inside
+    // the row lambda, which re-read and re-split every remembered track per row —
+    // a few hundred downloads meant a few hundred parses per scroll frame.
+    val downloadTracks = remember(downloads) {
+        val byId = Store.tracksById()
+        downloads.mapNotNull { e ->
+            byId[e.trackId] ?: Track(
+                id = e.trackId,
+                title = e.title,
+                artist = e.artist,
+                artUrl = e.artUrl,
+            )
+        }
+    }
+    // A setting that had no reader until 2.1.0. It hides the stats entries rather
+    // than deleting anything — the numbers are still counted.
+    val showStats = Prefs.settings.collectAsState().value.showStats
     val autos = remember(state.track?.id, openAuto) { Library.autoLists() }
     val gutter = LocalBunWindow.current.gutter
     val likedIds = remember(liked) { liked.map { it.id }.toSet() }
@@ -165,12 +184,23 @@ fun LibraryScreen(
     }
 
     fun toggle(t: Track) {
-        selected = if (selected.contains(t.id)) selected - t.id else selected + t.id
+        selection = selection.toggle(t.id)
+        selecting = true
+    }
+
+    /** Long press starts a selection; a second long press takes the run between. */
+    fun longPress(t: Track) {
+        selection = if (selecting) {
+            selection.toggleRange(t.id, shown.map { it.id })
+        } else {
+            Selection.of(t.id)
+        }
+        selecting = true
     }
 
     LazyColumn(
         Modifier.fillMaxSize().statusBarsPadding(),
-        contentPadding = PaddingValues(bottom = if (selecting) 96.dp else 24.dp),
+        contentPadding = PaddingValues(bottom = if (selecting) 116.dp else 24.dp),
     ) {
         item {
             ScreenTitle(
@@ -185,7 +215,7 @@ fun LibraryScreen(
                                 38.dp, 18.dp,
                             ) {
                                 selecting = !selecting
-                                if (!selecting) selected = emptySet()
+                                if (!selecting) selection = Selection()
                             }
                             // Grid or rows. The choice is stored, because a layout
                             // preference that resets on every launch is not one.
@@ -198,7 +228,7 @@ fun LibraryScreen(
                                 Prefs.update { it.copy(libraryGrid = grid) }
                             }
                         }
-                        IconBtn(G.Chart, Ink.Muted, 38.dp, 18.dp, onOpenStats)
+                        if (showStats) IconBtn(G.Chart, Ink.Muted, 38.dp, 18.dp, onOpenStats)
                     }
                 },
             )
@@ -210,11 +240,13 @@ fun LibraryScreen(
                     "Downloads", "${downloads.size} saved", G.Download, Ink.Mint,
                     Modifier.weight(1f), onOpenDownloads,
                 )
-                Spacer(Modifier.width(10.dp))
-                ShortcutCard(
-                    "Stats", "Time, top artists", G.Chart, Ink.Lavender,
-                    Modifier.weight(1f), onOpenStats,
-                )
+                if (showStats) {
+                    Spacer(Modifier.width(10.dp))
+                    ShortcutCard(
+                        "Stats", "Time, top artists", G.Chart, Ink.Lavender,
+                        Modifier.weight(1f), onOpenStats,
+                    )
+                }
             }
         }
 
@@ -253,20 +285,18 @@ fun LibraryScreen(
         }
 
         item {
-            Row(
-                Modifier
-                    .horizontalScroll(rememberScrollState())
-                    .padding(horizontal = gutter, vertical = 8.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                listOf("Playlists", "Liked", "Recent", "Downloaded").forEachIndexed { i, label ->
-                    Chip(label, selected = tab == i) {
-                        tab = i
-                        selecting = false
-                        selected = emptySet()
-                    }
-                }
-            }
+            // Four destinations, one control: a segmented group says "pick one"
+            // in a way a scrolling row of chips never did.
+            SegmentedGroup(
+                items = listOf("Playlists", "Liked", "Recent", "Saved"),
+                selected = tab,
+                onSelect = {
+                    tab = it
+                    selecting = false
+                    selection = Selection()
+                },
+                modifier = Modifier.padding(horizontal = gutter, vertical = 8.dp),
+            )
         }
 
         if (tab == 1 || tab == 2) {
@@ -298,16 +328,38 @@ fun LibraryScreen(
                     ) { sortDesc = !sortDesc }
                 }
             }
-            // Play all / shuffle: every other list in the app had these and the
-            // two biggest ones did not.
+            // One control instead of two equal pills. "Play all" is what most
+            // taps mean; shuffle, play-next and download live behind the chevron.
             if (shown.isNotEmpty()) {
                 item {
                     Row(
                         Modifier.padding(horizontal = gutter, vertical = 10.dp),
                         horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        FilledBtn("Play all", G.Play) { onPlay(shown, 0) }
-                        GhostBtn("Shuffle", G.Shuffle) { Playback.shufflePlay(shown) }
+                        SplitButton(
+                            label = "Play all",
+                            glyph = G.Play,
+                            onClick = { onPlay(shown, 0) },
+                            actions = listOf(
+                                "Shuffle" to { Playback.shufflePlay(shown) },
+                                "Play next" to {
+                                    Playback.enqueueNext(shown)
+                                    onToast("${shown.size} tracks up next")
+                                },
+                                "Download all" to {
+                                    val added = Downloads.enqueueAll(shown)
+                                    onToast(if (added == 0) "Already saved or queued" else "Queued $added")
+                                },
+                            ),
+                        )
+                        Spacer(Modifier.weight(1f))
+                        Text(
+                            "${shown.size} tracks",
+                            color = Ink.Faint,
+                            fontSize = 11.sp,
+                            fontFamily = SoraFamily,
+                        )
                     }
                 }
             }
@@ -426,16 +478,30 @@ fun LibraryScreen(
             } else {
                 itemsIndexed(shown, key = { i, t -> t.id + "#" + i }) { i, t ->
                     Box(Modifier.padding(horizontal = 8.dp)) {
-                        TrackRow(
-                            track = t,
-                            playing = state.isPlaying,
-                            isCurrent = state.track?.id == t.id,
-                            liked = true,
-                            downloaded = downloadedIds.contains(t.id),
-                            onPlay = { if (selecting) toggle(t) else onPlay(shown, i) },
-                            onLike = { Store.toggleLike(t.id) },
-                            onMore = { onMore(t) },
-                        )
+                        // Swipe right to play next, left to queue last — the
+                        // gesture every list in every music app has.
+                        SwipeActionRow(
+                            onPlayNext = {
+                                Playback.enqueueNext(t)
+                                onToast("Playing ${t.title} next")
+                            },
+                            onQueue = {
+                                Playback.addToQueue(t)
+                                onToast("Queued ${t.title}")
+                            },
+                        ) {
+                            TrackRow(
+                                track = t,
+                                playing = state.isPlaying,
+                                isCurrent = state.track?.id == t.id,
+                                liked = true,
+                                downloaded = downloadedIds.contains(t.id),
+                                onPlay = { if (selecting) toggle(t) else onPlay(shown, i) },
+                                onLongPress = { longPress(t) },
+                                onLike = { Store.toggleLike(t.id) },
+                                onMore = { onMore(t) },
+                            )
+                        }
                     }
                 }
             }
@@ -451,43 +517,25 @@ fun LibraryScreen(
             } else {
                 itemsIndexed(shown, key = { i, t -> t.id + "#" + i }) { i, t ->
                     Box(Modifier.padding(horizontal = 8.dp)) {
-                        TrackRow(
-                            track = t,
-                            playing = state.isPlaying,
-                            isCurrent = state.track?.id == t.id,
-                            liked = likedIds.contains(t.id),
-                            downloaded = downloadedIds.contains(t.id),
-                            onPlay = { if (selecting) toggle(t) else onPlay(shown, i) },
-                            onLike = { Store.toggleLike(t.id) },
-                            onMore = { onMore(t) },
-                        )
-                    }
-                }
-            }
-        }
-
-        if (tab == 3) {
-            if (downloads.isEmpty()) {
-                item {
-                    EmptyState(
-                        G.Download, "Nothing downloaded",
-                        "Open a track's menu and choose Download offline.",
-                    )
-                }
-            } else {
-                itemsIndexed(downloads, key = { _, e -> e.trackId }) { i, e ->
-                    val t = Store.track(e.trackId)
-                    if (t != null) {
-                        Box(Modifier.padding(horizontal = 8.dp)) {
+                        SwipeActionRow(
+                            onPlayNext = {
+                                Playback.enqueueNext(t)
+                                onToast("Playing ${t.title} next")
+                            },
+                            onQueue = {
+                                Playback.addToQueue(t)
+                                onToast("Queued ${t.title}")
+                            },
+                        ) {
                             TrackRow(
                                 track = t,
                                 playing = state.isPlaying,
                                 isCurrent = state.track?.id == t.id,
-                                downloaded = true,
-                                onPlay = {
-                                    val list = downloads.mapNotNull { Store.track(it.trackId) }
-                                    onPlay(list, list.indexOf(t).coerceAtLeast(0))
-                                },
+                                liked = likedIds.contains(t.id),
+                                downloaded = downloadedIds.contains(t.id),
+                                onPlay = { if (selecting) toggle(t) else onPlay(shown, i) },
+                                onLongPress = { longPress(t) },
+                                onLike = { Store.toggleLike(t.id) },
                                 onMore = { onMore(t) },
                             )
                         }
@@ -495,23 +543,62 @@ fun LibraryScreen(
                 }
             }
         }
+
+        if (tab == 3) {
+            if (downloadTracks.isEmpty()) {
+                item {
+                    EmptyState(
+                        G.Download, "Nothing downloaded",
+                        "Open a track's menu and choose Download offline.",
+                    )
+                }
+            } else {
+                itemsIndexed(downloadTracks, key = { _, t -> t.id }) { i, t ->
+                    Box(Modifier.padding(horizontal = 8.dp)) {
+                        TrackRow(
+                            track = t,
+                            playing = state.isPlaying,
+                            isCurrent = state.track?.id == t.id,
+                            downloaded = true,
+                            onPlay = { onPlay(downloadTracks, i) },
+                            onLongPress = { longPress(t) },
+                            onMore = { onMore(t) },
+                        )
+                    }
+                }
+            }
+        }
     }
 
     if (selecting) {
-        val picks = shown.filter { selected.contains(it.id) }
+        val ids = shown.map { it.id }
+        // A sort or filter change can strand ids that are no longer on screen.
+        val live = selection.prune(ids)
+        val picks = shown.filter { live.has(it.id) }
         SelectionBar(
             count = picks.size,
+            allSelected = shown.isNotEmpty() && picks.size == shown.size,
+            onAll = {
+                selection = if (picks.size == shown.size) selection.none() else selection.all(ids)
+            },
             onLike = {
                 Store.likeMany(picks.map { it.id }, true)
                 onToast("Liked ${picks.size}")
                 selecting = false
-                selected = emptySet()
+                selection = Selection()
             },
             onQueue = {
-                picks.forEach { Playback.addToQueue(it) }
+                // One call, one publish: N calls rebuilt the shuffle order N times.
+                Playback.addToQueue(picks)
                 onToast("${picks.size} added to the queue")
                 selecting = false
-                selected = emptySet()
+                selection = Selection()
+            },
+            onNext = {
+                Playback.enqueueNext(picks)
+                onToast("${picks.size} up next")
+                selecting = false
+                selection = Selection()
             },
             onDownload = {
                 val added = Downloads.enqueueAll(picks)
@@ -523,10 +610,10 @@ fun LibraryScreen(
                     }
                 )
                 selecting = false
-                selected = emptySet()
+                selection = Selection()
             },
             onClear = {
-                selected = emptySet()
+                selection = Selection()
                 selecting = false
             },
         )
@@ -540,21 +627,26 @@ fun LibraryScreen(
 @Composable
 private fun SelectionBar(
     count: Int,
+    allSelected: Boolean,
+    onAll: () -> Unit,
     onLike: () -> Unit,
     onQueue: () -> Unit,
+    onNext: () -> Unit,
     onDownload: () -> Unit,
     onClear: () -> Unit,
 ) {
+    val any = count > 0
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.BottomCenter) {
         Row(
             Modifier
                 .padding(horizontal = 16.dp, vertical = 90.dp)
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(20.dp))
+                .clip(RoundedCornerShape(22.dp))
                 .background(Ink.Sheet)
-                .padding(horizontal = 12.dp, vertical = 10.dp),
+                .border(1.dp, Ink.Hairline, RoundedCornerShape(22.dp))
+                .padding(horizontal = 10.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(4.dp),
+            horizontalArrangement = Arrangement.spacedBy(2.dp),
         ) {
             Text(
                 "$count",
@@ -564,11 +656,28 @@ private fun SelectionBar(
                 fontWeight = FontWeight.Bold,
                 modifier = Modifier.padding(horizontal = 6.dp),
             )
+            // Select-all lives here because this is the only moment it means
+            // anything: the bar exists only while a selection is live.
+            Box(
+                Modifier
+                    .clip(RoundedCornerShape(10.dp))
+                    .clickable { onAll() }
+                    .padding(horizontal = 8.dp, vertical = 5.dp),
+            ) {
+                Text(
+                    if (allSelected) "None" else "All",
+                    color = Ink.Muted,
+                    fontSize = 11.sp,
+                    fontFamily = SoraFamily,
+                    fontWeight = FontWeight.SemiBold,
+                )
+            }
             Spacer(Modifier.weight(1f))
-            IconBtn(G.Heart, if (count > 0) Ink.Text else Ink.Faint, 40.dp, 18.dp) { if (count > 0) onLike() }
-            IconBtn(G.Queue, if (count > 0) Ink.Text else Ink.Faint, 40.dp, 18.dp) { if (count > 0) onQueue() }
-            IconBtn(G.Download, if (count > 0) Ink.Text else Ink.Faint, 40.dp, 18.dp) { if (count > 0) onDownload() }
-            IconBtn(G.Close, Ink.Faint, 40.dp, 17.dp) { onClear() }
+            IconBtn(G.Next, if (any) Ink.Text else Ink.Faint, 38.dp, 17.dp) { if (any) onNext() }
+            IconBtn(G.Heart, if (any) Ink.Text else Ink.Faint, 38.dp, 17.dp) { if (any) onLike() }
+            IconBtn(G.Queue, if (any) Ink.Text else Ink.Faint, 38.dp, 17.dp) { if (any) onQueue() }
+            IconBtn(G.Download, if (any) Ink.Text else Ink.Faint, 38.dp, 17.dp) { if (any) onDownload() }
+            IconBtn(G.Close, Ink.Faint, 38.dp, 16.dp) { onClear() }
         }
     }
 }
@@ -590,13 +699,14 @@ private fun AutoRow(
             .padding(horizontal = gutter, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
+        val thumb = bunShape(coverShape(auto.id), 56.dp)
         Box(
-            Modifier.size(56.dp).clip(RoundedCornerShape(15.dp)).background(Ink.Lime.copy(alpha = 0.13f)),
+            Modifier.size(56.dp).clip(thumb).background(Ink.Lime.copy(alpha = 0.13f)),
             contentAlignment = Alignment.Center,
         ) {
             val first = auto.tracks.firstOrNull()
             if (first != null) {
-                ArtImage(first.artUrl, first.artAsset, Modifier.fillMaxSize(), RoundedCornerShape(15.dp))
+                ArtImage(first.artUrl, first.artAsset, Modifier.fillMaxSize(), thumb)
             } else {
                 Glyph(G.Sparkle, Ink.Lime, 20.dp)
             }
@@ -667,15 +777,16 @@ private fun PlaylistRow(
             .padding(horizontal = gutter, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
+        val thumb = bunShape(coverShape(p.id), 56.dp)
         Box(
             Modifier
                 .size(56.dp)
-                .clip(RoundedCornerShape(15.dp))
+                .clip(thumb)
                 .background(Ink.Card),
             contentAlignment = Alignment.Center,
         ) {
             if (first != null) {
-                ArtImage(first.artUrl, first.artAsset, Modifier.fillMaxSize(), RoundedCornerShape(15.dp))
+                ArtImage(first.artUrl, first.artAsset, Modifier.fillMaxSize(), thumb)
             } else {
                 Glyph(G.List, Ink.Faint, 20.dp)
             }
@@ -753,19 +864,22 @@ private fun TrackGrid(
                     Column(
                         Modifier.weight(1f).clickable { onPlayAt(index) },
                     ) {
+                        // The silhouette comes from the track's id, so the same
+                        // album never appears in two shapes.
+                        val tile = bunShape(coverShape(t.id), 156.dp)
                         Box {
                             ArtImage(
                                 url = t.artUrl,
                                 asset = t.artAsset,
                                 modifier = Modifier.fillMaxWidth().aspectRatio(1f),
-                                shape = RoundedCornerShape(14.dp),
+                                shape = tile,
                             )
                             if (currentId == t.id && playing) {
                                 Box(
                                     Modifier
                                         .fillMaxWidth()
                                         .aspectRatio(1f)
-                                        .clip(RoundedCornerShape(14.dp))
+                                        .clip(tile)
                                         .background(Ink.Void.copy(alpha = 0.5f)),
                                     contentAlignment = Alignment.Center,
                                 ) { EqualizerBars(Ink.Lime) }
