@@ -201,6 +201,40 @@ fun buildCommands(host: CommandHost): List<Command> {
         host.toast("Downloads removed")
     }
 
+    // --------------------------------------------------------------- memory
+    add(
+        "Memory", "mem.dna", "Share my listening DNA",
+        "A 1080 × 1350 card", G.Share, "radar profile personality stats",
+    ) {
+        val byId = Store.tracksById()
+        val dna = app.bunmusic.data.Memory.dna(
+            Store.events(), { byId[it] },
+            System.currentTimeMillis(), app.bunmusic.data.Listening.zoneOffset(),
+        )
+        if (dna == null) {
+            host.toast("Not enough plays yet — ${app.bunmusic.data.Memory.MIN_PLAYS} in ${app.bunmusic.data.Memory.WINDOW_DAYS} days")
+        } else {
+            ShareCard.shareDna(host.context, dna)
+        }
+    }
+
+    add(
+        "Memory", "mem.today", "Play what I played on this day",
+        "Up to five years back", G.Clock, "anniversary years ago rewind",
+    ) {
+        val byId = Store.tracksById()
+        val now = System.currentTimeMillis()
+        val first = app.bunmusic.data.Memory.onThisDay(
+            Store.events(), { byId[it] }, now, app.bunmusic.data.Listening.zoneOffset(),
+        ).firstOrNull()
+        if (first == null) {
+            host.toast("Nothing from this date in past years")
+        } else {
+            Playback.play(first.tracks, 0)
+            host.toast("${app.bunmusic.data.Memory.ago(first.yearsAgo)} — ${first.tracks.size} tracks")
+        }
+    }
+
     // ------------------------------------------------------------- navigate
     tab(Route.Home, "Go home", "The shelf", G.Home)
     tab(Route.Explore, "Explore", "Moods and new releases", G.Compass)
@@ -209,6 +243,7 @@ fun buildCommands(host: CommandHost): List<Command> {
     tab(Route.Hotlist, "Hotlist", "What is climbing", G.Flame)
     tab(Route.Settings, "Settings", "", G.Gear)
     tab(Route.Stats, "Listening stats", "Minutes and top artists", G.Chart)
+    tab(Route.TimeMachine, "Time machine", "Listening DNA and years ago", G.Clock)
     tab(Route.YearReview, "Year in review", "Your year as a reel", G.Sparkle)
     tab(Route.Downloads, "Downloads", "", G.Download)
     tab(Route.Equalizer, "Equaliser", "", G.Sliders)
@@ -634,6 +669,7 @@ private fun routeName(route: Route): String = when (route) {
     Route.Discovery -> "discovery"
     Route.Storage -> "storage"
     Route.Stability -> "stability"
+    Route.TimeMachine -> "memory"
     is Route.SearchFor -> "search"
     is Route.Detail -> "detail"
     is Route.MoodPage -> "mood"

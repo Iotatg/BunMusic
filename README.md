@@ -7,10 +7,36 @@ saved offline.
 
 ```
 package   app.bunmusic
-version   2.3.0 (25)
+version   2.4.0 (26)
 minSdk    26  ·  target/compile 37
 author    Iota Coder · iota14934@gmail.com
 ```
+
+---
+
+## 2.4.0 — the machine remembers
+
+Stats tell you how much you listened. This release tells you **how** you listened
+— and what you were playing on this exact date in earlier years.
+
+| Piece | What it is |
+|---|---|
+| **`data/Memory.kt`** | Pure arithmetic over the play log: `onThisDay`, `dna`, `currentStreak`, `radar`. Takes `now` and the zone offset as arguments, so a year boundary and a leap day are testable rather than hopeful |
+| **Listening DNA** | Five indices over the last 90 days — Curiosity (tracks heard once), Loyalty (tracks heard 4+ times), Range (artists per track), Night (plays after 22:00), Consistency (days with a play). Drawn as a pentagon that grows from the centre, with a list underneath saying what each axis counts |
+| **On this day** | Up to five years back, the same calendar date. Distinct tracks, most recent first, the real play count beside them, and a Play button that queues that day |
+| **Streak** | Counts back from today — or from yesterday if today is still young. A streak that breaks at midnight and repairs itself at breakfast is not a streak |
+| **Shareable** | The same pentagon rendered with `android.graphics` onto a 1080 × 1350 card. Screen and image call the same `Memory.radar`, so they cannot disagree |
+| **Commands** | `mem.dna` (share the card) and `mem.today` (play that day) — 160 in total |
+
+What it deliberately does **not** do: claim to know the music. There is no
+"energy" score, because the app does not analyse audio. These numbers describe
+behaviour, and below 20 plays in the window the screen says so instead of drawing
+a shape that would look authoritative anyway.
+
+459 unit tests, 0 failures. Same signing key.
+
+Honest limit, unchanged: no phone and no emulator here. Every number is pinned by
+tests, every screen compiles — nobody has looked at the pentagon on a display.
 
 ---
 

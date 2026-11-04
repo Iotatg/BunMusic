@@ -101,6 +101,7 @@ sealed interface Route {
     data object Discovery : Route
     data object Storage : Route
     data object Stability : Route
+    data object TimeMachine : Route
     /** Search opened from a credit, a mix or a long press — prefilled. */
     data class SearchFor(val query: String) : Route
     data class Detail(
@@ -419,7 +420,11 @@ private fun Shell(
                             onMore = { sheetTrack = it },
                         )
 
-                        Route.Stats -> StatsScreen(onBack = pop)
+                        Route.Stats -> StatsScreen(
+                            onBack = pop,
+                            onOpenMemory = { push(Route.TimeMachine) },
+                        )
+                        Route.TimeMachine -> MemoryScreen(onBack = pop)
                         Route.YearReview -> WrappedScreen(onBack = pop)
                         Route.Downloads -> DownloadsScreen(onBack = pop, onPlay = { list, i -> Playback.play(list, i) })
 

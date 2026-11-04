@@ -112,9 +112,9 @@ class CommandTest {
 
     @Test
     fun thereAreAtLeastOneHundredCommands() {
-        // 152 fixed commands plus one "wear this bun" per skin. The per-skin ones
+        // 155 fixed commands plus one "wear this bun" per skin. The per-skin ones
         // are generated, so adding a bun moves this number by exactly one.
-        assertEquals("the catalogue size is part of the deal", 152 + BunSkin.entries.size, commands.size)
+        assertEquals("the catalogue size is part of the deal", 155 + BunSkin.entries.size, commands.size)
     }
 
     @Test

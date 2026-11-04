@@ -54,6 +54,21 @@ fun AboutScreen(onBack: () -> Unit) {
             }
         }
 
+        item { GroupTitle("New in 2.4.0") }
+        item {
+            AboutCard {
+                Change("Time machine", "Stats tell you how much you listened. This tells you how you listened — and what you were playing on this exact date in earlier years. Both come from the same play log, and neither is generated")
+                Change("Listening DNA", "Five indices over the last 90 days: Curiosity (tracks heard once), Loyalty (tracks heard four times or more), Range (artists per track), Night (plays after 22:00), Consistency (days with a play). A radar chart you can read at a glance, and a list underneath that says what each axis counts")
+                Change("It is honest about what it is not", "These describe behaviour, not the music. The app does not analyse audio, so it does not claim to know whether a track is fast, happy or loud — a made-up energy score would look better on a card and mean nothing")
+                Change("No profile from nine plays", "Below twenty plays in the window the screen says so instead of drawing a shape. A radar chart is persuasive whatever it contains, which is exactly why an empty one is worse than an honest \u201cnot yet\u201d")
+                Change("On this day", "Up to five years back, the same calendar date. One song played eleven times is a memory of one song, not of eleven — distinct tracks, most recent first, with the real play count kept beside them")
+                Change("A leap day is not the 28th", "29 February clamps to the 28th in a common year, which would quietly invent a memory on the wrong day. The clamp is detected and that year is skipped")
+                Change("A streak that survives breakfast", "The streak counts back from today, or from yesterday if today is still young. A streak that breaks at midnight and repairs itself at breakfast is not a streak, it is a reason to stop trusting the number")
+                Change("Shareable DNA", "The same pentagon, drawn with android.graphics onto a 1080 × 1350 card and out through the share sheet. The card and the screen call the same geometry, so the image can never disagree with the app")
+                Change("Two new commands", "\u201cShare my listening DNA\u201d and \u201cPlay what I played on this day\u201d, both in the palette")
+            }
+        }
+
         item { GroupTitle("New in 2.3.0") }
         item {
             AboutCard {

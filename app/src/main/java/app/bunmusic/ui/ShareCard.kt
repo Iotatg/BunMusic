@@ -12,6 +12,7 @@ import android.graphics.Shader
 import android.graphics.Typeface
 import androidx.core.content.FileProvider
 import app.bunmusic.data.LibraryStats
+import app.bunmusic.data.Memory
 import app.bunmusic.data.Store
 import app.bunmusic.data.Wrapped
 import java.io.File
@@ -258,5 +259,158 @@ object ShareCard {
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
         }
         context.startActivity(Intent.createChooser(send, "Share receipt"))
+    }
+
+    /**
+     * The listening DNA as a card.
+     *
+     * Same 1080 × 1350 canvas and the same rule as the receipt: drawn with
+     * android.graphics so the file is identical every time it is rendered, rather
+     * than a screenshot of whatever happened to be on screen. The pentagon comes
+     * from [Memory.radar], so the shape in the shared image and the shape on the
+     * screen are the same arithmetic.
+     */
+    fun renderDna(dna: Memory.Dna, dateLabel: String): Bitmap {
+        val bmp = Bitmap.createBitmap(W, H, Bitmap.Config.ARGB_8888)
+        val c = Canvas(bmp)
+        c.drawColor(AColor.rgb(10, 5, 24))
+
+        val glow = Paint().apply {
+            shader = LinearGradient(
+                0f, 0f, W.toFloat(), H.toFloat(),
+                AColor.rgb(76, 29, 149), AColor.rgb(10, 5, 24),
+                Shader.TileMode.CLAMP,
+            )
+        }
+        c.drawRect(0f, 0f, W.toFloat(), H.toFloat(), glow)
+
+        var y = 150f
+        fun text(s: String, size: Float, color: Int, bold: Boolean = false, x: Float = 96f): Float {
+            val p = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                this.color = color
+                textSize = size
+                typeface = Typeface.create("sans-serif", if (bold) Typeface.BOLD else Typeface.NORMAL)
+            }
+            c.drawText(s, x, y, p)
+            return p.measureText(s)
+        }
+
+        text("BUNMUSIC", 32f, lime, bold = true)
+        y += 66
+        text("Listening DNA", 68f, ink, bold = true)
+        y += 46
+        text("$dateLabel · ${dna.plays} plays over ${dna.days} days", 26f, dim)
+
+        // ------------------------------------------------------------- radar
+        val cx = W / 2f
+        val cy = 760f
+        val r = 300f
+        val values = dna.axes.map { it.value }
+
+        val grid = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            style = Paint.Style.STROKE
+            strokeWidth = 2f
+            color = AColor.argb(40, 255, 255, 255)
+        }
+        for (ring in 1..3) {
+            val pts = Memory.radar(List(values.size) { 100 }, r * ring / 3f)
+            val path = android.graphics.Path()
+            pts.forEachIndexed { i, p ->
+                val x = cx + p.first
+                val yy = cy + p.second
+                if (i == 0) path.moveTo(x, yy) else path.lineTo(x, yy)
+            }
+            path.close()
+            c.drawPath(path, grid)
+        }
+
+        val spokes = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            strokeWidth = 2f
+            color = AColor.argb(34, 255, 255, 255)
+        }
+        Memory.radar(List(values.size) { 100 }, r).forEach { p ->
+            c.drawLine(cx, cy, cx + p.first, cy + p.second, spokes)
+        }
+
+        val pts = Memory.radar(values, r)
+        if (pts.isNotEmpty()) {
+            val shape = android.graphics.Path()
+            pts.forEachIndexed { i, p ->
+                if (i == 0) shape.moveTo(cx + p.first, cy + p.second)
+                else shape.lineTo(cx + p.first, cy + p.second)
+            }
+            shape.close()
+
+            val fill = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                style = Paint.Style.FILL
+                shader = LinearGradient(
+                    cx - r, cy - r, cx + r, cy + r,
+                    AColor.argb(150, 216, 246, 92), AColor.argb(70, 176, 107, 255),
+                    Shader.TileMode.CLAMP,
+                )
+            }
+            c.drawPath(shape, fill)
+            val stroke = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                style = Paint.Style.STROKE
+                strokeWidth = 5f
+                color = lime
+            }
+            c.drawPath(shape, stroke)
+            val dot = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = lime }
+            pts.forEach { p -> c.drawCircle(cx + p.first, cy + p.second, 9f, dot) }
+        }
+
+        // Labels sit just outside their own vertex, so the shape is never
+        // obscured by the words that explain it.
+        val label = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            textAlign = Paint.Align.CENTER
+            textSize = 30f
+            typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
+            color = ink
+        }
+        val sub = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            textAlign = Paint.Align.CENTER
+            textSize = 24f
+            color = dim
+        }
+        val outer = Memory.radar(List(values.size) { 100 }, r + 74f)
+        dna.axes.forEachIndexed { i, axis ->
+            val p = outer[i]
+            val x = cx + p.first
+            val yy = cy + p.second + 10f
+            c.drawText(axis.label, x, yy, label)
+            c.drawText("${axis.value}", x, yy + 34f, sub)
+        }
+
+        y = H - 190f
+        val rule = Paint().apply { color = AColor.argb(50, 255, 255, 255); strokeWidth = 2f }
+        c.drawLine(96f, y, W - 96f, y, rule)
+        y += 56
+        text("How I listen, not what the songs sound like.", 26f, dim)
+        y += 46
+        text("BunMusic · a quiet place for loud music", 26f, lime)
+
+        return bmp
+    }
+
+    /** Writes the DNA card and opens the share sheet. */
+    fun shareDna(context: Context, dna: Memory.Dna) {
+        val stamp = SimpleDateFormat("MMMM yyyy", Locale.getDefault()).format(Date())
+        val dir = File(context.cacheDir, "shared").apply { mkdirs() }
+        val file = File(dir, "bunmusic-dna.png")
+        runCatching {
+            file.outputStream().use { out ->
+                renderDna(dna, stamp).compress(Bitmap.CompressFormat.PNG, 100, out)
+            }
+        }.onFailure { return }
+
+        val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
+        val send = Intent(Intent.ACTION_SEND).apply {
+            type = "image/png"
+            putExtra(Intent.EXTRA_STREAM, uri)
+            putExtra(Intent.EXTRA_TEXT, "My listening DNA — BunMusic")
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
+        context.startActivity(Intent.createChooser(send, "Share your DNA"))
     }
 }

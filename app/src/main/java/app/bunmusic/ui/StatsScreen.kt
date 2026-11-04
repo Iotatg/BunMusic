@@ -41,6 +41,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
@@ -63,7 +64,7 @@ import app.bunmusic.data.Track
 import app.bunmusic.data.Wrapped
 
 @Composable
-fun StatsScreen(onBack: () -> Unit) {
+fun StatsScreen(onBack: () -> Unit, onOpenMemory: () -> Unit = {}) {
     // The play log is a preference string that can be thousands of events long.
     // Parsing it — twice — during composition was the reason this page took a
     // visible beat to open on a phone with a year of listening on it.
@@ -126,6 +127,43 @@ fun StatsScreen(onBack: () -> Unit) {
                     "Counted on this device only — nothing leaves the app.",
                     color = Ink.Muted, fontSize = 12.sp, fontFamily = SoraFamily,
                 )
+            }
+        }
+
+        item {
+            // The numbers on this page are counts. The machine is the only thing
+            // here that tells you something about yourself you could not have
+            // guessed, so it gets a door rather than a footnote.
+            Panel(
+                Modifier.padding(horizontal = 20.dp, vertical = 12.dp).fillMaxWidth(),
+            ) {
+                Row(
+                    Modifier.fillMaxWidth()
+                        .tapable(scale = 0.985f) { onOpenMemory() }
+                        .padding(horizontal = 16.dp, vertical = 14.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Box(
+                        Modifier.size(38.dp).clip(CircleShape)
+                            .background(Ink.Lime.copy(alpha = 0.12f)),
+                        contentAlignment = Alignment.Center,
+                    ) { Glyph(G.Clock, Ink.Lime, 18.dp, 1.9.dp) }
+                    Spacer(Modifier.width(12.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text(
+                            "Time machine",
+                            color = Ink.Text, fontSize = 13.5.sp, fontFamily = SoraFamily,
+                            fontWeight = FontWeight.Medium,
+                        )
+                        Spacer(Modifier.height(2.dp))
+                        Text(
+                            "Your listening DNA, and what you played on this day in past years",
+                            color = Ink.Faint, fontSize = 10.5.sp, fontFamily = SoraFamily,
+                            lineHeight = 15.sp,
+                        )
+                    }
+                    Box(Modifier.rotate(270f)) { Glyph(G.Back, Ink.Muted, 12.dp, 1.8.dp) }
+                }
             }
         }
 
