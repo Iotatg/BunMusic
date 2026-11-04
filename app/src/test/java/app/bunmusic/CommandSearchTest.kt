@@ -24,6 +24,7 @@ class CommandSearchTest {
         override fun go(route: Route) = Unit
         override fun openPlayer() = Unit
         override fun openQueue() = Unit
+        override fun shareQueue() = Unit
         override fun toast(message: String) = Unit
         override fun close() = Unit
     }

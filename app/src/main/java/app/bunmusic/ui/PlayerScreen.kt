@@ -94,12 +94,14 @@ fun PlayerScreen(
     onClose: () -> Unit,
     onMore: () -> Unit,
     openQueueOnStart: Boolean = false,
+    openShareOnStart: Boolean = false,
     onSearch: (String) -> Unit = {},
     onToast: (String) -> Unit = {},
 ) {
     val track = state.track
     val settings by Prefs.settings.collectAsState()
     var showQueue by remember { mutableStateOf(false) }
+    var showShare by remember { mutableStateOf(false) }
     var showLyrics by remember { mutableStateOf(false) }
     var showSleep by remember { mutableStateOf(false) }
     var showSpeed by remember { mutableStateOf(false) }
@@ -111,6 +113,7 @@ fun PlayerScreen(
     // The widget's queue button opens the player *and* the queue. It used to
     // open the player and leave the listener to find the button themselves.
     LaunchedEffect(openQueueOnStart) { if (openQueueOnStart) showQueue = true }
+    LaunchedEffect(openShareOnStart) { if (openShareOnStart) showShare = true }
 
     // The id-hash paints the first frame, because waiting for a network image to
     // colour a background is worse than starting in the wrong colour. As soon as
@@ -428,6 +431,24 @@ fun PlayerScreen(
                 state = state,
                 onClose = { showQueue = false },
                 onSaved = { name -> onToast("Saved as \"$name\"") },
+                onShare = {
+                    showQueue = false
+                    showShare = true
+                },
+            )
+        }
+
+        AnimatedVisibility(
+            visible = showShare,
+            enter = fadeIn() + slideInVertically { it },
+            exit = fadeOut() + slideOutVertically { it },
+        ) {
+            ShareQueueSheet(
+                tracks = state.queue,
+                onClose = { showShare = false },
+                onPlay = { list -> Playback.play(list, 0) },
+                onEnqueue = { list -> Playback.enqueueNext(list) },
+                onToast = onToast,
             )
         }
 

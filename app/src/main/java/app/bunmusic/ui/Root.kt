@@ -155,6 +155,7 @@ private fun Shell(
     var stack by remember { mutableStateOf<List<Route>>(listOf(Route.Home)) }
     var playerOpen by remember { mutableStateOf(false) }
     var queueOnStart by remember { mutableStateOf(false) }
+    var shareOnStart by remember { mutableStateOf(false) }
     var paletteOpen by remember { mutableStateOf(false) }
     var sheetTrack by remember { mutableStateOf<Track?>(null) }
     var toast by remember { mutableStateOf<String?>(null) }
@@ -489,9 +490,11 @@ private fun Shell(
                 onClose = {
                     playerOpen = false
                     queueOnStart = false
+                    shareOnStart = false
                 },
                 onMore = { sheetTrack = state.track },
                 openQueueOnStart = queueOnStart,
+                openShareOnStart = shareOnStart,
                 onSearch = { q -> push(Route.SearchFor(q)) },
                 onToast = { toast = it },
             )
@@ -535,6 +538,12 @@ private fun Shell(
                     override fun openQueue() {
                         if (Playback.state.value.hasTrack) {
                             queueOnStart = true
+                            playerOpen = true
+                        }
+                    }
+                    override fun shareQueue() {
+                        if (Playback.state.value.hasTrack) {
+                            shareOnStart = true
                             playerOpen = true
                         }
                     }

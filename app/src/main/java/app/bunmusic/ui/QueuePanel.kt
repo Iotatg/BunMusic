@@ -63,6 +63,7 @@ fun QueuePanel(
     state: PlayerState,
     onClose: () -> Unit,
     onSaved: (String) -> Unit = {},
+    onShare: () -> Unit = {},
 ) {
     val played = remember(state.queue, state.index) { QueueMath.played(state.queue, state.index) }
     val upcoming = remember(state.queue, state.index) { QueueMath.upcoming(state.queue, state.index) }
@@ -112,6 +113,8 @@ fun QueuePanel(
                 if (name.isNotBlank()) onSaved(name)
             }
             Spacer(Modifier.width(8.dp))
+            IconBtn(G.Share, Ink.Muted, 38.dp, 16.dp, onShare)
+            Spacer(Modifier.width(4.dp))
             IconBtn(G.Close, Ink.Text, 38.dp, 16.dp, onClose)
         }
 

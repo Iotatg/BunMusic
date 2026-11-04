@@ -104,6 +104,7 @@ class CommandTest {
         override fun go(route: Route) = Unit
         override fun openPlayer() = Unit
         override fun openQueue() = Unit
+        override fun shareQueue() = Unit
         override fun toast(message: String) = Unit
         override fun close() = Unit
     }
@@ -112,9 +113,9 @@ class CommandTest {
 
     @Test
     fun thereAreAtLeastOneHundredCommands() {
-        // 155 fixed commands plus one "wear this bun" per skin. The per-skin ones
+        // 156 fixed commands plus one "wear this bun" per skin. The per-skin ones
         // are generated, so adding a bun moves this number by exactly one.
-        assertEquals("the catalogue size is part of the deal", 155 + BunSkin.entries.size, commands.size)
+        assertEquals("the catalogue size is part of the deal", 156 + BunSkin.entries.size, commands.size)
     }
 
     @Test

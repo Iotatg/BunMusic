@@ -30,6 +30,7 @@ interface CommandHost {
     fun go(route: Route)
     fun openPlayer()
     fun openQueue()
+    fun shareQueue()
     fun toast(message: String)
     fun close()
 }
@@ -162,6 +163,9 @@ fun buildCommands(host: CommandHost): List<Command> {
     }
     add("Queue", "queue.up", "Move this track up the queue", "", G.Back) { Playback.moveCurrent(-1) }
     add("Queue", "queue.down", "Move this track down the queue", "", G.Forward) { Playback.moveCurrent(1) }
+    add("Queue", "queue.share", "Share the queue as a code", "QR or paste · no server", G.Share, "qr export handoff") {
+        host.shareQueue()
+    }
 
     // -------------------------------------------------------------- library
     add("Library", "lib.play.liked", "Play liked songs", "", G.Heart) {
