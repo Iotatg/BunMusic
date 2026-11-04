@@ -23,12 +23,14 @@ object Icons {
     private const val CHARCOAL_ALIAS = ".LauncherCharcoal"
     private const val CLOUD_ALIAS = ".LauncherCloud"
     private const val PINK_ALIAS = ".LauncherPink"
+    private const val NEBULA_ALIAS = ".LauncherNebula"
 
     fun aliasOf(skin: BunSkin): String = when (skin) {
         BunSkin.MIDNIGHT -> MIDNIGHT_ALIAS
         BunSkin.CHARCOAL -> CHARCOAL_ALIAS
         BunSkin.CLOUD -> CLOUD_ALIAS
         BunSkin.PINK -> PINK_ALIAS
+        BunSkin.NEBULA -> NEBULA_ALIAS
     }
 
     /**
@@ -43,6 +45,7 @@ object Icons {
         BunSkin.CHARCOAL -> R.mipmap.ic_launcher_charcoal_foreground
         BunSkin.CLOUD -> R.mipmap.ic_launcher_cloud_foreground
         BunSkin.PINK -> R.mipmap.ic_launcher_pink_foreground
+        BunSkin.NEBULA -> R.drawable.ic_launcher_nebula_foreground
     }
 
     /** The adaptive icon's background layer, paired with [layerOf]. */
@@ -51,6 +54,7 @@ object Icons {
         BunSkin.CHARCOAL -> R.drawable.ic_launcher_background_charcoal
         BunSkin.CLOUD -> R.drawable.ic_launcher_background_cloud
         BunSkin.PINK -> R.drawable.ic_launcher_background_pink
+        BunSkin.NEBULA -> R.drawable.ic_launcher_background_nebula
     }
 
     /**

@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Nebula's widget card, round corners. Violet glass: a card lighter than the page
+     with a one-pixel edge, because a solid card on a star field reads as a hole. -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
+    <corners android:radius="20dp" />
+    <solid android:color="#171030" />
+    <stroke android:width="1dp" android:color="#2A1E4A" />
+</shape>

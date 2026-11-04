@@ -1,16 +1,47 @@
 # BunMusic
 
 A quiet music player for Android — built from scratch in Kotlin + Jetpack Compose.
-Four skins, "buns", and you pick which one the app wears.
+Five skins, "buns", and you pick which one the app wears.
 Nothing is bundled: every track comes from YouTube Music, and anything you like can be
 saved offline.
 
 ```
 package   app.bunmusic
-version   2.2.0 (24)
+version   2.3.0 (25)
 minSdk    26  ·  target/compile 37
 author    Iota Coder · iota14934@gmail.com
 ```
+
+---
+
+## 2.3.0 — Nebula
+
+A fifth bun, and the first one that is a place rather than a palette. Deep space
+violet, neon edges, a sky that is different for every song, and a bun asleep on a
+cloud with a cat against its shoulder.
+
+| Piece | What it is |
+|---|---|
+| **`core/Cosmos.kt`** | Pure arithmetic: a 31-hash seed, sixty stars from six lines of xorshift, a raised-cosine twinkle, a crescent's position. Testable, so "the same song always looks the same" is a claim with a test behind it |
+| **`ui/Cosmos.kt`** | Paint only — `NebulaBackdrop`, `Crescent`, `BunMascot`, `Modifier.glass`, `Modifier.neon`, `GlowPill`. A violet well, three clouds, a field of stars with cross flares on the bright ones |
+| **The bun** | Drawn in a 100 × 100 unit space: hood, headphones, closed eyes, blushes, a cat. One drawing scales from a 28 dp avatar in the header to a 220 dp hero in the player. It breathes at 4.2 s asleep, 2.6 s playing |
+| **Glass** | Surfaces hold light at the top edge and fade toward the bottom. On the light buns the same modifier degrades to the plain card — white-on-white glass is a slightly wrong white |
+| **Neon** | The accent used as a shadow colour rather than a stroke, so the play button and the nav bar look lit. API 26–27 paints it black, which is still a shadow |
+| **Where it applies** | Home (sky + header mascot + empty-state card), the player (same sky, crescent behind the artwork, lit transport button), the nav bar, the mini player, the search pill, panels, the bun picker's preview |
+| **The icon** | A real adaptive icon, a window theme pre-tinted `#0A0518`, and a launcher alias — cold start no longer flashes the lime bun first |
+| **The widget** | Nebula card in three corner shapes and a violet transport button |
+| **Swipe to skip** | The now-playing strip follows the thumb and commits past a third of its width, with the threshold in `SwipeSkip` so it is measured in fractions rather than pixels — the same 120 dp drag is most of a phone strip and a sliver of a tablet one |
+
+The other four buns are untouched. `Skin.isNebula` gates every piece of it, so
+Midnight, Charcoal, Cloud and Pink still draw the flat paper they always did.
+
+436 unit tests, 0 failures. Same signing key.
+
+Honest limit, unchanged: no phone and no emulator here. The star field, the
+twinkle curve, the seed stability and the crescent geometry are pinned by tests,
+and every screen compiles — but nobody has looked at the mascot on a display.
+If the bun reads wrong on your device, the numbers to move are the 100-unit
+coordinates in `drawBun`, in `ui/Cosmos.kt`.
 
 ---
 
@@ -143,7 +174,7 @@ needs a server, a second platform, or a paid API key.
 ## What it does
 
 **Buns**
-Four complete skins, switched in Settings → Buns. A bun is not a tint: it replaces the
+Five complete skins, switched in Settings → Buns. A bun is not a tint: it replaces the
 palette, the typeface, the corner radii, the shape of the bottom bar, whether a list shows
 cover art or a track number, and whether the seek bar is a line or a waveform.
 
@@ -153,6 +184,7 @@ cover art or a track number, and whether the seek bar is a line or a waveform.
 | **Charcoal** | Paper white, charcoal ink, Inter throughout, 24 dp cards, waveform seek bar, white nav bar with a dark active pill, dark mini player. |
 | **Cloud Blue** | Chalk white and electric blue, Sora throughout, blue hero gradient, hairline seek bar with a knob, blue active nav pill, navy mini player. Its launcher icon is the bun in headphones. |
 | **Pink Bun** | Blush paper and deep rose, Sora throughout, pink hero gradient, waveform seek bar, rose active nav pill, plum mini player. Its launcher icon is the bun with the music note. |
+| **Nebula** | Deep space violet, neon accent shadows, glass panels, a computed star field that changes with the song, and a mascot asleep on a cloud. Its launcher icon is the bun under a crescent. |
 
 Switching restarts the process — the only way to be sure no `remember`ed colour from the old
 bun survives. Nothing else is touched: library, downloads and account stay put.
@@ -371,7 +403,7 @@ home, album pages, Explore, Charts, mood pages and the automix radio queue.
   next, queue), a 2×2 cover, a 4×1 strip, and a 4×4 queue whose rows jump to the
   track. The 1.0.x widget was a single 4×1 bar with three buttons.
 - **The widget wears the bun.** Match the current bun, or pin Midnight, Charcoal,
-  Cloud, Pink or smoked glass. Three corner shapes, and each element — progress,
+  Cloud, Pink, Nebula or smoked glass. Three corner shapes, and each element — progress,
   times, like, queue — can be switched off per widget. Long-press to reconfigure.
 - **It resizes instead of clipping.** Below 118 dp the time row goes; below 96 dp
   the bar goes; below 200 dp wide the like and queue buttons go. A cell that is one

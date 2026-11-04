@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Nebula's tile: the bun asleep in headphones, a crescent behind it, three
+     stars. Drawn as vectors rather than shipped as a 512 px render so the icon
+     stays sharp at every density and the file stays under 3 KB.
+
+     Everything lives inside the 72 dp safe zone (18…90 of 108), because a
+     launcher mask can crop to a circle. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- crescent: outer disc with the inner disc cut out by even-odd fill -->
+    <path
+        android:fillColor="#FFF0C98A"
+        android:fillAlpha="0.92"
+        android:fillType="evenOdd"
+        android:pathData="M64,34a14,14 0 1,0 28,0a14,14 0 1,0 -28,0z M58,30a13,13 0 1,0 26,0a13,13 0 1,0 -26,0z" />
+
+    <!-- glow under the bun -->
+    <path
+        android:pathData="M28,66a26,26 0 1,0 52,0a26,26 0 1,0 -52,0z">
+        <aapt:attr xmlns:aapt="http://schemas.android.com/aapt" name="android:fillColor">
+            <gradient
+                android:type="radial"
+                android:centerX="54"
+                android:centerY="66"
+                android:gradientRadius="26">
+                <item android:offset="0.0" android:color="#66B06BFF" />
+                <item android:offset="1.0" android:color="#00B06BFF" />
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <!-- headphone band, behind the head -->
+    <path
+        android:pathData="M34,56C34,32 74,32 74,56"
+        android:strokeColor="#FF1A1030"
+        android:strokeWidth="5"
+        android:strokeLineCap="round" />
+
+    <!-- head -->
+    <path
+        android:fillColor="#FFF8F4FF"
+        android:pathData="M54,36C66,36 74,45 74,56C74,67 66,74 54,74C42,74 34,67 34,56C34,45 42,36 54,36Z" />
+
+    <!-- blush -->
+    <path
+        android:fillColor="#FFFF9EC4"
+        android:fillAlpha="0.55"
+        android:pathData="M38,60a3.4,3.4 0 1,0 6.8,0a3.4,3.4 0 1,0 -6.8,0z M63,60a3.4,3.4 0 1,0 6.8,0a3.4,3.4 0 1,0 -6.8,0z" />
+
+    <!-- closed eyes and mouth -->
+    <path
+        android:pathData="M44,55q3.2,-4.4 6.4,0"
+        android:strokeColor="#FF2A1B45"
+        android:strokeWidth="2.2"
+        android:strokeLineCap="round" />
+    <path
+        android:pathData="M57.6,55q3.2,-4.4 6.4,0"
+        android:strokeColor="#FF2A1B45"
+        android:strokeWidth="2.2"
+        android:strokeLineCap="round" />
+    <path
+        android:pathData="M51,63q3,3 6,0"
+        android:strokeColor="#FF2A1B45"
+        android:strokeWidth="1.8"
+        android:strokeLineCap="round" />
+
+    <!-- ear cups -->
+    <path
+        android:fillColor="#FF1A1030"
+        android:pathData="M26,56a8,8 0 1,0 16,0a8,8 0 1,0 -16,0z M66,56a8,8 0 1,0 16,0a8,8 0 1,0 -16,0z" />
+    <path
+        android:pathData="M26,56a8,8 0 1,0 16,0a8,8 0 1,0 -16,0z M66,56a8,8 0 1,0 16,0a8,8 0 1,0 -16,0z"
+        android:strokeColor="#FFB06BFF"
+        android:strokeWidth="2" />
+    <path
+        android:fillColor="#FFB06BFF"
+        android:pathData="M32,56a2,2 0 1,0 4,0a2,2 0 1,0 -4,0z M72,56a2,2 0 1,0 4,0a2,2 0 1,0 -4,0z" />
+
+    <!-- stars -->
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:fillAlpha="0.9"
+        android:pathData="M26,30a1.6,1.6 0 1,0 3.2,0a1.6,1.6 0 1,0 -3.2,0z M78,66a1.4,1.4 0 1,0 2.8,0a1.4,1.4 0 1,0 -2.8,0z M34,78a1.2,1.2 0 1,0 2.4,0a1.2,1.2 0 1,0 -2.4,0z" />
+</vector>

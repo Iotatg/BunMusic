@@ -161,7 +161,7 @@ private fun BunCard(bun: BunSkin, active: Boolean, onPick: () -> Unit) {
                 if (active) p.accent else p.hairline,
                 RoundedCornerShape(24.dp),
             )
-            .clickable { onPick() }
+            .tapable(scale = 0.985f) { onPick() }
             .padding(14.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -197,7 +197,7 @@ private fun BunCard(bun: BunSkin, active: Boolean, onPick: () -> Unit) {
         }
 
         Spacer(Modifier.height(12.dp))
-        BunPreview(p, Modifier.fillMaxWidth().height(188.dp))
+        BunPreview(bun, p, Modifier.fillMaxWidth().height(188.dp))
         Spacer(Modifier.height(12.dp))
 
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -243,13 +243,23 @@ private fun Swatch(color: Color, hex: String, ink: Color) {
  * drawn rather than captured so it can never drift from the real thing.
  */
 @Composable
-private fun BunPreview(p: BunPalette, modifier: Modifier) {
+private fun BunPreview(bun: BunSkin, p: BunPalette, modifier: Modifier) {
     Box(
         modifier
             .clip(RoundedCornerShape(18.dp))
             .background(p.base)
             .border(1.dp, p.hairline, RoundedCornerShape(18.dp)),
     ) {
+        // A picker that shows five identical grey skeletons is a colour chart,
+        // not a preview. Nebula gets its sky and its bun behind the skeleton, so
+        // what you pick here is what you get.
+        if (bun == BunSkin.NEBULA) {
+            NebulaBackdrop(seed = "preview", modifier = Modifier.fillMaxSize(), intensity = 0.85f)
+            BunMascot(
+                Modifier.align(Alignment.BottomEnd).padding(end = 6.dp, bottom = 4.dp).size(92.dp),
+                breathing = false,
+            )
+        }
         Column(Modifier.fillMaxSize().padding(12.dp)) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Box(Modifier.size(5.dp).clip(CircleShape).background(p.text.copy(alpha = 0.5f)))

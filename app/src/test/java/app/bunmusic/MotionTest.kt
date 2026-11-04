@@ -1,5 +1,6 @@
 package app.bunmusic
 
+import app.bunmusic.core.SwipeSkip
 import app.bunmusic.data.HistoryItem
 import app.bunmusic.data.Library
 import app.bunmusic.data.Track
@@ -100,4 +101,56 @@ class MotionTest {
         val forgotten = Library.forgotten(listOf(t("never")), emptyList(), now = 1_700_000_000_000L)
         assertEquals(listOf("never"), forgotten.map { it.id })
     }
+    // ------------------------------------------------------------ swipe skip
+
+    @Test
+    fun `a short drag puts the strip back`() {
+        assertEquals(0, SwipeSkip.direction(40f, 400f))
+        assertTrue(!SwipeSkip.commits(40f, 400f))
+    }
+
+    @Test
+    fun `a third of the width commits, and the sign picks the track`() {
+        // Dragging left is "next" — the strip moves the way the music is going.
+        assertEquals(-1, SwipeSkip.direction(-140f, 400f))
+        // Dragging right is "previous".
+        assertEquals(1, SwipeSkip.direction(140f, 400f))
+    }
+
+    @Test
+    fun `the threshold is a third, not a pixel count`() {
+        // The same drag commits on a phone strip and not on a tablet one, which
+        // is the point of measuring in fractions: 120 dp is most of a phone and a
+        // sliver of a tablet.
+        assertTrue(SwipeSkip.commits(120f, 300f))
+        assertTrue(!SwipeSkip.commits(120f, 900f))
+    }
+
+    @Test
+    fun `the strip cannot be dragged off the screen`() {
+        assertEquals(400f * SwipeSkip.LIMIT, SwipeSkip.clamp(9_999f, 400f), 0.01f)
+        assertEquals(-400f * SwipeSkip.LIMIT, SwipeSkip.clamp(-9_999f, 400f), 0.01f)
+        assertEquals(0f, SwipeSkip.clamp(0f, 400f), 0.01f)
+    }
+
+    @Test
+    fun `an unmeasured strip does not divide by zero`() {
+        // The first frame has no width yet. A threshold of NaN would make every
+        // gesture commit and every skip fire on the first pixel of a drag.
+        assertEquals(0f, SwipeSkip.clamp(50f, 0f), 0f)
+        assertTrue(!SwipeSkip.commits(50f, 0f))
+        assertEquals(0, SwipeSkip.direction(50f, 0f))
+        assertEquals(1f, SwipeSkip.alpha(50f, 0f), 0f)
+    }
+
+    @Test
+    fun `the strip fades but never disappears before it commits`() {
+        // Fully pulled, it is still 70 % opaque: a row that goes transparent looks
+        // like it has already gone, and then it springs back.
+        assertEquals(1f, SwipeSkip.alpha(0f, 400f), 0.0001f)
+        val pulled = SwipeSkip.alpha(-400f, 400f)
+        assertTrue(pulled in 0.69f..0.71f)
+        assertTrue(SwipeSkip.alpha(-800f, 400f) >= 0.69f)
+    }
+
 }

@@ -108,6 +108,21 @@
             </intent-filter>
         </activity-alias>
 
+        <activity-alias
+            android:name=".LauncherNebula"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_nebula"
+            android:label="@string/app_name"
+            android:roundIcon="@mipmap/ic_launcher_nebula_round"
+            android:targetActivity=".MainActivity"
+            android:theme="@style/Theme.BunMusic.Nebula">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
         <!-- stopWithTask=false: swiping the app off the recents list must not
              take the music, the session and the notification with it.
              MEDIA_BUTTON is in the filter so a headset or a car can address this

@@ -54,6 +54,22 @@ fun AboutScreen(onBack: () -> Unit) {
             }
         }
 
+        item { GroupTitle("New in 2.3.0") }
+        item {
+            AboutCard {
+                Change("A fifth bun: Nebula", "Deep space violet, neon edges, and a bun asleep on a cloud. A bun has to restyle every screen — palette, typeface, list rhythm — not tint the buttons, which is why there were four of them for three releases")
+                Change("The sky is computed, not painted", "Sixty stars whose positions come from the playing track's id, so a song always looks the same and no two songs look alike. A 1080 px backdrop would add a megabyte to the APK and go soft on a tablet; sixty circles cost nothing and stay sharp")
+                Change("Same seed, same sky, forever", "The generator is six lines of xorshift rather than kotlin.random.Random, which is explicitly allowed to change its algorithm between releases. An update must not reshuffle everybody's sky")
+                Change("A bun, drawn not shipped", "Headphones, closed eyes, a cat against the shoulder — drawn in a 100 × 100 unit space, so the same code is a 28 dp avatar in the header and a 220 dp hero in the player. It breathes slower when nothing is playing")
+                Change("Glass instead of cards", "Nebula's surfaces hold light at the top edge and fade toward the bottom, because a solid card on a star field reads as a hole punched in the sky. On the light buns the same modifier degrades to the plain card — white-on-white glass is just a slightly wrong white")
+                Change("Neon is a shadow, not a stroke", "The accent colour is used as a shadow colour, so the play button and the nav bar look lit rather than outlined. On API 26–27 Android paints it black: a shadow that is merely dark is still a shadow, so the fallback is honest")
+                Change("Home and the player share one sky", "Opening a song does not walk into a different app — the same backdrop composable is behind both, seeded by the same track")
+                Change("The icon follows the bun", "A real adaptive icon per bun, and the window background is pre-tinted before Compose draws, so a cold start into Nebula no longer flashes the lime bun first")
+                Change("The empty page is a character", "With nothing playing, Home shows the bun asleep under a crescent and one sentence, instead of a grey box and a demo track. The illustration carries the page")
+                Change("Swipe the strip to skip", "The now-playing bar follows your thumb sideways and only commits past a third of its width — a flick would fire on the accidental brush of a thumb reaching for the tab bar, and a skipped song is not undoable the way a scroll is. The haptic fires the moment the threshold is crossed, so the decision is legible before you let go")
+            }
+        }
+
         item { GroupTitle("New in 2.2.0") }
         item {
             AboutCard {
@@ -213,6 +229,7 @@ fun AboutScreen(onBack: () -> Unit) {
                         app.bunmusic.core.BunSkin.CHARCOAL -> "Charcoal · black disc on paper"
                         app.bunmusic.core.BunSkin.CLOUD -> "Cloud · blue bun on chalk"
                         app.bunmusic.core.BunSkin.PINK -> "Pink · blush tile, bun and note"
+                        app.bunmusic.core.BunSkin.NEBULA -> "Nebula · crescent, bun, violet glow"
                     },
                 )
             }

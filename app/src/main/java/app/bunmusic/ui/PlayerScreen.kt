@@ -74,6 +74,7 @@ import app.bunmusic.core.Haptics
 import app.bunmusic.core.Ink
 import app.bunmusic.core.LocalBunWindow
 import app.bunmusic.core.SerifFamily
+import app.bunmusic.core.Cosmos
 import app.bunmusic.core.Skin
 import app.bunmusic.core.SoraFamily
 import app.bunmusic.data.Downloads
@@ -146,6 +147,18 @@ fun PlayerScreen(
                 }
             )
     ) {
+        // Nebula's player is the same sky as Home, with the crescent behind the
+        // artwork. It is the same backdrop composable, so opening a song does not
+        // feel like walking into a different app.
+        if (Skin.isNebula) {
+            NebulaBackdrop(
+                seed = track?.id,
+                moon = Cosmos.moon(),
+                modifier = Modifier.fillMaxSize(),
+                intensity = 0.85f,
+            )
+        }
+
         if (glowAlpha > 0f && !Ink.isLight) {
             Box(
                 Modifier
@@ -161,7 +174,27 @@ fun PlayerScreen(
 
         if (track == null) {
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Text("Nothing playing", color = Ink.Muted, fontFamily = SoraFamily)
+                if (Skin.isNebula) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        BunMascot(Modifier.size(180.dp))
+                        Spacer(Modifier.height(10.dp))
+                        Text(
+                            "Nothing playing",
+                            color = Ink.Text,
+                            fontSize = 22.sp,
+                            fontFamily = SerifFamily,
+                        )
+                        Spacer(Modifier.height(4.dp))
+                        Text(
+                            "The bun is asleep until you pick something.",
+                            color = Ink.Muted,
+                            fontSize = 12.sp,
+                            fontFamily = SoraFamily,
+                        )
+                    }
+                } else {
+                    Text("Nothing playing", color = Ink.Muted, fontFamily = SoraFamily)
+                }
             }
             return@Box
         }
@@ -874,6 +907,9 @@ private fun ColumnScope.CharcoalPlayer(
             glyphSize = 25.dp,
             busy = state.buffering,
             stroke = 2.4.dp,
+            // The one lit object on the page. On the other buns this is a plain
+            // disc; on Nebula the accent is a light source, so the button casts it.
+            modifier = if (Skin.isNebula) Modifier.neon(Ink.Lime, radius = 34.dp, elevation = 26.dp) else Modifier,
         ) { Playback.toggle() }
         Box(
             Modifier.size(44.dp).clip(CircleShape).tapable { Playback.next() },

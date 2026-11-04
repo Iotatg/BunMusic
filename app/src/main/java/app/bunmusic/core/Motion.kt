@@ -137,3 +137,49 @@ fun <T> motionOr(spec: FiniteAnimationSpec<T>): FiniteAnimationSpec<T> =
 @Composable
 fun eased(durationMs: Int = 300, easing: Easing = BunEase.Emphasised): FiniteAnimationSpec<Float> =
     androidx.compose.animation.core.tween(motionMs(durationMs), easing = easing)
+
+/**
+ * When a sideways drag on the now-playing strip counts as "skip".
+ *
+ * Pure arithmetic, because a threshold is a decision about the user's intent and
+ * those should be checkable without a phone: a third of the strip is far enough
+ * that a thumb reaching past it for the tab bar cannot trigger it, and short
+ * enough that a deliberate swipe does not have to cross the whole screen.
+ */
+object SwipeSkip {
+    /** Fraction of the strip's width that commits the skip. */
+    const val THRESHOLD = 0.33f
+
+    /** Fraction the strip may be dragged; past this it stops following. */
+    const val LIMIT = 0.70f
+
+    /** How far the strip travels when it commits, as a fraction of its width. */
+    const val EXIT = 1.10f
+
+    /** Rubber band: the offset actually shown for a raw drag. */
+    fun clamp(dx: Float, width: Float): Float {
+        if (width <= 0f) return 0f
+        val limit = width * LIMIT
+        return dx.coerceIn(-limit, limit)
+    }
+
+    fun commits(dx: Float, width: Float): Boolean =
+        width > 0f && kotlin.math.abs(dx) > width * THRESHOLD
+
+    /**
+     * -1 for next (dragged left), +1 for previous (dragged right), 0 for "put it
+     * back". Direction is the sign of the drag, not of the velocity: the strip is
+     * already under the finger, so where it is says more than how fast it got there.
+     */
+    fun direction(dx: Float, width: Float): Int = when {
+        !commits(dx, width) -> 0
+        dx < 0f -> -1
+        else -> 1
+    }
+
+    /** Opacity of the strip at [dx]: it fades as it is pulled away. */
+    fun alpha(dx: Float, width: Float): Float {
+        if (width <= 0f) return 1f
+        return 1f - 0.30f * (kotlin.math.abs(dx) / width).coerceIn(0f, 1f)
+    }
+}

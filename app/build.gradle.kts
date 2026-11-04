@@ -11,8 +11,8 @@ android {
         applicationId = "app.bunmusic"
         minSdk = 26
         targetSdk = 37
-        versionCode = 24
-        versionName = "2.2.0"
+        versionCode = 25
+        versionName = "2.3.0"
         vectorDrawables.useSupportLibrary = true
     }
 

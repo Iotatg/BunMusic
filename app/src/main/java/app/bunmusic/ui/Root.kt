@@ -242,6 +242,19 @@ private fun Shell(
                 }
             )
     ) {
+        // Nebula's sky follows you into the library, search, settings and stats —
+        // quieter: no clouds, a third of the stars, because text on sixty stars is
+        // text on gravel. Home and the player draw their own, louder version, and
+        // the bun picker draws each bun's own preview.
+        if (Skin.isNebula && !playerOpen && route != Route.Home && route != Route.Buns) {
+            NebulaBackdrop(
+                seed = null,
+                modifier = Modifier.fillMaxSize(),
+                intensity = 0.55f,
+                count = 26,
+                clouds = false,
+            )
+        }
         Row(Modifier.fillMaxSize()) {
             // 600 dp and up: the tabs move to the edge a thumb isn't holding, and
             // the content keeps the 84 dp the bottom bar used to eat — which on a
@@ -639,6 +652,7 @@ private fun BottomChrome(
                         onOpen = onOpen,
                         onToggle = onToggle,
                         onNext = onNext,
+                        onPrevious = { Playback.previous() },
                     )
                 }
             }
@@ -688,6 +702,7 @@ private fun BottomNav(
 @Composable
 private fun DarkNav(current: Route, onSelect: (Route) -> Unit, modifier: Modifier = Modifier) {
     val reduced = LocalReducedMotion.current
+    val nebula = Skin.isNebula
     Box(
         modifier
             .fillMaxWidth()
@@ -696,9 +711,20 @@ private fun DarkNav(current: Route, onSelect: (Route) -> Unit, modifier: Modifie
         Row(
             Modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(26.dp))
-                .background(Ink.NavBg.copy(alpha = 0.96f))
-                .border(1.dp, Ink.Hairline, RoundedCornerShape(26.dp))
+                // Nebula's bar floats: a lit glass shelf rather than a solid
+                // slab. The other buns keep the slab, which is what they are.
+                .then(
+                    if (nebula) {
+                        Modifier
+                            .neon(Ink.Lime, radius = 26.dp, elevation = 20.dp)
+                            .glass(radius = 26.dp, topAlpha = 0.13f, bottomAlpha = 0.05f)
+                    } else {
+                        Modifier
+                            .clip(RoundedCornerShape(26.dp))
+                            .background(Ink.NavBg.copy(alpha = 0.96f))
+                            .border(1.dp, Ink.Hairline, RoundedCornerShape(26.dp))
+                    }
+                )
                 .padding(horizontal = 6.dp, vertical = 7.dp),
             horizontalArrangement = Arrangement.SpaceEvenly,
             verticalAlignment = Alignment.CenterVertically,
@@ -709,7 +735,9 @@ private fun DarkNav(current: Route, onSelect: (Route) -> Unit, modifier: Modifie
                 // and the glyph lifts a hair — two cheap properties that make a
                 // tab bar feel like it noticed the tap.
                 val fill by animateColorAsState(
-                    targetValue = if (selected) Ink.Lime.copy(alpha = 0.14f) else Color.Transparent,
+                    targetValue = if (selected) {
+                        if (nebula) Ink.NavActiveBg else Ink.Lime.copy(alpha = 0.14f)
+                    } else Color.Transparent,
                     animationSpec = tween(if (reduced) 0 else 240, easing = BunEase.Standard),
                     label = "navFill",
                 )
@@ -739,7 +767,13 @@ private fun DarkNav(current: Route, onSelect: (Route) -> Unit, modifier: Modifie
                                 scaleY = lift
                             }
                         ) {
-                            Glyph(t.glyph, if (selected) Ink.Lime else Ink.Faint, 19.dp)
+                            Glyph(
+                                t.glyph,
+                                if (selected) {
+                                    if (nebula) Ink.NavActiveInk else Ink.Lime
+                                } else Ink.Faint,
+                                19.dp,
+                            )
                         }
                     }
                     Spacer(Modifier.height(3.dp))

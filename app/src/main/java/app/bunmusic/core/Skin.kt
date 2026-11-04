@@ -62,6 +62,13 @@ enum class BunSkin(
         credit = "After the Pink Bun study",
         typeLabel = "Sora · rounded, soft tracking",
     ),
+    NEBULA(
+        id = "NEBULA",
+        title = "Nebula",
+        tagline = "Deep space violet, neon edges, a bun asleep on a cloud.",
+        credit = "After the Shunya study",
+        typeLabel = "Sora + Instrument Serif · wide tracking",
+    ),
     ;
 
     companion object {
@@ -259,6 +266,51 @@ private val Pink = BunPalette(
     light = true,
 )
 
+/**
+ * Nebula — the fifth bun, drawn from the violet-and-neon study.
+ *
+ * It is the only bun that is dark *and* saturated. Midnight is ink with one acid
+ * accent; Nebula is a night sky: a near-black violet page, a page-wide star
+ * field, glass cards that hold light at their top edge, and a purple that is
+ * allowed to glow rather than just sit there.
+ *
+ * The accent is #B06BFF rather than the artwork's #A855F7 because it is also used
+ * as 11 sp text on the page, where the brighter shade lands at 6.1:1 instead of
+ * 4.6:1. The glow layers push it back toward the artwork's hue.
+ */
+private val Nebula = BunPalette(
+    void = Color(0xFF05020E),
+    base = Color(0xFF0A0518),
+    raised = Color(0xFF120A22),
+    card = Color(0xFF171030),
+    line = Color(0xFF2A1E4A),
+    text = Color(0xFFF2EDFF),
+    muted = Color(0xFFB4A6D9),
+    faint = Color(0xFF8B7CB8),
+    accent = Color(0xFFB06BFF),
+    onAccent = Color(0xFF12002B),
+    lavender = Color(0xFFC9B4FF),
+    rose = Color(0xFFFF7AC8),
+    mint = Color(0xFF6FE3FF),
+    hairline = Color(0x1AFFFFFF),
+    field = Color(0x14FFFFFF),
+    sheet = Color(0xFF150C28),
+    navBg = Color(0xFF0F0820),
+    navActiveBg = Color(0xFF2E1560),
+    navActiveInk = Color(0xFFD9BEFF),
+    miniBg = Color(0xFF1B0F38),
+    miniText = Color(0xFFF2EDFF),
+    shadow = Color(0x99000000),
+    // The hero is a violet lit from inside: dark enough at the top that white
+    // type sits on it at 11:1, bright enough at the bottom to read as light.
+    hero = listOf(Color(0xFF4C1D95), Color(0xFF6D28D9), Color(0xFF8B5CF6)),
+    heroInk = Color(0xFFFFFFFF),
+    heroSub = Color(0xFFE9DDFF),
+    heroBtn = Color(0xFFFFFFFF),
+    heroBtnInk = Color(0xFF4C1D95),
+    light = false,
+)
+
 object Skin {
 
     /** Set by [load] at startup and by [apply] on a switch. */
@@ -305,9 +357,17 @@ object Skin {
         BunSkin.CHARCOAL -> Charcoal
         BunSkin.CLOUD -> Cloud
         BunSkin.PINK -> Pink
+        BunSkin.NEBULA -> Nebula
     }
 
     val light: Boolean get() = p.light
+
+    /**
+     * Nebula is the one bun that gets the cosmic layer: a star field, a crescent,
+     * glass surfaces and the sleeping bun. The other four keep their flat paper —
+     * stars behind a chalk page look like dust on the screen, not like weather.
+     */
+    val isNebula: Boolean get() = current == BunSkin.NEBULA
 
     /**
      * Cloud is the one bun that is light *and* blue. A few pieces — the line

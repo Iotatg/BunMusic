@@ -22,6 +22,7 @@ enum class WidgetSkin(val id: String, val label: String) {
     CHARCOAL("CHARCOAL", "Charcoal"),
     CLOUD("CLOUD", "Cloud Blue"),
     PINK("PINK", "Pink Bun"),
+    NEBULA("NEBULA", "Nebula"),
     GLASS("GLASS", "Smoked glass"),
     ;
 
@@ -32,6 +33,7 @@ enum class WidgetSkin(val id: String, val label: String) {
         CHARCOAL -> BunSkin.CHARCOAL
         CLOUD -> BunSkin.CLOUD
         PINK -> BunSkin.PINK
+        NEBULA -> BunSkin.NEBULA
         GLASS -> null
     }
 
@@ -166,6 +168,11 @@ internal object WidgetRes {
             WidgetShape.ROUND -> R.drawable.widget_card_pink_round
             WidgetShape.PILL -> R.drawable.widget_card_pink_pill
         }
+        BunSkin.NEBULA -> when (shape) {
+            WidgetShape.SHARP -> R.drawable.widget_card_nebula_sharp
+            WidgetShape.ROUND -> R.drawable.widget_card_nebula_round
+            WidgetShape.PILL -> R.drawable.widget_card_nebula_pill
+        }
         null -> when (shape) {
             WidgetShape.SHARP -> R.drawable.widget_card_glass_sharp
             WidgetShape.ROUND -> R.drawable.widget_card_glass_round
@@ -184,6 +191,7 @@ internal object WidgetRes {
         BunSkin.CHARCOAL -> R.drawable.widget_play_charcoal
         BunSkin.CLOUD -> R.drawable.widget_play_cloud
         BunSkin.PINK -> R.drawable.widget_play_pink
+        BunSkin.NEBULA -> R.drawable.widget_play_nebula
         null -> R.drawable.widget_play_glass
     }
 }

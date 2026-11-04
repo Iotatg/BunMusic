@@ -32,6 +32,15 @@
         <item name="android:windowBackground">#FDF2F6</item>
     </style>
 
+    <!-- Nebula's window: the violet night, so the cold-start frame is already
+         deep space instead of flashing the lime bun first. -->
+    <style name="Theme.BunMusic.Nebula" parent="Theme.BunMusic">
+        <item name="android:statusBarColor">#0A0518</item>
+        <item name="android:navigationBarColor">#0A0518</item>
+        <item name="android:windowBackground">#0A0518</item>
+        <item name="android:windowLightStatusBar">false</item>
+    </style>
+
     <!-- The widget configuration sheet. Translucent so the launcher stays visible
          behind it — configuring a home-screen widget should feel like adjusting
          the thing you are looking at, not like entering the app. -->

@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Nebula's backdrop: the night sky the tile sits in. A violet well in the
+     middle, near-black at the edges, and one warm ember at the top right where
+     the moon is. The foreground carries the bun, so this only shows where a
+     launcher mask crops harder than the artwork does. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path android:pathData="M0,0h108v108h-108z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:type="radial"
+                android:centerX="54"
+                android:centerY="58"
+                android:gradientRadius="86">
+                <item android:offset="0.0" android:color="#FF2A1560" />
+                <item android:offset="0.55" android:color="#FF120A2C" />
+                <item android:offset="1.0" android:color="#FF05020E" />
+            </gradient>
+        </aapt:attr>
+    </path>
+    <path
+        android:pathData="M0,0h108v108h-108z"
+        android:fillAlpha="0.55">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:type="radial"
+                android:centerX="82"
+                android:centerY="24"
+                android:gradientRadius="46">
+                <item android:offset="0.0" android:color="#66FFC98A" />
+                <item android:offset="1.0" android:color="#00FFC98A" />
+            </gradient>
+        </aapt:attr>
+    </path>
+</vector>

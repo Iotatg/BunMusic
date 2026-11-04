@@ -25,6 +25,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -40,26 +41,32 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.bunmusic.core.BunSkin
+import app.bunmusic.core.BunSpring
 import app.bunmusic.core.G
 import app.bunmusic.core.Glyph
 import app.bunmusic.core.Haptics
@@ -70,6 +77,7 @@ import app.bunmusic.core.LocalReducedMotion
 import app.bunmusic.core.SerifFamily
 import app.bunmusic.core.Skin
 import app.bunmusic.core.SoraFamily
+import app.bunmusic.core.SwipeSkip
 import app.bunmusic.data.Collection
 import app.bunmusic.data.Cache
 import app.bunmusic.data.Store
@@ -77,6 +85,7 @@ import app.bunmusic.data.Track
 import app.bunmusic.player.PlayerState
 import coil3.compose.AsyncImage
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlin.math.abs
 import kotlin.math.roundToInt
@@ -187,9 +196,18 @@ fun Panel(
 ) {
     Box(
         modifier
-            .clip(RoundedCornerShape(radius))
-            .background(color)
-            .border(1.dp, Ink.Hairline, RoundedCornerShape(radius))
+            // Nebula's panels are glass; the other buns keep a solid card, because
+            // a translucent card on paper is just a slightly wrong white.
+            .then(
+                if (Skin.isNebula && color == Ink.Card) {
+                    Modifier.glass(radius)
+                } else {
+                    Modifier
+                        .clip(RoundedCornerShape(radius))
+                        .background(color)
+                        .border(1.dp, Ink.Hairline, RoundedCornerShape(radius))
+                }
+            )
     ) { content() }
 }
 
@@ -210,13 +228,22 @@ fun SectionHeader(title: String, action: String? = null, onAction: (() -> Unit)?
             modifier = Modifier.weight(1f),
         )
         if (action != null) {
-            Text(
-                action,
-                color = Ink.Muted,
-                fontSize = 12.sp,
-                fontFamily = SoraFamily,
-                modifier = Modifier.clickable(enabled = onAction != null) { onAction?.invoke() },
-            )
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier
+                    .clip(RoundedCornerShape(8.dp))
+                    .tapable(scale = 0.96f) { onAction?.invoke() }
+                    .padding(start = 8.dp, end = 2.dp, top = 4.dp, bottom = 4.dp),
+            ) {
+                Text(
+                    action,
+                    color = Ink.Muted,
+                    fontSize = 12.sp,
+                    fontFamily = SoraFamily,
+                )
+                // A chevron, because "See all" is a door and a bare word is not.
+                Box(Modifier.rotate(270f)) { Glyph(G.Back, Ink.Muted, 10.dp, 1.8.dp) }
+            }
         }
     }
 }
@@ -806,14 +833,88 @@ fun MiniPlayer(
     onOpen: () -> Unit,
     onToggle: () -> Unit,
     onNext: () -> Unit,
+    onPrevious: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val track = state.track ?: return
+    val strip = modifier.swipeToSkip(
+        key = track.id,
+        onNext = onNext,
+        onPrevious = onPrevious,
+    )
     if (Ink.isLight) {
-        CharcoalMiniPlayer(state, track, onOpen, onToggle, modifier)
+        CharcoalMiniPlayer(state, track, onOpen, onToggle, strip)
     } else {
-        MidnightMiniPlayer(state, track, onOpen, onToggle, onNext, modifier)
+        MidnightMiniPlayer(state, track, onOpen, onToggle, onNext, strip)
     }
+}
+
+/**
+ * Swipe the now-playing strip sideways to change track.
+ *
+ * The strip follows the finger and only commits past a third of its width —
+ * a flick would fire on the accidental brush of a thumb reaching for the tab
+ * bar, and skipping a song is not undoable in the way a scroll is. Short of the
+ * threshold it springs back, and the haptic fires the moment the threshold is
+ * crossed so the decision is legible before the finger lifts.
+ *
+ * The strip fades as it is pulled, which is the cheapest way to say "this is
+ * leaving" without animating a second copy of the row.
+ */
+@Composable
+private fun Modifier.swipeToSkip(
+    key: Any?,
+    onNext: () -> Unit,
+    onPrevious: () -> Unit,
+): Modifier {
+    val reduced = LocalReducedMotion.current
+    if (reduced) return this
+    val scope = rememberCoroutineScope()
+    var dx by remember(key) { mutableFloatStateOf(0f) }
+    var width by remember { mutableFloatStateOf(1f) }
+    val settle = remember(key) { androidx.compose.animation.core.Animatable(0f) }
+    var armed by remember(key) { mutableStateOf(false) }
+
+    fun release() {
+        val dir = SwipeSkip.direction(dx, width)
+        scope.launch {
+            if (dir != 0) {
+                settle.snapTo(dx)
+                settle.animateTo(dir * width * SwipeSkip.EXIT, tween(170)) { dx = value }
+                if (dir < 0) onNext() else onPrevious()
+                settle.snapTo(0f)
+                dx = 0f
+            } else {
+                settle.snapTo(dx)
+                settle.animateTo(0f, BunSpring.snappy()) { dx = value }
+            }
+            armed = false
+        }
+    }
+
+    return this
+        .onSizeChanged { width = it.width.toFloat().coerceAtLeast(1f) }
+        .offset { IntOffset(dx.roundToInt(), 0) }
+        .graphicsLayer { alpha = SwipeSkip.alpha(dx, width) }
+        .pointerInput(key, width) {
+            detectHorizontalDragGestures(
+                onHorizontalDrag = { change, drag ->
+                    change.consume()
+                    // A little resistance past the commit point, so the strip
+                    // cannot be dragged off the screen entirely.
+                    dx = SwipeSkip.clamp(dx + drag, width)
+                    val nowArmed = SwipeSkip.commits(dx, width)
+                    if (nowArmed && !armed) {
+                        armed = true
+                        Haptics.tick()
+                    } else if (!nowArmed && armed) {
+                        armed = false
+                    }
+                },
+                onDragEnd = { release() },
+                onDragCancel = { release() },
+            )
+        }
 }
 
 @Composable
@@ -915,9 +1016,18 @@ private fun MidnightMiniPlayer(
         modifier
             .fillMaxWidth()
             .padding(horizontal = 14.dp, vertical = 6.dp)
-            .clip(RoundedCornerShape(20.dp))
-            .background(Brush.linearGradient(listOf(Ink.MiniBg, Ink.Void)))
-            .border(1.dp, Color.White.copy(alpha = 0.07f), RoundedCornerShape(20.dp))
+            .then(
+                if (Skin.isNebula) {
+                    Modifier
+                        .neon(Ink.Lime, radius = 20.dp, elevation = 16.dp)
+                        .glass(radius = 20.dp, topAlpha = 0.15f, bottomAlpha = 0.06f)
+                } else {
+                    Modifier
+                        .clip(RoundedCornerShape(20.dp))
+                        .background(Brush.linearGradient(listOf(Ink.MiniBg, Ink.Void)))
+                        .border(1.dp, Color.White.copy(alpha = 0.07f), RoundedCornerShape(20.dp))
+                }
+            )
             .tapable(scale = 0.99f) { onOpen() }
     ) {
         Row(
@@ -974,7 +1084,13 @@ private fun MidnightMiniPlayer(
                     .fillMaxWidth(animated)
                     .height(2.5.dp)
                     .clip(RoundedCornerShape(2.dp))
-                    .background(Ink.Lime)
+                    .background(
+                        if (Skin.isNebula) {
+                            Brush.horizontalGradient(listOf(Ink.Lime, Ink.Lavender))
+                        } else {
+                            Brush.horizontalGradient(listOf(Ink.Lime, Ink.Lime))
+                        }
+                    )
             )
         }
         Spacer(Modifier.height(8.dp))

@@ -92,6 +92,7 @@ val SerifFamily: FontFamily get() = when (Skin.current) {
     BunSkin.CHARCOAL -> Inter
     BunSkin.CLOUD -> Sora
     BunSkin.PINK -> Sora
+    BunSkin.NEBULA -> InstrumentSerif
     BunSkin.MIDNIGHT -> InstrumentSerif
 }
 

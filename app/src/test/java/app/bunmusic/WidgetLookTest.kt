@@ -65,10 +65,11 @@ class WidgetLookTest {
     @Test
     fun `every skin but auto and glass pins a real bun`() {
         val pinned = WidgetSkin.entries.filter { it != WidgetSkin.AUTO && it != WidgetSkin.GLASS }
-        assertEquals(4, pinned.size)
+        assertEquals(WidgetSkin.entries.size - 2, pinned.size)
         pinned.forEach { assertTrue("$it has no bun", it.bun() != null) }
         assertEquals(BunSkin.CLOUD, WidgetSkin.CLOUD.bun())
         assertEquals(BunSkin.PINK, WidgetSkin.PINK.bun())
+        assertEquals(BunSkin.NEBULA, WidgetSkin.NEBULA.bun())
     }
 
     @Test

@@ -44,8 +44,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -56,6 +58,7 @@ import app.bunmusic.core.Ink
 import app.bunmusic.core.LocalBunWindow
 import app.bunmusic.core.LocalReducedMotion
 import app.bunmusic.core.SerifFamily
+import app.bunmusic.core.Skin
 import app.bunmusic.core.SoraFamily
 import app.bunmusic.data.Collection
 import app.bunmusic.data.Discovery
@@ -102,14 +105,20 @@ fun HomeScreen(
     }
 
     Box(Modifier.fillMaxSize()) {
-    // The page has its own weather: three soft hues derived from whatever is
-    // playing, drifting slowly behind the list. It is the same field the player
-    // uses, so opening a song does not feel like changing apps.
-    AuroraBackdrop(
-        seed = state.track?.id ?: recents.firstOrNull()?.id,
-        modifier = Modifier.fillMaxSize(),
-        intensity = if (Ink.isLight) 0.75f else 0.9f,
-    )
+    // The page has its own weather. Nebula gets a sky — a violet well, two slow
+    // clouds and sixty stars whose positions come from the playing track's id, so
+    // a song always looks the same. The other buns keep the aurora, which is the
+    // same idea in three hues and no stars.
+    val seed = state.track?.id ?: recents.firstOrNull()?.id
+    if (Skin.isNebula) {
+        NebulaBackdrop(seed = seed, modifier = Modifier.fillMaxSize())
+    } else {
+        AuroraBackdrop(
+            seed = seed,
+            modifier = Modifier.fillMaxSize(),
+            intensity = if (Ink.isLight) 0.75f else 0.9f,
+        )
+    }
 
     LazyColumn(
         Modifier.fillMaxSize().statusBarsPadding(),
@@ -123,6 +132,25 @@ fun HomeScreen(
                     .padding(start = gutter, end = gutter - 6.dp, top = 10.dp, bottom = 2.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
+                if (Skin.isNebula) {
+                    // The mascot, at 34 dp, as the app's face. The drawing is the
+                    // same one the player and the empty state use, so the character
+                    // is recognisable before the user has read a word.
+                    Box(
+                        Modifier
+                            .size(34.dp)
+                            .clip(CircleShape)
+                            .background(
+                                Brush.radialGradient(
+                                    listOf(Ink.Lime.copy(alpha = 0.34f), Color.Transparent)
+                                )
+                            ),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        BunMascot(Modifier.fillMaxSize(), playing = state.isPlaying)
+                    }
+                    Spacer(Modifier.width(9.dp))
+                }
                 Text(
                     "BUNMUSIC",
                     color = Ink.Text,
@@ -185,6 +213,8 @@ fun HomeScreen(
                         onOpen = { onOpenPlayer() },
                         onToggle = onTogglePlay,
                     )
+                } else if (Skin.isNebula) {
+                    NebulaStartCard(onOpenSearch = onOpenSearch)
                 } else {
                     StartCard(onOpenSearch = onOpenSearch)
                 }
@@ -311,10 +341,19 @@ private fun SearchPill(onClick: () -> Unit, modifier: Modifier = Modifier) {
     Row(
         modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(16.dp))
-            .background(Ink.Card)
-            // On a chalk page a white pill needs an edge, or it dissolves.
-            .then(if (Ink.isLight) Modifier.border(1.dp, Ink.Hairline, RoundedCornerShape(16.dp)) else Modifier)
+            .then(
+                if (Skin.isNebula) {
+                    // Glass rather than a solid card: on a star field a flat
+                    // rectangle reads as a hole punched in the sky.
+                    Modifier.glass(radius = 16.dp)
+                } else {
+                    Modifier
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(Ink.Card)
+                        // On a chalk page a white pill needs an edge, or it dissolves.
+                        .then(if (Ink.isLight) Modifier.border(1.dp, Ink.Hairline, RoundedCornerShape(16.dp)) else Modifier)
+                }
+            )
             .tapable(scale = 0.985f) { onClick() }
             .padding(horizontal = 16.dp, vertical = 14.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -368,6 +407,59 @@ private fun StartCard(onOpenSearch: () -> Unit) {
     }
 }
 
+/**
+ * The empty home, Nebula edition.
+ *
+ * The reference does the one thing most music apps are afraid of: with nothing
+ * playing it shows a character instead of a grey box. So this card is the bun,
+ * asleep on its cloud, a crescent behind it, and one sentence that says what to
+ * do. No demo track, no fake shelf — the illustration carries the page.
+ */
+@Composable
+private fun NebulaStartCard(onOpenSearch: () -> Unit) {
+    Box(
+        Modifier
+            .padding(horizontal = LocalBunWindow.current.gutter)
+            .fillMaxWidth()
+            .neon(Ink.Lime, radius = 30.dp, elevation = 26.dp)
+            .glass(radius = 30.dp),
+    ) {
+        Crescent(
+            Modifier
+                .align(Alignment.TopCenter)
+                .padding(top = 10.dp)
+                .size(196.dp),
+            alpha = 0.55f,
+        )
+        Column(
+            Modifier.fillMaxWidth().padding(horizontal = 22.dp, vertical = 20.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            BunMascot(Modifier.size(168.dp))
+            Spacer(Modifier.height(4.dp))
+            Text(
+                "Feel the silence",
+                color = Ink.Text,
+                fontSize = 27.sp,
+                fontFamily = SerifFamily,
+                textAlign = TextAlign.Center,
+            )
+            Spacer(Modifier.height(6.dp))
+            Text(
+                "Hear the infinity. Search for a song, an artist or a mood — " +
+                    "anything you play is kept here, and what you play twice is already cached.",
+                color = Ink.Muted,
+                fontSize = 12.sp,
+                fontFamily = SoraFamily,
+                lineHeight = 18.sp,
+                textAlign = TextAlign.Center,
+            )
+            Spacer(Modifier.height(18.dp))
+            GlowPill("Find something", G.Search, onClick = onOpenSearch)
+        }
+    }
+}
+
 @Composable
 private fun HeroCard(track: Track, playing: Boolean, onOpen: () -> Unit, onToggle: () -> Unit) {
     val reduced = LocalReducedMotion.current
@@ -389,6 +481,7 @@ private fun HeroCard(track: Track, playing: Boolean, onOpen: () -> Unit, onToggl
         Modifier
             .padding(horizontal = LocalBunWindow.current.gutter)
             .fillMaxWidth()
+            .then(if (Skin.isNebula) Modifier.neon(Ink.Lime, radius = 28.dp, elevation = 26.dp) else Modifier)
             .clip(RoundedCornerShape(28.dp))
             .background(Brush.linearGradient(Ink.Hero))
             .tapable(scale = 0.985f) { onOpen() }

@@ -19,6 +19,7 @@ class BunSkinTest {
         val charcoal = Skin.paletteOf(BunSkin.CHARCOAL)
         val cloud = Skin.paletteOf(BunSkin.CLOUD)
         val pink = Skin.paletteOf(BunSkin.PINK)
+        val nebula = Skin.paletteOf(BunSkin.NEBULA)
         assertNotEquals(midnight.base, charcoal.base)
         assertNotEquals(midnight.text, charcoal.text)
         assertNotEquals(midnight.accent, charcoal.accent)
@@ -26,11 +27,15 @@ class BunSkinTest {
         assertNotEquals(charcoal.text, cloud.text)
         assertNotEquals(cloud.accent, pink.accent)
         assertNotEquals(cloud.base, pink.base)
+        assertNotEquals(nebula.base, midnight.base)
+        assertNotEquals(nebula.accent, midnight.accent)
+        assertNotEquals(nebula.card, pink.card)
     }
 
     @Test
-    fun onlyMidnightIsDark() {
+    fun twoBunsAreDark() {
         assertFalse(Skin.paletteOf(BunSkin.MIDNIGHT).light)
+        assertFalse(Skin.paletteOf(BunSkin.NEBULA).light)
         assertTrue(Skin.paletteOf(BunSkin.CHARCOAL).light)
         assertTrue(Skin.paletteOf(BunSkin.CLOUD).light)
         assertTrue(Skin.paletteOf(BunSkin.PINK).light)
