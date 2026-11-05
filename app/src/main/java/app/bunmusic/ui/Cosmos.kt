@@ -1,6 +1,5 @@
 package app.bunmusic.ui
 
-import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -13,7 +12,6 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -33,7 +31,6 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.PathFillType
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -47,181 +44,30 @@ import app.bunmusic.core.Glyph
 import app.bunmusic.core.Ink
 import app.bunmusic.core.LocalReducedMotion
 import app.bunmusic.core.SoraFamily
-import app.bunmusic.core.Star
 import kotlin.math.min
 
 /**
- * The cosmic layer: a sky, a moon, glass, neon, and the bun.
+ * The cosmic layer: glass, neon, and the bun.
  *
- * Everything in here is painted, not shipped as an image. A 1080 px backdrop
- * would add a megabyte to the APK and go soft on a tablet; a star field is sixty
- * circles whose positions are decided by [Cosmos] and therefore testable.
- *
- * The layer is only used by the Nebula bun. Stars behind a chalk page read as
- * dust on the glass, so the other four buns keep their flat paper and only
- * borrow the glass surfaces, which derive their tint from the palette.
+ * The *sky* moved to `Aurora.kt` in 2.8.0. The crescent poster, its fixed
+ * sixty-star field and its violet well are gone; every screen that asked for a
+ * `NebulaBackdrop` now gets a drifting aurora instead. Keeping this name means
+ * Home, Buns, Root and the player all changed with one edit rather than five,
+ * and the [moon] argument is retained (unused) so no call site had to be
+ * rewritten for a parameter that no longer has any meaning.
  */
 
 // ------------------------------------------------------------------ backdrop
 
-/**
- * The page's weather: a violet well, two slow clouds, a field of stars and
- * optionally a crescent.
- *
- * [moon] is passed explicitly because where a moon belongs is a layout decision:
- * Home wants stars only (its header sits at the top), the player wants one
- * behind the artwork. Nothing here decides that for the caller.
- */
 @Composable
 fun NebulaBackdrop(
     seed: String?,
     modifier: Modifier = Modifier,
-    moon: Cosmos.Moon? = null,
+    @Suppress("UNUSED_PARAMETER") moon: Cosmos.Moon? = null,
     intensity: Float = 1f,
-    count: Int = Cosmos.DEFAULT_STARS,
+    count: Int = Cosmos.DEFAULT_DUST,
     clouds: Boolean = true,
-) {
-    val reduced = LocalReducedMotion.current
-    val transition = if (reduced) null else rememberInfiniteTransition(label = "sky")
-    val phase = transition?.animateFloat(
-        initialValue = 0f,
-        targetValue = 1f,
-        animationSpec = infiniteRepeatable(tween(9_000, easing = LinearEasing), RepeatMode.Restart),
-        label = "twinkle",
-    )
-    Box(modifier.fillMaxSize()) {
-        // The ground: gradient, clouds, moon. It does not depend on the song, so
-        // it is drawn once and never re-entered when the track changes.
-        Canvas(Modifier.fillMaxSize()) { drawSkyBase(moon, intensity, clouds) }
-
-        // The stars do depend on the song, and a hard cut from one sky to another
-        // reads as a glitch rather than as a change of weather. Crossfading the
-        // star layer only — the gradient underneath is identical — means a track
-        // change looks like the sky rearranging itself.
-        Crossfade(
-            targetState = seed,
-            modifier = Modifier.fillMaxSize(),
-            animationSpec = tween(if (reduced) 0 else 700),
-            label = "skyChange",
-        ) { s ->
-            val stars = remember(s) { Cosmos.stars(s, count) }
-            Canvas(Modifier.fillMaxSize()) {
-                // The animated value is read here, in the draw phase, not in the
-                // composable body: a sky that recomposes sixty times a second to
-                // move sixty dots is the expensive way to draw nothing.
-                drawStars(stars, phase?.value ?: 0.35f, intensity)
-            }
-        }
-    }
-}
-
-private fun DrawScope.drawSkyBase(
-    moon: Cosmos.Moon?,
-    intensity: Float,
-    clouds: Boolean,
-) {
-    val w = size.width
-    val h = size.height
-    if (w <= 0f || h <= 0f) return
-    val span = size.minDimension
-
-    // 1. the page itself
-    drawRect(
-        Brush.verticalGradient(
-            0f to Color(0xFF12082A),
-            0.42f to Ink.Base,
-            1f to Ink.Void,
-        )
-    )
-
-    // 2. nebula clouds. Not a blur — two overlapping radial gradients cost
-    //    almost nothing and sit behind a list that is also scrolling.
-    if (clouds) {
-        blob(w * 0.18f, h * 0.06f, span * 0.95f, Ink.Lime, 0.16f * intensity)
-        blob(w * 0.92f, h * 0.26f, span * 0.80f, Ink.Lavender, 0.10f * intensity)
-        blob(w * 0.50f, h * 0.88f, span * 0.90f, Color(0xFF3B1E7A), 0.22f * intensity)
-    }
-
-    // 3. the moon, if this page has one
-    if (moon != null) {
-        val cx = w * moon.cx
-        val cy = h * moon.cy
-        val r = span * moon.radius
-        blob(cx, cy, r * 2.1f, Color(0xFFFFD9A0), 0.13f * intensity)
-        drawCrescent(cx, cy, r)
-    }
-}
-
-private fun DrawScope.blob(cx: Float, cy: Float, radius: Float, color: Color, a: Float) {
-    drawCircle(
-        brush = Brush.radialGradient(
-            colors = listOf(color.copy(alpha = a), color.copy(alpha = 0f)),
-            center = Offset(cx, cy),
-            radius = radius,
-        ),
-        radius = radius,
-        center = Offset(cx, cy),
-    )
-}
-
-private fun DrawScope.drawStars(stars: List<Star>, phase: Float, intensity: Float) {
-    val w = size.width
-    val h = size.height
-    if (w <= 0f || h <= 0f) return
-    val span = size.minDimension
-    stars.forEach { star ->
-        val a = Cosmos.twinkle(star.phase, phase) * intensity
-        val c = Color.White.copy(alpha = a * if (star.bright) 0.95f else 0.62f)
-        val cx = w * star.x
-        val cy = h * star.y
-        val r = span * star.radius
-        drawCircle(c, r, Offset(cx, cy))
-        if (star.bright) {
-            // A cross flare: two hairlines, not a glow. A glow on sixty stars is
-            // sixty offscreen buffers.
-            val len = r * 5.5f
-            drawLine(c.copy(alpha = a * 0.35f), Offset(cx - len, cy), Offset(cx + len, cy), r * 0.45f)
-            drawLine(c.copy(alpha = a * 0.35f), Offset(cx, cy - len), Offset(cx, cy + len), r * 0.45f)
-        }
-    }
-}
-
-/**
- * The crescent itself, carved with an even-odd fill.
- *
- * The same geometry as [Crescent] in this file, kept in one place so the one on
- * the page and the one inside a card cannot drift apart.
- */
-private fun DrawScope.drawCrescent(
-    cx: Float,
-    cy: Float,
-    r: Float,
-    top: Color = Color(0xFFFFE9BE),
-    bottom: Color = Color(0xFFFFC98A),
-) {
-    val outer = Path().apply {
-        addOval(androidx.compose.ui.geometry.Rect(cx - r, cy - r, cx + r, cy + r))
-    }
-    val inner = Path().apply {
-        val ir = r * 0.86f
-        val ix = cx + r * 0.52f
-        val iy = cy - r * 0.18f
-        addOval(androidx.compose.ui.geometry.Rect(ix - ir, iy - ir, ix + ir, iy + ir))
-    }
-    val crescent = Path().apply {
-        fillType = PathFillType.EvenOdd
-        addPath(outer)
-        addPath(inner)
-    }
-    drawPath(
-        path = crescent,
-        brush = Brush.linearGradient(
-            listOf(top, bottom),
-            start = Offset(cx - r, cy - r),
-            end = Offset(cx + r, cy + r),
-        ),
-    )
-}
+) = AuroraBackdrop(seed, modifier, intensity, count, clouds)
 
 // --------------------------------------------------------------------- glass
 
@@ -549,28 +395,44 @@ fun GlowRule(modifier: Modifier = Modifier, height: Dp = 1.dp) {
 }
 
 /**
- * A crescent on its own, for the places that need one inside a card rather than
- * across a page — the empty home card and the player's backdrop.
+ * A lit orb for the empty-home card.
  *
- * Even-odd fill, so the shape is carved rather than painted over: a crescent
- * drawn as "circle, then a second circle in the background colour" leaves a seam
- * the moment the card behind it is translucent.
+ * The crescent was the signature of the old poster-style Nebula and drew a hard
+ * carved edge that sat badly on translucent glass. A radial-gradient orb with a
+ * faint halo is the same "something glowing behind the bun" idea in the new
+ * language: soft, tinted by the palette, no seam on any background.
  */
 @Composable
-fun Crescent(
+fun AuroraOrb(
     modifier: Modifier = Modifier,
-    color: Color = Color(0xFFFFD9A0),
-    alpha: Float = 0.9f,
+    color: Color = Ink.Lavender,
+    alpha: Float = 0.55f,
 ) {
     Canvas(modifier) {
-        val r = size.minDimension * 0.40f
+        val c = center
+        val r = size.minDimension * 0.30f
         if (r <= 0f) return@Canvas
-        drawCrescent(
-            cx = size.width * 0.5f,
-            cy = size.height * 0.5f,
-            r = r,
-            top = color.copy(alpha = alpha),
-            bottom = color.copy(alpha = alpha * 0.55f),
+        drawCircle(
+            brush = Brush.radialGradient(
+                0f to color.copy(alpha = alpha * 0.9f),
+                0.55f to color.copy(alpha = alpha * 0.30f),
+                1f to Color.Transparent,
+                center = c,
+                radius = r * 1.9f,
+            ),
+            radius = r * 1.9f,
+            center = c,
+        )
+        drawCircle(
+            brush = Brush.radialGradient(
+                0f to Color.White.copy(alpha = alpha * 0.55f),
+                0.45f to color.copy(alpha = alpha * 0.75f),
+                1f to color.copy(alpha = alpha * 0.12f),
+                center = Offset(c.x - r * 0.25f, c.y - r * 0.30f),
+                radius = r * 1.3f,
+            ),
+            radius = r,
+            center = c,
         )
     }
 }

@@ -11,8 +11,8 @@ android {
         applicationId = "app.bunmusic"
         minSdk = 26
         targetSdk = 37
-        versionCode = 29
-        versionName = "2.7.0"
+        versionCode = 30
+        versionName = "2.8.0"
         vectorDrawables.useSupportLibrary = true
     }
 
@@ -67,6 +67,18 @@ android {
         abortOnError = false
         checkReleaseBuilds = false
     }
+
+    /**
+     * Robolectric renders the real composables on the JVM, so the screens can be
+     * looked at without a phone. Android resources have to be on the test
+     * classpath for the theme, fonts and drawables to resolve.
+     */
+    testOptions {
+        unitTests {
+            isIncludeAndroidResources = true
+            isReturnDefaultValues = true
+        }
+    }
 }
 
 dependencies {
@@ -102,4 +114,10 @@ dependencies {
     implementation("com.github.maxrave-dev:BravePipeExtractor:105aad96c7")
 
     testImplementation("junit:junit:4.13.2")
+
+    // Screen rendering on the JVM: Robolectric's native graphics draws the real
+    // Compose tree into a bitmap, so a layout mistake is visible in CI.
+    testImplementation("org.robolectric:robolectric:4.16.1")
+    testImplementation("androidx.compose.ui:ui-test-junit4")
+    debugImplementation("androidx.compose.ui:ui-test-manifest")
 }

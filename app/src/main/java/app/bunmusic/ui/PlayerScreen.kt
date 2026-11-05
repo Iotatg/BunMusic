@@ -227,6 +227,26 @@ fun PlayerScreen(
             return@Box
         }
 
+        // Nebula does not use the shared player layout. Its aurora, its orbital
+        // artwork and its waveform seek bar are a different composition, not a
+        // recolour. The sheets below are shared, so back handling, queue sharing
+        // and lyrics still live in exactly one place.
+        if (Skin.isNebula) {
+            NebulaPlayer(
+                state = state,
+                songTint = tint,
+                glow = glowAlpha,
+                settings = settings,
+                onClose = onClose,
+                onMore = onMore,
+                onQueue = { showQueue = true },
+                onLyrics = { showLyrics = true },
+                onSleep = { showSleep = true },
+                onSpeed = { showSpeed = true },
+                onCredits = { showCredits = true },
+                onLikeChanged = { now -> if (now) likePulse++ },
+            )
+        } else {
         Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding()) {
 
             if (Ink.isLight) {
@@ -447,6 +467,7 @@ fun PlayerScreen(
             }
             }
         }
+        }
 
         AnimatedVisibility(
             visible = showQueue,
@@ -562,9 +583,10 @@ private fun SeekBlock(state: PlayerState, tint: Color, modifier: Modifier = Modi
             Spacer(Modifier.weight(1f))
             Text(fmtTime(state.durationMs), color = Ink.Faint, fontSize = 11.sp, fontFamily = SoraFamily)
         }
-        if (state.error != null) {
+        val seekError = state.error
+        if (seekError != null) {
             Spacer(Modifier.height(6.dp))
-            ErrorRow(state.error ?: "")
+            ErrorRow(seekError)
         }
     }
 }
@@ -626,7 +648,7 @@ private fun TransportRow(state: PlayerState, tint: Color, modifier: Modifier = M
 
 /** Lyrics · sleep · speed · queue. */
 @Composable
-private fun SecondaryRow(
+fun SecondaryRow(
     state: PlayerState,
     onLyrics: () -> Unit,
     onSleep: () -> Unit,
@@ -934,9 +956,10 @@ private fun ColumnScope.CharcoalPlayer(
             Spacer(Modifier.weight(1f))
             Text(fmtTime(state.durationMs), color = Ink.Muted, fontSize = 11.sp, fontFamily = SoraFamily)
         }
-        if (state.error != null) {
+        val wideError = state.error
+        if (wideError != null) {
             Spacer(Modifier.height(4.dp))
-            ErrorRow(state.error ?: "")
+            ErrorRow(wideError)
         }
     }
 
@@ -1157,7 +1180,7 @@ private fun CardArt(track: Track, tint: Color) {
 // ------------------------------------------------------------------ secondary
 
 @Composable
-private fun SecondaryAction(label: String, glyph: G, active: Boolean, onClick: () -> Unit) {
+fun SecondaryAction(label: String, glyph: G, active: Boolean, onClick: () -> Unit) {
     Column(
         Modifier.clip(RoundedCornerShape(14.dp)).clickable { onClick() }.padding(horizontal = 10.dp, vertical = 6.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -1452,7 +1475,7 @@ private fun shareLyrics(ctx: android.content.Context, track: Track, lyrics: Lyri
 }
 
 @Composable
-private fun LyricsPeek(track: Track, positionMs: Long, expanded: Boolean, onToggle: () -> Unit) {
+fun LyricsPeek(track: Track, positionMs: Long, expanded: Boolean, onToggle: () -> Unit) {
     var lyrics by remember(track.id) { mutableStateOf<Lyrics?>(null) }
     LaunchedEffect(track.id) {
         lyrics = runCatching { LyricsApi.forTrack(track) }.getOrNull()

@@ -412,7 +412,7 @@ private fun StartCard(onOpenSearch: () -> Unit) {
  *
  * The reference does the one thing most music apps are afraid of: with nothing
  * playing it shows a character instead of a grey box. So this card is the bun,
- * asleep on its cloud, a crescent behind it, and one sentence that says what to
+ * asleep on its cloud, a lit orb behind it, and one sentence that says what to
  * do. No demo track, no fake shelf — the illustration carries the page.
  */
 @Composable
@@ -424,7 +424,7 @@ private fun NebulaStartCard(onOpenSearch: () -> Unit) {
             .neon(Ink.Lime, radius = 30.dp, elevation = 26.dp)
             .glass(radius = 30.dp),
     ) {
-        Crescent(
+        AuroraOrb(
             Modifier
                 .align(Alignment.TopCenter)
                 .padding(top = 10.dp)
