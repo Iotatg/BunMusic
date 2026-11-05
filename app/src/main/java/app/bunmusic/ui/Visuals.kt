@@ -41,6 +41,10 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
@@ -53,6 +57,7 @@ import app.bunmusic.core.G
 import app.bunmusic.core.Glyph
 import app.bunmusic.core.Haptics
 import app.bunmusic.core.Ink
+import app.bunmusic.core.Labels
 import app.bunmusic.core.LocalReducedMotion
 import app.bunmusic.core.SoraFamily
 import kotlinx.coroutines.delay
@@ -211,16 +216,34 @@ fun SoftGlow(
 // -------------------------------------------------------------------- press
 
 /**
+ * Names a control that has no text of its own.
+ *
+ * A `Glyph` is drawn on a `Canvas`, so to a screen reader an icon button is an
+ * unlabelled "button". `contentDescription` gives it the action, and `Role.Button`
+ * makes TalkBack say what it is — including the "double tap to activate" hint.
+ * Applied after `clickable`, so the click action itself is not replaced.
+ */
+fun Modifier.iconLabel(label: String): Modifier =
+    if (label.isEmpty()) this else semantics {
+        contentDescription = label
+        role = Role.Button
+    }
+
+/**
  * A clickable that shrinks under the finger.
  *
  * `clickable` alone gives a ripple on release; by then the eye has already moved
  * on. The scale is the acknowledgement — 3 % is enough to feel, small enough
  * that a grid of cards does not visibly wobble as you tap through it.
+ *
+ * [label] is for controls whose only child is an icon. Rows with visible text
+ * leave it empty: TalkBack reads the text, and repeating it would be noise.
  */
 @Composable
 fun Modifier.tapable(
     enabled: Boolean = true,
     scale: Float = 0.965f,
+    label: String = "",
     onClick: () -> Unit,
 ): Modifier {
     val source = remember { MutableInteractionSource() }
@@ -239,6 +262,7 @@ fun Modifier.tapable(
             enabled = enabled,
             onClick = onClick,
         )
+        .iconLabel(label)
 }
 
 /**
@@ -391,6 +415,9 @@ fun MorphPlayButton(
         playing -> G.Pause
         else -> G.Play
     }
+    // The label is the *action*, not the picture: while playing it must say
+    // "Pause", and while buffering it must not claim to be a play button.
+    val label = Labels.transport(playing, busy && !playing)
     Box(
         modifier
             .size(size)
@@ -406,7 +433,8 @@ fun MorphPlayButton(
             ) {
                 Haptics.tick()
                 onClick()
-            },
+            }
+            .iconLabel(label),
         contentAlignment = Alignment.Center,
     ) {
         AnimatedContent(

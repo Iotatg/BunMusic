@@ -30,6 +30,82 @@ enum class G {
     Copy, ThumbDown, Bell, Sort, Receipt, Pin, Cloud, External
 }
 
+/**
+ * What a screen reader says for a control drawn only as a glyph.
+ *
+ * This is an exhaustive `when`, not a map: adding a glyph to [G] stops the
+ * build until somebody names it, so a new icon can never ship mute. The words
+ * are deliberately verb-ish ("Shuffle", "Add to queue") rather than the shape
+ * of the drawing ("two crossed arrows") — a listener needs the action.
+ *
+ * Kept out of Compose on purpose: it is plain Kotlin, so it is unit-testable
+ * and can be reused by a widget or a shortcut without a composition.
+ */
+val G.label: String
+    get() = when (this) {
+        G.Play -> "Play"
+        G.Pause -> "Pause"
+        G.Next -> "Next track"
+        G.Prev -> "Previous track"
+        G.Search -> "Search"
+        G.Home -> "Home"
+        G.Library -> "Library"
+        G.Shuffle -> "Shuffle"
+        G.Repeat -> "Repeat"
+        G.RepeatOne -> "Repeat one"
+        G.Heart -> "Like"
+        G.HeartFill -> "Unlike"
+        G.Queue -> "Queue"
+        G.Back -> "Back"
+        G.Forward -> "Forward"
+        G.More -> "More options"
+        G.Plus -> "Add"
+        G.Close -> "Close"
+        G.Mic -> "Voice search"
+        G.Download -> "Download"
+        G.Youtube -> "YouTube Music"
+        G.Clock -> "Clock"
+        G.Check -> "Selected"
+        G.Trash -> "Delete"
+        G.Filter -> "Filter"
+        G.Wave -> "Now playing"
+        G.Sparkle -> "Highlights"
+        G.Disc -> "Album"
+        G.List -> "List"
+        G.Share -> "Share"
+        G.Offline -> "Offline"
+        G.Compass -> "Explore"
+        G.Chart -> "Stats"
+        G.Gear -> "Settings"
+        G.Moon -> "Night"
+        G.Grid -> "Grid"
+        G.Flame -> "Trending"
+        G.User -> "Account"
+        G.Drag -> "Reorder"
+        G.Speed -> "Playback speed"
+        G.PlayCircle -> "Play"
+        G.Refresh -> "Refresh"
+        G.Google -> "Google"
+        G.Mail -> "Mail"
+        G.Phone -> "Phone"
+        G.Lock -> "Lock"
+        G.Eye -> "Show"
+        G.EyeOff -> "Hide"
+        G.Logout -> "Sign out"
+        G.Shield -> "Privacy"
+        G.Sliders -> "Equalizer"
+        G.Edit -> "Edit"
+        G.Key -> "Key"
+        G.Copy -> "Copy"
+        G.ThumbDown -> "Not interested"
+        G.Bell -> "Notifications"
+        G.Sort -> "Sort"
+        G.Receipt -> "Credits"
+        G.Pin -> "Pin"
+        G.Cloud -> "Cloud"
+        G.External -> "Open in browser"
+    }
+
 @Composable
 fun Glyph(
     g: G,

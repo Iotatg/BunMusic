@@ -113,9 +113,9 @@ fun QueuePanel(
                 if (name.isNotBlank()) onSaved(name)
             }
             Spacer(Modifier.width(8.dp))
-            IconBtn(G.Share, Ink.Muted, 38.dp, 16.dp, onShare)
+            IconBtn(G.Share, Ink.Muted, 38.dp, 16.dp, onClick = onShare)
             Spacer(Modifier.width(4.dp))
-            IconBtn(G.Close, Ink.Text, 38.dp, 16.dp, onClose)
+            IconBtn(G.Close, Ink.Text, 38.dp, 16.dp, onClick = onClose)
         }
 
         // Only worth showing once the list is longer than a screenful.
@@ -324,9 +324,13 @@ private fun DraggableQueueRow(
             Modifier.size(30.dp).clip(CircleShape),
             contentAlignment = Alignment.Center,
         ) { Glyph(G.Drag, Ink.Faint, 14.dp) }
+        // 44 dp rather than the 26 the glyph needs: the drawing stays small so
+        // the row reads as a list, but the target is thumb-sized. At 26 this was
+        // the smallest thing in the app and the easiest to miss.
         Box(
-            Modifier.size(26.dp).clip(CircleShape).clickable { onRemove() },
+            Modifier.size(44.dp).clip(CircleShape).clickable { onRemove() }
+                .iconLabel("Remove from queue"),
             contentAlignment = Alignment.Center,
-        ) { Glyph(G.Close, Ink.Faint, 12.dp) }
+        ) { Glyph(G.Close, Ink.Faint, 13.dp) }
     }
 }

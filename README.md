@@ -7,10 +7,32 @@ saved offline.
 
 ```
 package   app.bunmusic
-version   2.5.0 (27)
+version   2.6.0 (28)
 minSdk    26  ·  target/compile 37
 author    Iota Coder · iota14934@gmail.com
 ```
+
+---
+
+## 2.6.0 — every button has a name
+
+No new screens. Two things that were quietly broken for anyone not using the
+app with their eyes and a steady thumb.
+
+| Piece | What it is |
+|---|---|
+| **`core/Glyphs.kt`** | `val G.label` — an exhaustive `when` over all 61 glyphs. Exhaustive on purpose: add a glyph and the build stops until somebody names it, so a new icon can never ship mute |
+| **`core/Labels.kt`** | The state-dependent ones. Repeat has three modes and used to say "Repeat" for all of them; it now says "Repeat one. Turn repeat off" — the state first, then what a tap will do. Same for shuffle, like, and the play button while buffering |
+| **`Modifier.iconLabel`** | One helper, applied at 33 icon-only buttons and every transport control. Empty label means no change, so text rows and decorative chevrons are untouched |
+| **Back** | The queue, share, lyrics, credits and info panels are plain composables drawn over the player — nothing gave them a back gesture, so back from the queue closed the whole player and lost your place. One ordered handler now closes the sheet in front of you first. Sleep and speed are left to their own modal sheets, which already handle it |
+| **The little ×** | Remove-from-queue was a 26 dp target — the smallest thing in the app. The drawing is still small; the target is 44 dp |
+
+Labels are plain Kotlin, so they are unit-tested without a device: `LabelsTest`
+walks every glyph and fails on a blank, a shout, or a sentence.
+
+493 unit tests, 0 failures. Same signing key. No phone or emulator here, so
+nobody has heard TalkBack read these labels aloud or pressed back on a real
+device — the strings and the ordering are verified, the sound of them is not.
 
 ---
 

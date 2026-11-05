@@ -1,6 +1,7 @@
 package app.bunmusic.ui
 
 import androidx.compose.animation.animateColorAsState
+import androidx.activity.compose.BackHandler
 import androidx.compose.runtime.produceState
 import app.bunmusic.core.ArtColors
 import androidx.compose.animation.AnimatedVisibility
@@ -72,6 +73,8 @@ import app.bunmusic.core.G
 import app.bunmusic.core.Glyph
 import app.bunmusic.core.Haptics
 import app.bunmusic.core.Ink
+import app.bunmusic.core.label
+import app.bunmusic.core.Labels
 import app.bunmusic.core.LocalBunWindow
 import app.bunmusic.core.SerifFamily
 import app.bunmusic.core.Cosmos
@@ -109,6 +112,28 @@ fun PlayerScreen(
     var showInfo by remember { mutableStateOf(false) }
     var likePulse by remember { mutableIntStateOf(0) }
     var inlineLyrics by remember { mutableStateOf(false) }
+
+    /**
+     * Back closes the sheet in front of you, not the player behind it.
+     *
+     * The five overlays here are plain composables drawn over the player, so
+     * nothing in the framework gives them a back gesture — without this, back
+     * from the queue panel dismissed the whole player and lost your place.
+     * One ordered handler rather than one per sheet: the precedence reads top
+     * to bottom, so the most recently opened sheet is the first to go.
+     *
+     * Sleep and speed are left out on purpose — they are real modal sheets,
+     * which handle back themselves and would fight this.
+     */
+    BackHandler(enabled = showQueue || showShare || showLyrics || showCredits || showInfo) {
+        when {
+            showInfo -> showInfo = false
+            showCredits -> showCredits = false
+            showLyrics -> showLyrics = false
+            showShare -> showShare = false
+            else -> showQueue = false
+        }
+    }
     val window = LocalBunWindow.current
     // The widget's queue button opens the player *and* the queue. It used to
     // open the player and leave the listener to find the button themselves.
@@ -253,7 +278,8 @@ fun PlayerScreen(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Box(
-                    Modifier.size(40.dp).clip(CircleShape).clickable { onClose() },
+                    Modifier.size(40.dp).clip(CircleShape).clickable { onClose() }
+                        .iconLabel("Collapse player"),
                     contentAlignment = Alignment.Center,
                 ) {
                     Box(Modifier.rotate(90f)) { Glyph(G.Back, Ink.Text, 20.dp, 2.dp) }
@@ -281,7 +307,7 @@ fun PlayerScreen(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     IconBtn(G.Receipt, Ink.Text, 38.dp, 17.dp) { showCredits = true }
                     IconBtn(G.Queue, Ink.Text, 38.dp, 18.dp) { showQueue = true }
-                    IconBtn(G.More, Ink.Text, 38.dp, 18.dp, onMore)
+                    IconBtn(G.More, Ink.Text, 38.dp, 18.dp, onClick = onMore)
                 }
             }
 
@@ -375,7 +401,7 @@ fun PlayerScreen(
                             likePulse++
                             Haptics.tick()
                         }
-                    },
+                    }.iconLabel(Labels.like(liked)),
                     contentAlignment = Alignment.Center,
                 ) {
                     Glyph(
@@ -588,6 +614,7 @@ private fun TransportRow(state: PlayerState, tint: Color, modifier: Modifier = M
             if (state.repeat == 2) G.RepeatOne else G.Repeat,
             if (state.repeat != 0) active else Ink.Faint,
             40.dp, 18.dp,
+            label = Labels.repeat(state.repeat),
         ) { Playback.cycleRepeat() }
     }
 }
@@ -667,7 +694,8 @@ private fun WidePlayer(
         Column(Modifier.weight(0.85f).fillMaxHeight()) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Box(
-                    Modifier.size(40.dp).clip(CircleShape).clickable { onClose() },
+                    Modifier.size(40.dp).clip(CircleShape).clickable { onClose() }
+                        .iconLabel("Collapse player"),
                     contentAlignment = Alignment.Center,
                 ) {
                     Box(Modifier.rotate(90f)) { Glyph(G.Back, Ink.Text, 20.dp, 2.dp) }
@@ -683,7 +711,7 @@ private fun WidePlayer(
                 )
                 Spacer(Modifier.weight(1f))
                 IconBtn(G.Queue, Ink.Text, 38.dp, 18.dp) { onQueue() }
-                IconBtn(G.More, Ink.Text, 38.dp, 18.dp, onMore)
+                IconBtn(G.More, Ink.Text, 38.dp, 18.dp, onClick = onMore)
             }
 
             Spacer(Modifier.weight(0.4f))
@@ -730,7 +758,7 @@ private fun WidePlayer(
                     Modifier.size(42.dp).clip(CircleShape).clickable {
                         liked = Store.toggleLike(track.id)
                         Haptics.tick()
-                    },
+                    }.iconLabel(Labels.like(liked)),
                     contentAlignment = Alignment.Center,
                 ) {
                     Glyph(
@@ -784,7 +812,8 @@ private fun ColumnScope.CharcoalPlayer(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Box(
-            Modifier.size(40.dp).clip(CircleShape).clickable { onClose() },
+            Modifier.size(40.dp).clip(CircleShape).clickable { onClose() }
+                        .iconLabel("Collapse player"),
             contentAlignment = Alignment.Center,
         ) {
             Box(Modifier.rotate(90f)) { Glyph(G.Back, Ink.Text, 21.dp, 2.2.dp) }
@@ -800,7 +829,8 @@ private fun ColumnScope.CharcoalPlayer(
         )
         Spacer(Modifier.weight(1f))
         Box(
-            Modifier.size(40.dp).clip(CircleShape).clickable { onQueue() },
+            Modifier.size(40.dp).clip(CircleShape).clickable { onQueue() }
+                .iconLabel(G.Queue.label),
             contentAlignment = Alignment.Center,
         ) { Glyph(G.Queue, Ink.Text, 20.dp, 2.dp) }
     }
@@ -836,7 +866,7 @@ private fun ColumnScope.CharcoalPlayer(
             Modifier.size(38.dp).clip(CircleShape).clickable {
                 liked = Store.toggleLike(track.id)
                 Haptics.tick()
-            },
+            }.iconLabel(Labels.like(liked)),
             contentAlignment = Alignment.Center,
         ) {
             Glyph(
@@ -870,7 +900,8 @@ private fun ColumnScope.CharcoalPlayer(
             )
         }
         Box(
-            Modifier.size(38.dp).clip(CircleShape).clickable { onMore() },
+            Modifier.size(38.dp).clip(CircleShape).clickable { onMore() }
+            .iconLabel(G.More.label),
             contentAlignment = Alignment.Center,
         ) { Glyph(G.More, Ink.Faint, 20.dp, 2.dp) }
     }
@@ -913,11 +944,12 @@ private fun ColumnScope.CharcoalPlayer(
         horizontalArrangement = Arrangement.SpaceBetween,
     ) {
         Box(
-            Modifier.size(40.dp).clip(CircleShape).tapable { Playback.toggleShuffle() },
+            Modifier.size(40.dp).clip(CircleShape)
+                .tapable(label = Labels.shuffle(state.shuffle)) { Playback.toggleShuffle() },
             contentAlignment = Alignment.Center,
         ) { Glyph(G.Shuffle, if (state.shuffle) Ink.Text else Ink.Faint, 20.dp, 1.9.dp) }
         Box(
-            Modifier.size(44.dp).clip(CircleShape).tapable { Playback.previous() },
+            Modifier.size(44.dp).clip(CircleShape).tapable(label = G.Prev.label) { Playback.previous() },
             contentAlignment = Alignment.Center,
         ) { Glyph(G.Prev, Ink.Text, 26.dp, 2.2.dp) }
         MorphPlayButton(
@@ -933,11 +965,12 @@ private fun ColumnScope.CharcoalPlayer(
             modifier = if (Skin.isNebula) Modifier.neon(Ink.Lime, radius = 34.dp, elevation = 26.dp) else Modifier,
         ) { Playback.toggle() }
         Box(
-            Modifier.size(44.dp).clip(CircleShape).tapable { Playback.next() },
+            Modifier.size(44.dp).clip(CircleShape).tapable(label = G.Next.label) { Playback.next() },
             contentAlignment = Alignment.Center,
         ) { Glyph(G.Next, Ink.Text, 26.dp, 2.2.dp) }
         Box(
-            Modifier.size(40.dp).clip(CircleShape).tapable { Playback.cycleRepeat() },
+            Modifier.size(40.dp).clip(CircleShape)
+                .tapable(label = Labels.repeat(state.repeat)) { Playback.cycleRepeat() },
             contentAlignment = Alignment.Center,
         ) {
             Glyph(
@@ -1163,7 +1196,7 @@ private fun QueueSheet(state: PlayerState, onClose: () -> Unit, onSaved: (String
             Spacer(Modifier.width(8.dp))
             GhostBtn("Clear", G.Trash) { Playback.clearQueue() }
             Spacer(Modifier.width(8.dp))
-            IconBtn(G.Close, Ink.Text, 38.dp, 16.dp, onClose)
+            IconBtn(G.Close, Ink.Text, 38.dp, 16.dp, onClick = onClose)
         }
         LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 20.dp)) {
             itemsIndexed(state.queue) { i, t ->
@@ -1206,9 +1239,10 @@ private fun QueueSheet(state: PlayerState, onClose: () -> Unit, onSaved: (String
                         contentAlignment = Alignment.Center,
                     ) { Glyph(G.Drag, Ink.Faint, 14.dp) }
                     Box(
-                        Modifier.size(26.dp).clip(CircleShape).clickable { Playback.removeAt(i) },
+                        Modifier.size(44.dp).clip(CircleShape).clickable { Playback.removeAt(i) }
+                            .iconLabel("Remove from queue"),
                         contentAlignment = Alignment.Center,
-                    ) { Glyph(G.Close, Ink.Faint, 12.dp) }
+                    ) { Glyph(G.Close, Ink.Faint, 13.dp) }
                 }
             }
         }
@@ -1261,7 +1295,7 @@ private fun LyricsSheet(track: Track, positionMs: Long, onClose: () -> Unit) {
             }
             IconBtn(G.Copy, Ink.Muted, 38.dp, 16.dp) { copyLyrics(track, lyrics, ctx) }
             IconBtn(G.Share, Ink.Muted, 38.dp, 16.dp) { shareLyrics(ctx, track, lyrics) }
-            IconBtn(G.Close, Ink.Text, 38.dp, 16.dp, onClose)
+            IconBtn(G.Close, Ink.Text, 38.dp, 16.dp, onClick = onClose)
         }
 
         // A lyric file that runs 700 ms ahead of the audio is the most common

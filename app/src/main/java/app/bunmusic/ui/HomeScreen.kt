@@ -160,7 +160,7 @@ fun HomeScreen(
                     letterSpacing = 1.8.sp,
                 )
                 Spacer(Modifier.weight(1f))
-                IconBtn(G.Gear, Ink.Muted, 38.dp, 18.dp, onOpenSettings)
+                IconBtn(G.Gear, Ink.Muted, 38.dp, 18.dp, onClick = onOpenSettings)
             }
         }
 

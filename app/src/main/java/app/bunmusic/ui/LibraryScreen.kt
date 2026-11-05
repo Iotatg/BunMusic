@@ -228,7 +228,7 @@ fun LibraryScreen(
                                 Prefs.update { it.copy(libraryGrid = grid) }
                             }
                         }
-                        if (showStats) IconBtn(G.Chart, Ink.Muted, 38.dp, 18.dp, onOpenStats)
+                        if (showStats) IconBtn(G.Chart, Ink.Muted, 38.dp, 18.dp, onClick = onOpenStats)
                     }
                 },
             )
@@ -724,8 +724,8 @@ private fun AutoRow(
             )
             Text(auto.subtitle, color = Ink.Faint, fontSize = 11.5.sp, fontFamily = SoraFamily)
         }
-        IconBtn(G.Play, Ink.Muted, 36.dp, 15.dp, onPlay)
-        IconBtn(G.Shuffle, Ink.Muted, 36.dp, 15.dp, onShuffle)
+        IconBtn(G.Play, Ink.Muted, 36.dp, 15.dp, onClick = onPlay)
+        IconBtn(G.Shuffle, Ink.Muted, 36.dp, 15.dp, onClick = onShuffle)
         Glyph(if (expanded) G.Back else G.Forward, Ink.Faint, 15.dp)
     }
 }

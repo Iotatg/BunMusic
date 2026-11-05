@@ -72,6 +72,7 @@ import app.bunmusic.core.Glyph
 import app.bunmusic.core.Haptics
 import app.bunmusic.core.Icons
 import app.bunmusic.core.Ink
+import app.bunmusic.core.label
 import app.bunmusic.core.LocalBunWindow
 import app.bunmusic.core.LocalReducedMotion
 import app.bunmusic.core.SerifFamily
@@ -677,9 +678,16 @@ fun Chip(
 }
 
 @Composable
-fun IconBtn(glyph: G, tint: Color = Ink.Text, size: Dp = 40.dp, glyphSize: Dp = 18.dp, onClick: () -> Unit) {
+fun IconBtn(
+    glyph: G,
+    tint: Color = Ink.Text,
+    size: Dp = 40.dp,
+    glyphSize: Dp = 18.dp,
+    label: String = glyph.label,
+    onClick: () -> Unit,
+) {
     Box(
-        Modifier.size(size).clip(CircleShape).tapable { onClick() },
+        Modifier.size(size).clip(CircleShape).tapable(label = label) { onClick() },
         contentAlignment = Alignment.Center,
     ) { Glyph(glyph, tint, glyphSize) }
 }

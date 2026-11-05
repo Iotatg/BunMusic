@@ -158,7 +158,7 @@ private fun SheetShell(
                         )
                     }
                 }
-                IconBtn(G.Close, Ink.Text, 38.dp, 16.dp, onClose)
+                IconBtn(G.Close, Ink.Text, 38.dp, 16.dp, onClick = onClose)
             }
             content()
         }
