@@ -1,6 +1,7 @@
 package app.bunmusic.ui
 
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
@@ -458,8 +459,49 @@ fun MorphPlayButton(
     }
 }
 
-// ------------------------------------------------------------------- rules
+/**
+ * One glyph becoming another, in place.
+ *
+ * Repeat has two drawings and three modes; like has an empty heart and a full
+ * one. Swapping them in a single frame reads as a repaint — the eye is given no
+ * reason to look. A short cross-spring makes the change itself the feedback,
+ * which is the whole trick behind Rive's state machines, done here in about
+ * fifteen lines with no runtime and no asset.
+ *
+ * The tint crossfades too, so a control that goes from grey to accent does not
+ * flash through an intermediate colour on the way.
+ */
+@Composable
+fun MorphIcon(
+    glyph: G,
+    tint: Color,
+    size: Dp = 22.dp,
+    modifier: Modifier = Modifier,
+) {
+    val reduced = LocalReducedMotion.current
+    val ink by animateColorAsState(tint, tween(if (reduced) 0 else 220), label = "ink")
+    AnimatedContent(
+        targetState = glyph,
+        modifier = modifier.size(size),
+        transitionSpec = {
+            (
+                fadeIn(tween(if (reduced) 0 else 150)) +
+                    scaleIn(
+                        initialScale = 0.62f,
+                        animationSpec = if (reduced) tween(0) else BunSpring.snappy(),
+                    )
+                ) togetherWith (
+                fadeOut(tween(if (reduced) 0 else 110)) +
+                    scaleOut(targetScale = 0.62f, animationSpec = tween(if (reduced) 0 else 110))
+                )
+        },
+        label = "iconMorph",
+    ) { g ->
+        Glyph(g, ink, size)
+    }
+}
 
+// ------------------------------------------------------------------- rules
 /** A hairline that fades in from both ends. A full-width rule cuts a page in two. */
 @Composable
 fun GradientRule(modifier: Modifier = Modifier, height: Dp = 1.dp) {

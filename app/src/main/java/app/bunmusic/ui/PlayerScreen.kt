@@ -404,10 +404,10 @@ fun PlayerScreen(
                     }.iconLabel(Labels.like(liked)),
                     contentAlignment = Alignment.Center,
                 ) {
-                    Glyph(
-                        if (liked) G.HeartFill else G.Heart,
-                        if (liked) Ink.Rose else Ink.Muted,
-                        20.dp,
+                    MorphIcon(
+                        glyph = if (liked) G.HeartFill else G.Heart,
+                        tint = if (liked) Ink.Rose else Ink.Muted,
+                        size = 20.dp,
                     )
                 }
             }
@@ -610,12 +610,17 @@ private fun TransportRow(state: PlayerState, tint: Color, modifier: Modifier = M
             ) { Playback.toggle() }
         }
         IconBtn(G.Next, Ink.Text, 48.dp, 24.dp) { Playback.next() }
-        IconBtn(
-            if (state.repeat == 2) G.RepeatOne else G.Repeat,
-            if (state.repeat != 0) active else Ink.Faint,
-            40.dp, 18.dp,
-            label = Labels.repeat(state.repeat),
-        ) { Playback.cycleRepeat() }
+        Box(
+            Modifier.size(40.dp).clip(CircleShape)
+                .tapable(label = Labels.repeat(state.repeat)) { Playback.cycleRepeat() },
+            contentAlignment = Alignment.Center,
+        ) {
+            MorphIcon(
+                glyph = if (state.repeat == 2) G.RepeatOne else G.Repeat,
+                tint = if (state.repeat != 0) active else Ink.Faint,
+                size = 18.dp,
+            )
+        }
     }
 }
 
@@ -761,10 +766,10 @@ private fun WidePlayer(
                     }.iconLabel(Labels.like(liked)),
                     contentAlignment = Alignment.Center,
                 ) {
-                    Glyph(
-                        if (liked) G.HeartFill else G.Heart,
-                        if (liked) Ink.Rose else Ink.Muted,
-                        20.dp,
+                    MorphIcon(
+                        glyph = if (liked) G.HeartFill else G.Heart,
+                        tint = if (liked) Ink.Rose else Ink.Muted,
+                        size = 20.dp,
                     )
                 }
             }
@@ -869,11 +874,10 @@ private fun ColumnScope.CharcoalPlayer(
             }.iconLabel(Labels.like(liked)),
             contentAlignment = Alignment.Center,
         ) {
-            Glyph(
-                if (liked) G.HeartFill else G.Heart,
-                if (liked) Ink.Rose else Ink.Faint,
-                21.dp,
-                2.dp,
+            MorphIcon(
+                glyph = if (liked) G.HeartFill else G.Heart,
+                tint = if (liked) Ink.Rose else Ink.Faint,
+                size = 21.dp,
             )
         }
         Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {

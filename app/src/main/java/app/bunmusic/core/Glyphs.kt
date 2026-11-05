@@ -6,6 +6,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
@@ -106,12 +107,24 @@ val G.label: String
         G.External -> "Open in browser"
     }
 
+/**
+ * Stroke width for a glyph drawn [size] wide.
+ *
+ * Two units on a 24 grid, scaled — the rule Lucide, Heroicons and IBM's icon
+ * set all land on. The point is that the *ratio* stays constant: a 13 dp close
+ * mark and a 26 dp transport button should look like they were drawn by the
+ * same hand. Fixing the stroke at 1.9 dp did the opposite — it made every small
+ * icon look bold and every large one look thin, which is the single most
+ * common reason a hand-rolled icon set reads as amateur.
+ */
+fun glyphStroke(size: Dp): Dp = size * (2f / 24f)
+
 @Composable
 fun Glyph(
     g: G,
     tint: Color = Ink.Text,
     size: Dp = 22.dp,
-    stroke: Dp = 1.9.dp,
+    stroke: Dp = glyphStroke(size),
 ) {
     Canvas(Modifier.size(size)) {
         val k = this.size.minDimension / 24f
@@ -175,7 +188,6 @@ private fun DrawScope.drawGlyph(g: G, c: Color, sw: Float) {
             line(5.6f, 4.2f, 5.6f, 19.8f, sw * 1.15f)
             line(10.6f, 4.2f, 10.6f, 19.8f, sw * 1.15f)
             poly(15.2f, 6.2f, 19.4f, 18.6f)
-            line(15.2f, 6.2f, 15.2f, 6.2f)
         }
         G.Shuffle -> {
             poly(3.5f, 17.5f, 7.5f, 17.5f, 16.5f, 6.5f, 20.5f, 6.5f)
@@ -232,10 +244,12 @@ private fun DrawScope.drawGlyph(g: G, c: Color, sw: Float) {
         G.Plus -> { line(12f, 4.8f, 12f, 19.2f); line(4.8f, 12f, 19.2f, 12f) }
         G.Close -> { line(6f, 6f, 18f, 18f); line(18f, 6f, 6f, 18f) }
         G.Mic -> {
-            drawRoundRect(c, Offset(9f, 2.8f), Size(6f, 10.6f), androidx.compose.ui.geometry.CornerRadius(3f), style = s)
-            poly(5.8f, 11.2f, 5.8f, 12.2f)
-            drawArc(c, 200f, 140f, false, Offset(5.4f, 6.2f), Size(13.2f, 13.2f), style = s)
-            line(12f, 19.4f, 12f, 21.4f)
+            drawRoundRect(c, Offset(9f, 2.6f), Size(6f, 10.8f), CornerRadius(3f), style = s)
+            // The cradle is the *bottom* half of a circle whose rim sits level
+            // with the capsule's base. It used to be drawn from 200° to 340° —
+            // the top half — which is why the whole glyph read as a headphone.
+            drawArc(c, 0f, 180f, false, Offset(5.4f, 5.4f), Size(13.2f, 13.2f), style = s)
+            line(12f, 18.6f, 12f, 21.2f)
         }
         G.Download -> {
             line(12f, 3.8f, 12f, 14.6f)
@@ -259,9 +273,9 @@ private fun DrawScope.drawGlyph(g: G, c: Color, sw: Float) {
             line(13.8f, 10.4f, 13.4f, 16.6f)
         }
         G.Filter -> {
-            line(3.8f, 6.4f, 20.2f, 6.4f)
-            line(6.6f, 12f, 17.4f, 12f)
-            line(9.4f, 17.6f, 14.6f, 17.6f)
+            // A funnel. Three shrinking rules were indistinguishable from
+            // G.Sort at 18 dp, which is the size this is actually used at.
+            poly(3.6f, 5.2f, 20.4f, 5.2f, 14.2f, 12.6f, 14.2f, 19.4f, 9.8f, 21.4f, 9.8f, 12.6f, close = true)
         }
         G.Wave -> {
             val hs = floatArrayOf(6f, 12f, 8.5f, 15f, 5f)
@@ -334,9 +348,18 @@ private fun DrawScope.drawGlyph(g: G, c: Color, sw: Float) {
             line(12f, 13.6f, 12f, 20.4f)
         }
         G.Cloud -> {
-            drawArc(c, 150f, 240f, false, Offset(3.4f, 6.4f), Size(11f, 11f), style = s)
-            drawArc(c, 300f, 210f, false, Offset(9.6f, 4.4f), Size(11f, 11f), style = s)
-            line(5.4f, 17.4f, 18.6f, 17.4f)
+            // One closed outline instead of two arcs and a line. The old
+            // version drew the two lobes and the base as three separate
+            // strokes that never met, so the glyph read as a hook.
+            val p = Path().apply {
+                moveTo(17.5f, 19f)
+                lineTo(9f, 19f)
+                arcTo(Rect(2f, 5f, 16f, 19f), 90f, 253.4f, false)
+                lineTo(17.5f, 10f)
+                arcTo(Rect(13f, 10f, 22f, 19f), 270f, 180f, false)
+                close()
+            }
+            drawPath(p, c, style = s)
         }
         G.External -> {
             poly(13.6f, 4.4f, 19.6f, 4.4f, 19.6f, 10.4f)
@@ -353,12 +376,18 @@ private fun DrawScope.drawGlyph(g: G, c: Color, sw: Float) {
             drawRoundRect(c, Offset(16.4f, 10f), Size(3.2f, 9.4f), androidx.compose.ui.geometry.CornerRadius(1.2f))
         }
         G.Gear -> {
-            drawCircle(c, 8.3f, Offset(12f, 12f), style = s)
-            drawCircle(c, 3.1f, Offset(12f, 12f), style = s)
-            line(12f, 1.9f, 12f, 4.3f)
-            line(12f, 19.7f, 12f, 22.1f)
-            line(1.9f, 12f, 4.3f, 12f)
-            line(19.7f, 12f, 22.1f, 12f)
+            // Eight teeth, not four. Four spokes on a ring is a sun; a gear
+            // needs enough of them to read as machined rather than drawn.
+            drawCircle(c, 6.8f, Offset(12f, 12f), style = s)
+            drawCircle(c, 2.6f, Offset(12f, 12f), style = s)
+            line(12f, 4.1f, 12f, 2.8f)
+            line(12f, 19.9f, 12f, 21.2f)
+            line(15.9f, 12f, 17.2f, 12f)
+            line(8.1f, 12f, 6.8f, 12f)
+            line(17.6f, 17.6f, 18.5f, 18.5f)
+            line(6.4f, 17.6f, 5.5f, 18.5f)
+            line(6.4f, 6.4f, 5.5f, 5.5f)
+            line(17.6f, 6.4f, 18.5f, 5.5f)
         }
         G.Moon -> {
             val p = Path()
@@ -398,8 +427,14 @@ private fun DrawScope.drawGlyph(g: G, c: Color, sw: Float) {
             drawPath(p, c, style = s)
         }
         G.Drag -> {
-            line(5.4f, 9.2f, 18.6f, 9.2f)
-            line(5.4f, 14.8f, 18.6f, 14.8f)
+            // Six dots — the shape every list uses for "hold and move". Two
+            // rules read as a hamburger menu, which promises something else.
+            drawCircle(c, 1.35f, Offset(9.4f, 7f))
+            drawCircle(c, 1.35f, Offset(14.6f, 7f))
+            drawCircle(c, 1.35f, Offset(9.4f, 12f))
+            drawCircle(c, 1.35f, Offset(14.6f, 12f))
+            drawCircle(c, 1.35f, Offset(9.4f, 17f))
+            drawCircle(c, 1.35f, Offset(14.6f, 17f))
         }
         G.Speed -> {
             drawArc(
