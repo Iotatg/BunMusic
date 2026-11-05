@@ -1197,6 +1197,10 @@ fun WaveSeekBar(
         modifier
             .fillMaxWidth()
             .height(46.dp)
+            // The waveform is drawn on a Canvas, so it has no name and no range
+            // of its own. Without this, a screen reader finds empty space where
+            // a sighted user finds a scrub bar.
+            .seekSemantics(positionMs, durationMs, onSeek)
             .pointerInput(durationMs) {
                 detectHorizontalDragGestures(
                     onDragStart = { offset ->
@@ -1273,6 +1277,9 @@ fun LineSeekBar(
         modifier
             .fillMaxWidth()
             .height(34.dp)
+            // A hairline on a Canvas is invisible to TalkBack without a name,
+            // a range and a way to set it — the shared contract gives it all.
+            .seekSemantics(positionMs, durationMs, onSeek)
             .pointerInput(durationMs) {
                 detectHorizontalDragGestures(
                     onDragStart = { offset ->

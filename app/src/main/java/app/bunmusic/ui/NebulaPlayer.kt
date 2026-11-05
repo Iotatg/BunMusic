@@ -37,6 +37,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -54,10 +55,6 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.semantics.ProgressBarRangeInfo
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.progressBarRangeInfo
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -539,7 +536,7 @@ private fun NebulaCover(title: String, tint: Color) {
  * value is read in the draw lambda — no recomposition per frame.
  */
 @Composable
-private fun AuroraWave(
+internal fun AuroraWave(
     positionMs: Long,
     durationMs: Long,
     playing: Boolean,
@@ -560,31 +557,48 @@ private fun AuroraWave(
     } else {
         0f
     }
+    // A drag used to call onSeek on every frame — one seek per frame makes
+    // ExoPlayer stutter through the whole gesture. Now the finger only moves a
+    // local playhead; the single seek is committed when the finger lifts, the
+    // same contract WaveSeekBar and LineSeekBar already keep.
+    var dragging by remember { mutableStateOf(false) }
+    var local by remember { mutableFloatStateOf(0f) }
+    val shown = if (dragging) local else progress
 
     Column(modifier.fillMaxWidth()) {
         Canvas(
             Modifier
                 .fillMaxWidth()
                 .height(46.dp)
-                .semantics {
-                    contentDescription = "Seek, ${fmtTime(positionMs)} of ${fmtTime(durationMs)}"
-                    progressBarRangeInfo = ProgressBarRangeInfo(progress, 0f..1f)
-                }
+                // A Canvas has no accessibility of its own: this names it, gives
+                // it a range and a SetProgress action, and adds ±10 s jumps.
+                .seekSemantics(positionMs, durationMs, onSeek)
                 .pointerInput(durationMs) {
                     detectTapGestures { off ->
                         if (durationMs > 0) {
                             val f = (off.x / size.width).coerceIn(0f, 1f)
                             onSeek((f * durationMs).toLong())
+                            Haptics.tick()
                         }
                     }
                 }
                 .pointerInput(durationMs) {
-                    detectHorizontalDragGestures { change, _ ->
-                        if (durationMs > 0) {
-                            val f = (change.position.x / size.width).coerceIn(0f, 1f)
-                            onSeek((f * durationMs).toLong())
-                            change.consume()
-                        }
+                    detectHorizontalDragGestures(
+                        onDragStart = { off ->
+                            dragging = true
+                            local = (off.x / size.width).coerceIn(0f, 1f)
+                        },
+                        onDragEnd = {
+                            dragging = false
+                            if (durationMs > 0) {
+                                onSeek((local * durationMs).toLong())
+                                Haptics.tick()
+                            }
+                        },
+                        onDragCancel = { dragging = false },
+                    ) { change, _ ->
+                        local = (change.position.x / size.width).coerceIn(0f, 1f)
+                        change.consume()
                     }
                 }
         ) {
@@ -598,7 +612,7 @@ private fun AuroraWave(
                 val wave = 0.5f - 0.5f * cos(TWO_PI * (phase - i * 0.5f / WAVE_BARS))
                 val motion = if (playing) 0.45f + 0.55f * wave else 0.40f
                 val h = size.height * (0.13f + 0.80f * envelope * motion)
-                val played = (i.toFloat() / WAVE_BARS) <= progress
+                val played = (i.toFloat() / WAVE_BARS) <= shown
                 val colour = if (played) {
                     lerp(Ink.Lime, Ink.Mint, i.toFloat() / WAVE_BARS)
                 } else {
@@ -611,7 +625,7 @@ private fun AuroraWave(
                     cornerRadius = CornerRadius(barW / 2f, barW / 2f),
                 )
             }
-            val px = size.width * progress
+            val px = size.width * shown
             drawLine(
                 color = Ink.Text.copy(alpha = 0.85f),
                 start = Offset(px, 0f),
