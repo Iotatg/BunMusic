@@ -10,7 +10,7 @@ package app.bunmusic.core
  * again.
  */
 object AppVersion {
-    const val VERSION = "2.9.0"
-    const val CODE = 31
+    const val VERSION = "2.10.0"
+    const val CODE = 32
     const val LABEL = "$VERSION ($CODE)"
 }

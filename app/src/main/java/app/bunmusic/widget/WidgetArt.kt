@@ -6,82 +6,130 @@ import android.graphics.BitmapFactory
 import android.graphics.BitmapShader
 import android.graphics.Canvas
 import android.graphics.Paint
+import android.graphics.Rect
 import android.graphics.RectF
 import android.graphics.Shader
 import android.util.LruCache
 import androidx.compose.ui.graphics.toArgb
 import app.bunmusic.core.BunPalette
-import app.bunmusic.data.hq
+import app.bunmusic.core.CrashGuard
+import app.bunmusic.data.Track
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.net.HttpURLConnection
 import java.net.URL
-import java.security.MessageDigest
+import java.util.concurrent.ConcurrentHashMap
 
 /**
- * Cover art and progress bars for the launcher.
+ * Cover art and progress bars for the launcher, the notification and the
+ * lock screen.
  *
  * A widget cannot use Coil: the launcher inflates it in its own process, so the
- * bitmap has to be handed over already decoded. That makes this the one place in
- * the app that talks to the network by hand — and the one place that must not
+ * bitmap has to be handed over already decoded. That makes this the one place
+ * in the app that talks to the network by hand — and the one place that must not
  * block the main thread doing it.
  *
  * Three layers, cheapest first: an in-memory LRU, a disk cache under
  * `cacheDir/widget_art`, then the network. The disk layer is what makes a widget
- * survive a reboot: the launcher asks for a redraw before the phone has finished
- * connecting to Wi-Fi, and a placeholder there looks broken.
+ * survive a reboot: the launcher asks for a redraw before the phone has
+ * finished connecting to Wi-Fi, and a placeholder there looks broken.
+ *
+ * The disk key is **one canonical square per URL**, not one file per
+ * `(url, size, radius)` as it used to be. The main widget loaded at 180 px, the
+ * compact one at 320 px and the queue rows asked for 96 px, each with a
+ * different corner radius — so every consumer wrote a file no other consumer
+ * ever looked for. Sizes and radii are now memory-only derivations of the same
+ * file. See [ArtKeys], which is pure and tested.
  */
 object WidgetArt {
 
     private const val DIR = "widget_art"
-    private const val MAX_ENTRIES = 24
+    /** One canonical square per cover; every consumer crops down from this. */
+    private const val DISK_SIZE = 320
+    /** 8 MB of decoded bitmaps, measured in bytes — not "8 kilobytes". */
+    private const val MAX_MEM_BYTES = 8 * 1024 * 1024
+    private const val MAX_DISK_ENTRIES = 64
+    private const val UA = "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 Mobile Safari/537.36"
 
-    private val mem = LruCache<String, Bitmap>(MAX_ENTRIES)
-
-    /** Rounded cover art, or null when it is not on disk and not in memory. */
-    fun cached(url: String?, sizePx: Int, radiusPx: Int): Bitmap? {
-        val key = key(url, sizePx, radiusPx) ?: return null
-        mem.get(key)?.let { return it }
-        return null
+    private val mem = object : LruCache<String, Bitmap>(MAX_MEM_BYTES) {
+        override fun sizeOf(key: String, value: Bitmap): Int = value.byteCount
     }
 
+    private val io = CoroutineScope(
+        SupervisorJob() + Dispatchers.IO + CrashGuard.handler("widget-art"),
+    )
+
+    /** URLs already warmed for the queue, so a dead cover is retried only once. */
+    private val warmed = ConcurrentHashMap.newKeySet<String>()
+
+    /** Memory only. For callers that must not touch the disk at all. */
+    fun cached(url: String?, sizePx: Int, radiusPx: Int): Bitmap? =
+        mem.get(ArtKeys.memory(url, sizePx, radiusPx) ?: return null)
+
     /**
-     * Load art from disk if possible. Safe to call from a `RemoteViewsFactory`,
-     * which runs on a binder thread and must not touch the network.
+     * Memory, then disk. Safe on a binder thread: it never opens the network.
+     *
+     * This is the one that fixed "cached thumbnails don't show". The first draw
+     * after a reboot (and every queue row) reads the same canonical file, crops
+     * it to the requested size and radius, and caches that derivation in memory.
      */
     fun cachedOnDisk(context: Context, url: String?, sizePx: Int, radiusPx: Int): Bitmap? {
-        val key = key(url, sizePx, radiusPx) ?: return null
+        val key = ArtKeys.memory(url, sizePx, radiusPx) ?: return null
         mem.get(key)?.let { return it }
-        val file = fileFor(context, key)
-        if (!file.exists()) return null
-        val bitmap = runCatching { BitmapFactory.decodeFile(file.absolutePath) }.getOrNull() ?: return null
-        mem.put(key, bitmap)
-        return bitmap
+        val canonical = readCanonical(context, url) ?: return null
+        val derived = runCatching { derive(canonical, sizePx, radiusPx) }.getOrNull() ?: return null
+        mem.put(key, derived)
+        return derived
     }
 
     /** Fetch, round and cache. Always off the main thread. */
     suspend fun load(context: Context, url: String?, sizePx: Int, radiusPx: Int): Bitmap? =
-        withContext(Dispatchers.IO) {
-            val key = key(url, sizePx, radiusPx) ?: return@withContext null
-            mem.get(key)?.let { return@withContext it }
-            val file = fileFor(context, key)
-            if (file.exists()) {
-                val cached = runCatching { BitmapFactory.decodeFile(file.absolutePath) }.getOrNull()
-                if (cached != null) {
-                    mem.put(key, cached)
-                    return@withContext cached
-                }
+        withContext(Dispatchers.IO) { loadBlocking(context, url, sizePx, radiusPx) }
+
+    /** The same work without a coroutine, for the notification's art thread. */
+    fun loadBlocking(context: Context, url: String?, sizePx: Int, radiusPx: Int): Bitmap? {
+        val key = ArtKeys.memory(url, sizePx, radiusPx) ?: return null
+        mem.get(key)?.let { return it }
+        val existing = readCanonical(context, url)
+        if (existing != null) {
+            val derived = runCatching { derive(existing, sizePx, radiusPx) }.getOrNull()
+            if (derived != null) {
+                mem.put(key, derived)
+                return derived
             }
-            val raw = fetch(hq(url!!), sizePx) ?: return@withContext null
-            val rounded = round(raw, radiusPx)
-            mem.put(key, rounded)
-            runCatching {
-                file.parentFile?.mkdirs()
-                file.outputStream().use { rounded.compress(Bitmap.CompressFormat.PNG, 100, it) }
-            }
-            rounded
         }
+        val raw = fetch(ArtKeys.normalized(url) ?: return null) ?: return null
+        writeCanonical(context, url, raw)
+        val derived = runCatching { derive(raw, sizePx, radiusPx) }.getOrNull() ?: return null
+        mem.put(key, derived)
+        return derived
+    }
+
+    /**
+     * Warm the covers of the rows a queue widget is about to draw.
+     *
+     * The queue factory is disk-only on purpose — it runs on a binder thread
+     * with a deadline and must not fetch ten images. Without this, rows for
+     * tracks that have never been played had no thumbnail at all, because
+     * nothing ever wrote their cover to disk. Warming happens on IO and asks the
+     * launcher for one redraw when a cover lands.
+     */
+    fun warmQueue(context: Context, queue: List<Track>, index: Int, onLoaded: () -> Unit) {
+        if (queue.isEmpty()) return
+        if (warmed.size > 512) warmed.clear()
+        for (track in queue.drop((index + 1).coerceAtLeast(0)).take(8)) {
+            val u = track.artUrl?.takeIf { it.isNotBlank() } ?: continue
+            if (!warmed.add(u)) continue
+            io.launch {
+                val loaded = runCatching { loadBlocking(context, u, DISK_SIZE, 0) }.getOrNull()
+                if (loaded != null) withContext(Dispatchers.Main) { runCatching { onLoaded() } }
+            }
+        }
+    }
 
     /** A neutral tile in the bun's own ink, used before art arrives. */
     fun placeholder(palette: BunPalette, sizePx: Int, radiusPx: Int): Bitmap {
@@ -131,6 +179,7 @@ object WidgetArt {
 
     fun clear(context: Context) {
         mem.evictAll()
+        warmed.clear()
         runCatching { File(context.cacheDir, DIR).deleteRecursively() }
     }
 
@@ -142,13 +191,57 @@ object WidgetArt {
 
     // --------------------------------------------------------------- internals
 
-    private fun key(url: String?, sizePx: Int, radiusPx: Int): String? {
-        if (url.isNullOrBlank()) return null
-        return "${md5(url)}_${sizePx}_$radiusPx"
+    private fun readCanonical(context: Context, url: String?): Bitmap? {
+        val file = canonicalFile(context, url) ?: return null
+        if (!file.exists()) return null
+        return runCatching { BitmapFactory.decodeFile(file.absolutePath) }.getOrNull()
     }
 
-    private fun fileFor(context: Context, key: String): File =
-        File(File(context.cacheDir, DIR), "$key.png")
+    private fun writeCanonical(context: Context, url: String?, raw: Bitmap) {
+        val file = canonicalFile(context, url) ?: return
+        runCatching {
+            file.parentFile?.mkdirs()
+            file.outputStream().use { raw.compress(Bitmap.CompressFormat.PNG, 100, it) }
+            trim(context)
+        }
+    }
+
+    private fun canonicalFile(context: Context, url: String?): File? =
+        ArtKeys.diskFile(url)?.let { File(File(context.cacheDir, DIR), it) }
+
+    /** Delete legacy `<md5>_<size>_<radius>.png` files and cap the directory. */
+    private fun trim(context: Context) {
+        val dir = File(context.cacheDir, DIR)
+        val all = dir.listFiles()?.filter { it.isFile } ?: return
+        all.filterNot { ArtKeys.isCanonicalName(it.name) }.forEach { runCatching { it.delete() } }
+        val kept = dir.listFiles()?.filter { it.isFile }?.sortedBy { it.lastModified() } ?: return
+        var extra = kept.size - MAX_DISK_ENTRIES
+        if (extra <= 0) return
+        for (file in kept) {
+            if (extra-- <= 0) break
+            runCatching { file.delete() }
+        }
+    }
+
+    /** Centre-crop to a square of `sizePx`, then round the corners if asked. */
+    private fun derive(src: Bitmap, sizePx: Int, radiusPx: Int): Bitmap {
+        val square = square(src, sizePx)
+        return if (radiusPx <= 0) square else round(square, radiusPx)
+    }
+
+    private fun square(src: Bitmap, sizePx: Int): Bitmap {
+        if (src.width == sizePx && src.height == sizePx) return src
+        val out = Bitmap.createBitmap(sizePx, sizePx, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(out)
+        val paint = Paint(Paint.FILTER_BITMAP_FLAG or Paint.ANTI_ALIAS_FLAG)
+        val side = minOf(src.width, src.height)
+        val from = Rect(
+            (src.width - side) / 2, (src.height - side) / 2,
+            (src.width + side) / 2, (src.height + side) / 2,
+        )
+        canvas.drawBitmap(src, from, Rect(0, 0, sizePx, sizePx), paint)
+        return out
+    }
 
     private fun round(source: Bitmap, radiusPx: Int): Bitmap {
         val size = source.width
@@ -166,26 +259,24 @@ object WidgetArt {
         return out
     }
 
-    private fun fetch(url: String, sizePx: Int): Bitmap? = runCatching {
-        val conn = URL(url).openConnection() as HttpURLConnection
-        conn.connectTimeout = 8_000
-        conn.readTimeout = 12_000
-        conn.setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android 14)")
-        val decoded = conn.inputStream.use { BitmapFactory.decodeStream(it) } ?: return null
-        // Covers arrive around 500 px. Anything larger is scaled down before it
-        // is rounded, so the LRU holds 24 widgets' worth in a few megabytes.
-        if (decoded.width > sizePx) {
-            val scaled = Bitmap.createScaledBitmap(decoded, sizePx, sizePx, true)
-            if (scaled !== decoded) decoded.recycle()
-            scaled
-        } else {
-            decoded
+    private fun fetch(url: String): Bitmap? {
+        val conn = runCatching { URL(url).openConnection() as HttpURLConnection }.getOrNull() ?: return null
+        return try {
+            conn.connectTimeout = 8_000
+            conn.readTimeout = 12_000
+            conn.instanceFollowRedirects = true
+            conn.setRequestProperty("User-Agent", UA)
+            val decoded = conn.inputStream.use { BitmapFactory.decodeStream(it) } ?: return null
+            // Covers arrive around 500-1080 px. Store one canonical square at
+            // DISK_SIZE so a 96 px queue row and a 320 px widget share a file.
+            val canonical = square(decoded, DISK_SIZE)
+            if (canonical !== decoded) decoded.recycle()
+            canonical
+        } catch (t: Throwable) {
+            null
+        } finally {
+            runCatching { conn.disconnect() }
         }
-    }.getOrNull()
-
-    private fun md5(s: String): String {
-        val digest = MessageDigest.getInstance("MD5").digest(s.toByteArray())
-        return digest.joinToString("") { "%02x".format(it) }
     }
 }
 

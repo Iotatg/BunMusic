@@ -5,6 +5,7 @@ import androidx.media3.common.ForwardingPlayer
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
 import androidx.media3.common.Player
+import androidx.media3.common.Timeline
 import app.bunmusic.data.Store
 import app.bunmusic.data.Track
 
@@ -68,6 +69,42 @@ class SessionBridge(base: Player) : ForwardingPlayer(base) {
         val real = super.getDuration()
         if (real != C.TIME_UNSET && real > 0L) return real
         return state.durationMs
+    }
+
+    // ------------------------------------------------------- logical timeline
+    //
+    // Media3 cancels the playback notification whenever the controller sees an
+    // empty timeline — it does not ask the idle-player mode first. A restored
+    // session, a track swap while the next URL resolves, or Android 13 media
+    // resumption all leave ExoPlayer's real timeline empty for a moment while
+    // Playback.state already has a track. That is the "the card appears, then
+    // goes away" failure. The answers below describe the track BunMusic has,
+    // not the source ExoPlayer happens to have prepared, and step aside as soon
+    // as a real timeline exists.
+
+    override fun getCurrentTimeline(): Timeline {
+        val real = super.getCurrentTimeline()
+        if (!real.isEmpty) return real
+        val track = state.track ?: return real
+        return LogicalTimeline(item(track), track.durationMs)
+    }
+
+    override fun getMediaItemCount(): Int {
+        val real = super.getMediaItemCount()
+        if (real > 0) return real
+        return if (state.track != null) 1 else 0
+    }
+
+    override fun getMediaItemAt(index: Int): MediaItem {
+        if (super.getMediaItemCount() > 0) return super.getMediaItemAt(index)
+        val track = state.track ?: return super.getMediaItemAt(index)
+        return item(track)
+    }
+
+    override fun getCurrentMediaItemIndex(): Int {
+        val real = super.getCurrentMediaItemIndex()
+        if (real != C.INDEX_UNSET) return real
+        return if (state.track != null) 0 else real
     }
 
     // ------------------------------------------------------------- resumption

@@ -79,7 +79,10 @@ internal object WidgetRenderer {
         val radiusDp = if (kind == WidgetKind.COMPACT) look.shape.radiusDp else look.shape.artRadiusDp
         val radiusPx = (radiusDp * context.resources.displayMetrics.density).toInt()
         val track = state.track
-        val art = track?.artUrl?.let { WidgetArt.cached(it, artPx, radiusPx) }
+        // Disk, not memory: the first draw after a reboot has an empty LRU, and
+        // reading the canonical file here is what makes the cover appear
+        // immediately instead of after a background fetch.
+        val art = track?.artUrl?.let { WidgetArt.cachedOnDisk(context, it, artPx, radiusPx) }
 
         val views = when (kind) {
             WidgetKind.MEDIA -> media(context, id, look, state, width, height, art)
@@ -88,6 +91,15 @@ internal object WidgetRenderer {
             WidgetKind.QUEUE -> queue(context, id, look, state)
         }
         runCatching { manager.updateAppWidget(id, views) }
+
+        // The queue factory is disk-only. Warm the next eight covers on IO so
+        // its rows have thumbnails even for tracks nothing has played yet, and
+        // ask the launcher for one redraw when a cover lands.
+        if (kind == WidgetKind.QUEUE) {
+            WidgetArt.warmQueue(context, state.queue, state.index) {
+                runCatching { manager.notifyAppWidgetViewDataChanged(intArrayOf(id), R.id.widget_list) }
+            }
+        }
 
         // The first draw after a reboot has no art. Fetch it once, then redraw;
         // the guard stops a failing URL from retrying on every tick.

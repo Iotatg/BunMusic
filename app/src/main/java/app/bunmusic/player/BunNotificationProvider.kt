@@ -7,10 +7,8 @@ import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
-import android.graphics.BitmapFactory
 import android.os.Handler
 import android.os.Looper
-import android.util.LruCache
 import android.view.View
 import android.widget.RemoteViews
 import androidx.core.app.NotificationCompat
@@ -22,9 +20,8 @@ import androidx.media3.session.MediaNotification
 import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaStyleNotificationHelper
 import app.bunmusic.R
+import app.bunmusic.widget.WidgetArt
 import com.google.common.collect.ImmutableList
-import java.net.HttpURLConnection
-import java.net.URL
 import java.util.concurrent.Executors
 
 /**
@@ -48,9 +45,14 @@ import java.util.concurrent.Executors
  */
 class BunNotificationProvider(private val context: Context) : MediaNotification.Provider {
 
-    private val art = ArtCache()
     private val io = Executors.newSingleThreadExecutor { r -> Thread(r, "bun-notif-art").apply { isDaemon = true } }
     private val main = Handler(Looper.getMainLooper())
+
+    // One in-flight fetch per URL, and a cooldown after a failure, so a dead
+    // cover is not retried once a second forever.
+    private val artLock = Any()
+    private val pending = HashSet<String>()
+    private val failedUntil = HashMap<String, Long>()
 
     private var session: MediaSession? = null
     private var factory: MediaNotification.ActionFactory? = null
@@ -153,7 +155,13 @@ class BunNotificationProvider(private val context: Context) : MediaNotification.
         val open = session.sessionActivity
         // One lookup, used three times: the two layouts and the large icon that
         // the lock screen of an older Android draws instead of the custom view.
-        val cover = art.get(track?.artUrl)
+        //
+        // This reads the *disk* cache that the launcher widgets and the app
+        // share, not a private memory-only LRU. That is why a cached thumbnail
+        // now shows in the notification — including after the process died —
+        // and why the cover is the same high-resolution one the player uses.
+        val cover = WidgetArt.cachedOnDisk(context, track?.artUrl, ART_PX, 0)
+        if (cover == null) warmArt(track?.artUrl)
         val big = remoteBig(title, artist, position, duration, permille, cover, playing)
         val compact = remoteCompact(title, artist, position, duration, permille, cover, playing)
 
@@ -272,68 +280,47 @@ class BunNotificationProvider(private val context: Context) : MediaNotification.
     // ------------------------------------------------------------- artwork
 
     /**
-     * Cover art for the notification.
+     * Fetch a cover that is not cached yet, then redraw the card with it.
      *
-     * The service lives in this app's process, so it *could* use the image
-     * loader — but the notification is built on a binder call that the system
-     * may make at any moment, and blocking it on a network request freezes the
-     * media control. So: memory cache, one background thread, placeholder until
-     * the bytes arrive.
+     * The notification is built on a binder call the system may make at any
+     * moment; blocking it on a network request freezes the media control. So
+     * the build reads memory + disk synchronously (a 320 px decode, about a
+     * millisecond) and this warms the network copy on one daemon thread.
+     *
+     * The old private cache here was an `LruCache<String, Bitmap>(8)` whose
+     * `sizeOf` returned kilobytes: its ceiling was 8 *KB* while one 192 px
+     * ARGB_8888 cover is ~144 KB, so every successful download was evicted the
+     * instant it landed. It was also memory-only, used the raw low-resolution
+     * URL instead of `hq(url)`, and could not see the covers the widgets had
+     * already cached. All of that now lives in [WidgetArt], one cache for the
+     * whole app.
      */
-    private inner class ArtCache {
-        private val cache = object : LruCache<String, Bitmap>(8) {
-            override fun sizeOf(key: String, value: Bitmap): Int = value.byteCount / 1024
+    private fun warmArt(url: String?) {
+        val u = url?.takeIf { it.isNotBlank() } ?: return
+        val now = System.currentTimeMillis()
+        synchronized(artLock) {
+            if (pending.contains(u)) return
+            if (now < (failedUntil[u] ?: 0L)) return
+            pending.add(u)
         }
-        private val pending = HashSet<String>()
-        private val failed = HashSet<String>()
-
-        fun get(url: String?): Bitmap? {
-            if (url.isNullOrBlank()) return null
-            cache.get(url)?.let { return it }
-            if (pending.contains(url) || failed.contains(url)) return null
-            pending.add(url)
-            io.execute {
-                val bitmap = runCatching { download(url) }.getOrNull()
-                synchronized(this) {
-                    pending.remove(url)
-                    if (bitmap != null) cache.put(url, bitmap) else failed.add(url)
-                }
-                if (bitmap != null) republish()
+        io.execute {
+            val bitmap = runCatching { WidgetArt.loadBlocking(context, u, ART_PX, 0) }.getOrNull()
+            synchronized(artLock) {
+                pending.remove(u)
+                if (bitmap == null) failedUntil[u] = now + RETRY_COOLDOWN_MS
+                else failedUntil.remove(u)
             }
-            return null
-        }
-
-        private fun download(url: String): Bitmap? {
-            val conn = URL(url).openConnection() as HttpURLConnection
-            conn.connectTimeout = 6_000
-            conn.readTimeout = 8_000
-            conn.instanceFollowRedirects = true
-            return try {
-                conn.inputStream.use { BitmapFactory.decodeStream(it) }?.let { scale(it) }
-            } finally {
-                conn.disconnect()
-            }
-        }
-
-        /** 192 px square: big enough for a 64 dp thumbnail at 3x, small enough to parcel. */
-        private fun scale(src: Bitmap): Bitmap {
-            val size = 192
-            val out = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
-            val canvas = android.graphics.Canvas(out)
-            val paint = android.graphics.Paint(android.graphics.Paint.FILTER_BITMAP_FLAG)
-            val side = minOf(src.width, src.height)
-            val rect = android.graphics.Rect(
-                (src.width - side) / 2, (src.height - side) / 2,
-                (src.width + side) / 2, (src.height + side) / 2,
-            )
-            canvas.drawBitmap(src, rect, android.graphics.Rect(0, 0, size, size), paint)
-            return out
+            if (bitmap != null) republish()
         }
     }
 
     companion object {
         const val CHANNEL_ID = "bunmusic_playback"
         const val NOTIFICATION_ID = 1001
+
+        /** 192 px square: big enough for a 64 dp thumbnail at 3x, small enough to parcel. */
+        private const val ART_PX = 192
+        private const val RETRY_COOLDOWN_MS = 60_000L
 
         /**
          * Create the playback channel if it is not there yet.

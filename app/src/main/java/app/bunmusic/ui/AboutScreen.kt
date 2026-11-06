@@ -54,6 +54,20 @@ fun AboutScreen(onBack: () -> Unit) {
             }
         }
 
+        item { GroupTitle("New in 2.10.0") }
+        item {
+            AboutCard {
+                Change("The card stays", "Media3 re-checked whether a notification was allowed on every redraw and cancelled the card the moment its controller saw an empty or idle player. A restored queue, a track changing while the next stream resolved, or media resumption after a reboot all hit it — the controls showed up for a second and vanished. The session now reports the track BunMusic actually has, not only the source ExoPlayer has prepared, and the idle-player rule no longer hides a real track")
+                Change("Live in every state", "Playing, paused, buffering, or restored but not yet prepared — a track keeps its card. Only a full stop takes it away, so there is still no 'Nothing playing' notification. A like, a pause, a shuffle, a repeat, a queue edit or a resolved length now redraws immediately instead of waiting for the next second of audio")
+                Change("Cached thumbnails, actually shown", "The notification's private artwork cache was an 8-unit LRU whose sizeOf returned kilobytes: its ceiling was 8 KB while a single 192 px cover is about 144 KB, so every successful download was evicted the instant it landed. It was memory-only, asked for the low-resolution URL, and could not see the covers the widgets had already saved. There is one disk-backed cache for the notification, the lock screen and all four widgets now")
+                Change("One cover, one file", "The launcher widget wrote a file named for the URL, the size and the corner radius. The compact widget asked for 320 px, the 4×2 card for 180 px and the queue rows for 96 px — so each one looked for a file no other one had written. Sizes and radii are memory-only crops of a single canonical square now, and the queue's next eight covers are warmed in the background so a row never opens blank")
+                Change("The first draw after a reboot has art", "Widgets read the disk cache on their first draw instead of only looking in an empty in-memory LRU and waiting for a fetch. A cold launcher no longer shows a placeholder over a cover that is already on the phone")
+                Change("Clear artwork clears all of it", "The Storage screen counted Coil's art folder but not the widget/notification folder, and clearing artwork left the second one behind. Both are counted and both are emptied; the same pass deletes files written under the old key format")
+                Change("A foreground service that starts honestly", "A background start obliges the service to go foreground within five seconds. A placeholder now takes that slot immediately, so Media3 asynchronously connecting its own controller can never leave the service unpromoted on a cold start")
+                Change("The lock screen remembers the track", "While a restored session is still unprepared, the session's timeline carries the title, artist, artwork and length from the saved track, so the system media controls are not blank")
+            }
+        }
+
         item { GroupTitle("New in 2.4.0") }
         item {
             AboutCard {

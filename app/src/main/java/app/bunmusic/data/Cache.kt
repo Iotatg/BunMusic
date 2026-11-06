@@ -274,7 +274,17 @@ object Cache {
 
     fun streamBytes(): Long = sizeOf(streamDir())
 
-    fun imageBytes(): Long = sizeOf(imageDir())
+    /**
+     * Both cover stores count as art: Coil's `cacheDir/art` (in-app covers) and
+     * `cacheDir/widget_art` (the canonical squares the notification, lock screen
+     * and launcher widgets share). The second one used to be invisible here, so
+     * the Storage screen under-reported and "clear artwork" left it behind.
+     */
+    fun imageBytes(): Long {
+        val coil = sizeOf(imageDir())
+        val ctx = context ?: return coil
+        return coil + app.bunmusic.widget.WidgetArt.bytes(ctx)
+    }
 
     fun totalBytes(): Long = streamBytes() + imageBytes()
 
@@ -298,12 +308,19 @@ object Cache {
     }
 
     fun clearImages() {
+        // The old `context ?: return` lived *inside* inline `runCatching`, so it
+        // was a non-local return from this whole function: a null context (or a
+        // Coil init that threw) silently skipped the two lines below and left
+        // the widget-art cache behind. Check the context up front, then clear
+        // every store independently of whether Coil happened to be available.
+        val ctx = context ?: return
         runCatching {
-            val loader = coil3.SingletonImageLoader.get(context ?: return)
+            val loader = coil3.SingletonImageLoader.get(ctx)
             loader.diskCache?.clear()
             loader.memoryCache?.clear()
         }
         imageDir().deleteRecursively()
+        app.bunmusic.widget.WidgetArt.clear(ctx)
     }
 
     /**

@@ -552,16 +552,36 @@ object YtMusic {
  * clamp to the largest original, so asking for a big one is free — and it is the
  * difference between a blurry thumbnail and a sharp cover on a 1080p screen.
  */
+/**
+ * Matches the last `/<variant>.jpg` segment of an `i.ytimg.com/vi/...` URL.
+ * Anchored to the preceding `/` and to the end of the string so that only the
+ * whole filename is ever rewritten — `maxresdefault.jpg` can no longer be
+ * partially matched as `...default.jpg` and prefixed a second time.
+ * `maxresdefault` is included so an already-normalised URL maps to itself.
+ */
+private val YT_VI_VARIANT = Regex(
+    "(?i)/(hqdefault|sddefault|mqdefault|maxresdefault|default)\\.jpg$",
+)
+
+/**
+ * Upgrades a YouTube artwork URL to its highest resolution. This MUST be
+ * idempotent: the same cover reaches here through several paths (YtMusic
+ * parsing, Playback metadata, the palette extractor, and the artwork cache
+ * key), and [app.bunmusic.widget.ArtKeys] relies on `hq(hq(u)) == hq(u)` so the
+ * raw and high-resolution spellings resolve to one cache entry.
+ *
+ * The old chained `replace` calls were not idempotent: after `hqdefault` became
+ * `maxresdefault`, the final `default.jpg` replacement matched again and
+ * produced `maxresmaxresdefault.jpg`, growing on every call.
+ */
 fun hq(url: String): String {
     if (url.isBlank()) return url
     return when {
-        // i.ytimg.com/vi/<id>/hqdefault.jpg → maxresdefault.jpg
-        url.contains("/vi/") && !url.contains('=') -> url
-            .replace("hqdefault", "maxresdefault")
-            .replace("sddefault", "maxresdefault")
-            .replace("mqdefault", "maxresdefault")
-            .replace("default.jpg", "maxresdefault.jpg")
-        // ...=w60-h60-l90-rj → ...=w1080-h1080-l90-rj
+        // i.ytimg.com/vi/<id>/<variant>.jpg → .../maxresdefault.jpg
+        // One atomic replacement: a fixed point, so repeated calls are stable.
+        url.contains("/vi/") && !url.contains('=') ->
+            YT_VI_VARIANT.replace(url, "/maxresdefault.jpg")
+        // ...=w60-h60-l90-rj → ...=w1080-h1080-l90-rj (already idempotent)
         url.contains("=w") -> url.substringBefore("=w") + "=w1080-h1080-l90-rj"
         else -> url
     }
