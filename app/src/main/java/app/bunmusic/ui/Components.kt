@@ -76,6 +76,7 @@ import app.bunmusic.core.label
 import app.bunmusic.core.LocalBunWindow
 import app.bunmusic.core.LocalReducedMotion
 import app.bunmusic.core.SerifFamily
+import app.bunmusic.core.motionOr
 import app.bunmusic.core.Skin
 import app.bunmusic.core.SoraFamily
 import app.bunmusic.core.SwipeSkip
@@ -127,8 +128,15 @@ fun ArtImage(
     asset: String?,
     modifier: Modifier = Modifier,
     shape: Shape = CircleShape,
+    /** Cloud only: lay a moving glass reflection over the big player cover. */
+    glass: Boolean = false,
 ) {
-    Box(modifier.clip(shape).background(Ink.Card)) {
+    Box(
+        modifier
+            .clip(shape)
+            .background(Ink.Card)
+            .then(if (glass && Skin.isCloud) Modifier.cloudArtSheen(shape) else Modifier)
+    ) {
         val local = rememberAssetBitmap(asset)
         when {
             local != null -> Image(
@@ -197,10 +205,11 @@ fun Panel(
 ) {
     Box(
         modifier
-            // Nebula's panels are glass; the other buns keep a solid card, because
-            // a translucent card on paper is just a slightly wrong white.
+            // Nebula and Cloud get glass: Nebula over a dark aurora, Cloud over
+            // its drifting sky. The other buns keep a solid card, because a
+            // translucent card on flat paper is just a slightly wrong white.
             .then(
-                if (Skin.isNebula && color == Ink.Card) {
+                if ((Skin.isNebula || Skin.isCloud) && color == Ink.Card) {
                     Modifier.glass(radius)
                 } else {
                     Modifier
@@ -943,7 +952,8 @@ private fun CharcoalMiniPlayer(
             .fillMaxWidth()
             .padding(horizontal = 14.dp)
             .clip(RoundedCornerShape(24.dp))
-            .background(Ink.MiniBg)
+            .background(if (Skin.isCloud) Ink.MiniBg.copy(alpha = 0.92f) else Ink.MiniBg)
+            .then(if (Skin.isCloud) Modifier.cloudShine(radius = 24.dp) else Modifier)
             .tapable(scale = 0.99f) { onOpen() }
             .padding(start = 10.dp, end = 10.dp, top = 9.dp, bottom = 9.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -1255,9 +1265,13 @@ fun WaveSeekBar(
 }
 
 /**
- * Cloud's seek bar: a hairline track with a single blue knob, no waveform. It is
- * the one place the blue bun is deliberately plainer than the others — the study
- * it is drawn from uses a line, and a line is easier to hit on a light surface.
+ * Cloud's seek bar, reworked as a piece of frosted glass in 2.11.0.
+ *
+ * Still a line and still the easiest control to hit on a light surface — but no
+ * longer a flat hairline. The track is a translucent trough with a lit top edge,
+ * the played portion is a blue gradient, progress rides a spring rather than a
+ * fixed tween, and the thumb grows a soft halo while it is held. The TalkBack
+ * contract ([seekSemantics]) and reduced-motion behaviour are unchanged.
  */
 @Composable
 fun LineSeekBar(
@@ -1271,7 +1285,18 @@ fun LineSeekBar(
     var dragging by remember { mutableStateOf(false) }
     var local by remember { mutableFloatStateOf(0f) }
     val shown = smoothProgress(value, dragging, local)
-    val animated by animateFloatAsState(shown, tween(180), label = "line")
+    val animated by animateFloatAsState(
+        shown,
+        motionOr(BunSpring.smooth()),
+        label = "line",
+    )
+    // The thumb swells under the finger; a spring keeps the grow/settle bouncy
+    // but brief, and collapses to a snap when motion is reduced.
+    val halo by animateFloatAsState(
+        if (dragging) 1f else 0f,
+        motionOr(BunSpring.snappy()),
+        label = "halo",
+    )
 
     Canvas(
         modifier
@@ -1304,25 +1329,59 @@ fun LineSeekBar(
             },
     ) {
         val cy = size.height / 2f
-        val track = 4.dp.toPx()
-        val knob = 7.dp.toPx()
+        val track = 6.dp.toPx()
+        val knob = 7.dp.toPx() + 1.5f.dp.toPx() * halo
+        val corner = androidx.compose.ui.geometry.CornerRadius(track / 2f)
         val x = (animated * size.width).coerceIn(knob, size.width - knob)
 
+        // 1. Frosted trough: a dim blue base plus a bright top specular line,
+        //    so the track reads as a shallow channel cut into glass, not a rule.
         drawRoundRect(
             color = Ink.Line,
             topLeft = Offset(0f, cy - track / 2f),
             size = Size(size.width, track),
-            cornerRadius = androidx.compose.ui.geometry.CornerRadius(track / 2f),
+            cornerRadius = corner,
         )
         drawRoundRect(
-            color = activeColor,
+            brush = Brush.verticalGradient(
+                listOf(Color.White.copy(alpha = 0.65f), Color.White.copy(alpha = 0f)),
+                startY = cy - track / 2f,
+                endY = cy,
+            ),
+            topLeft = Offset(0f, cy - track / 2f),
+            size = Size(size.width, track),
+            cornerRadius = corner,
+        )
+        // 2. Played portion: a blue gradient, brighter toward the thumb.
+        drawRoundRect(
+            brush = Brush.horizontalGradient(
+                listOf(activeColor.copy(alpha = 0.55f), activeColor),
+                startX = 0f,
+                endX = x.coerceAtLeast(1f),
+            ),
             topLeft = Offset(0f, cy - track / 2f),
             size = Size(x.coerceAtLeast(0f), track),
-            cornerRadius = androidx.compose.ui.geometry.CornerRadius(track / 2f),
+            cornerRadius = corner,
         )
-        // A white ring keeps the knob readable where the track is pale.
+        // 3. Halo: light pooling under the thumb while it is held.
+        if (halo > 0.01f) {
+            val hr = knob * (2.6f + 0.8f * halo)
+            drawCircle(
+                brush = Brush.radialGradient(
+                    listOf(
+                        activeColor.copy(alpha = 0.26f * halo),
+                        activeColor.copy(alpha = 0f),
+                    ),
+                    center = Offset(x, cy),
+                    radius = hr,
+                ),
+                radius = hr,
+                center = Offset(x, cy),
+            )
+        }
+        // 4. A white ring keeps the knob readable where the track is pale.
         drawCircle(color = Color.White, radius = knob, center = Offset(x, cy))
-        drawCircle(color = activeColor, radius = knob - 2.dp.toPx(), center = Offset(x, cy))
+        drawCircle(color = activeColor, radius = (knob - 2.dp.toPx()).coerceAtLeast(1f), center = Offset(x, cy))
     }
 }
 

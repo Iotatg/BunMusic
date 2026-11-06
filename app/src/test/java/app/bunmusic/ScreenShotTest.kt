@@ -27,6 +27,7 @@ import app.bunmusic.player.PlayerState
 import app.bunmusic.ui.AboutScreen
 import app.bunmusic.ui.AuthScreen
 import app.bunmusic.ui.BunsScreen
+import app.bunmusic.ui.CloudBackdrop
 import app.bunmusic.ui.DiscoveryScreen
 import app.bunmusic.ui.EqualizerScreen
 import app.bunmusic.ui.ExploreScreen
@@ -117,7 +118,16 @@ class ScreenShotTest {
                                         )
                                     }
                                 )
-                        ) { content() }
+                        ) {
+                            // Screens don't paint the sky themselves except Home
+                            // and the player; Root does it once behind them. A
+                            // standalone shot needs the same sky, or Cloud's
+                            // glass has nothing to refract and reads as flat white.
+                            if (Skin.isCloud) {
+                                CloudBackdrop(modifier = Modifier.fillMaxSize(), intensity = 0.7f)
+                            }
+                            content()
+                        }
                     }
                 }
             }
@@ -141,6 +151,27 @@ class ScreenShotTest {
 
     @Test fun playerCloud() = shot("player-cloud", BunSkin.CLOUD, endless = true) {
         PlayerScreen(state = Sample.playing, onClose = {}, onMore = {})
+    }
+
+    @Test fun homeCloud() = shot("home-cloud", BunSkin.CLOUD, endless = true) {
+        HomeScreen(
+            state = Sample.playing, downloadedIds = emptySet(),
+            onOpenSearch = {}, onOpenExplore = {}, onOpenCollection = {}, onOpenMood = {},
+            onPlay = { _, _ -> }, onOpenPlayer = {}, onTogglePlay = {}, onMore = {},
+            onOpenSettings = {}, onOpenDiscovery = {},
+        )
+    }
+
+    @Test fun settingsCloud() = shot("settings-cloud", BunSkin.CLOUD) {
+        SettingsScreen(
+            onBack = {}, onOpenStats = {}, onOpenWrapped = {}, onOpenDownloads = {},
+            onOpenProfile = {}, onOpenEqualizer = {}, onOpenBuns = {}, onOpenAbout = {},
+            onOpenWidgets = {}, onOpenCommands = {}, onToast = {},
+        )
+    }
+
+    @Test fun bunsCloud() = shot("buns-cloud", BunSkin.CLOUD, endless = true) {
+        BunsScreen(onBack = {})
     }
 
     @Test fun playerPink() = shot("player-pink", BunSkin.PINK, endless = true) {

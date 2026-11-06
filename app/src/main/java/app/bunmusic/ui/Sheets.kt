@@ -42,6 +42,7 @@ import androidx.compose.ui.unit.sp
 import app.bunmusic.core.G
 import app.bunmusic.core.Glyph
 import app.bunmusic.core.Ink
+import app.bunmusic.core.Skin
 import app.bunmusic.core.SoraFamily
 import app.bunmusic.data.Downloads
 import app.bunmusic.data.Playlist
@@ -73,7 +74,7 @@ fun TrackSheet(
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
-        containerColor = Ink.Sheet,
+        containerColor = if (Skin.isCloud) Color.White.copy(alpha = 0.92f) else Ink.Sheet,
         contentColor = Ink.Text,
         dragHandle = { SheetHandle() },
     ) {
@@ -251,7 +252,7 @@ fun SleepSheet(onDismiss: () -> Unit, onPick: (Int) -> Unit, onEndOfTrack: () ->
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
-        containerColor = Ink.Sheet,
+        containerColor = if (Skin.isCloud) Color.White.copy(alpha = 0.92f) else Ink.Sheet,
         contentColor = Ink.Text,
         dragHandle = { SheetHandle() },
     ) {

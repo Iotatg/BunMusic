@@ -54,6 +54,17 @@ fun AboutScreen(onBack: () -> Unit) {
             }
         }
 
+        item { GroupTitle("New in 2.11.0") }
+        item {
+            AboutCard {
+                Change("Cloud Blue is made of light", "Cloud was a flat chalk page: every pane degraded to a solid white card and the only moving sky belonged to Nebula. It has its own weather now — a pale sky with slow blue, white and cyan light pools — and every surface is a pane of frosted glass that catches a bright line along its top edge and a cool rim at its base")
+                Change("Glass that stays readable", "A translucent pane over a drifting sky has no fixed colour, so the opacity, the specular highlight and the contrast of dark captions are decided by pure arithmetic rather than guessed. Raised sheets are thicker, high-contrast mode pushes panes toward opaque, and every decision is checked against WCAG AA on the JVM before a single pixel is drawn")
+                Change("One pass of light, not a spinner", "Surfaces get a single band of light crossing them once, with clean first and last frames — an endless shimmer reads as a loading indicator. Under reduced motion the light simply stops travelling: it is still there, it just sits still. The sky repaints from one phase inside the draw pass, so nothing recomposes per frame")
+                Change("Everywhere you look", "The search pill, the start card, the hero card, the tab bar, the side rail, the mini player and both sheets are glass now, not just the player. Cover art carries a moving reflection of its own, the blue play disc gets its specular edge, and the seek bar is a frosted trough with a spring and a halo under your thumb")
+                Change("Optics you can test", "The rules behind the glass live in plain Kotlin with no Android in them: how opaque a pane is, where its highlight sits, how four light pools drift on independent paths, and the exact colour a caption will sit on. A frozen clock in a screenshot test still captures the frame that belongs to it, so the weather is deterministic on every device")
+            }
+        }
+
         item { GroupTitle("New in 2.10.0") }
         item {
             AboutCard {

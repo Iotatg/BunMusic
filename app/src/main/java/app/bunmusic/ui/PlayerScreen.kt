@@ -186,6 +186,14 @@ fun PlayerScreen(
                 intensity = 0.85f,
             )
         }
+        // Cloud plays over the same sky as its Home page, so opening a track
+        // does not feel like stepping into a different app.
+        if (Skin.isCloud) {
+            CloudBackdrop(
+                modifier = Modifier.fillMaxSize(),
+                intensity = 0.92f,
+            )
+        }
 
         if (glowAlpha > 0f && !Ink.isLight) {
             Box(
@@ -629,6 +637,9 @@ private fun TransportRow(state: PlayerState, tint: Color, modifier: Modifier = M
                 glyphSize = 26.dp,
                 busy = state.buffering,
                 stroke = 2.4.dp,
+                // On Cloud the play disc is glass: a top-edge highlight and one
+                // slow light sweep over the blue, rather than a flat filled disc.
+                modifier = if (Skin.isCloud) Modifier.cloudShine(radius = 33.dp) else Modifier,
             ) { Playback.toggle() }
         }
         IconBtn(G.Next, Ink.Text, 48.dp, 24.dp) { Playback.next() }
@@ -879,6 +890,7 @@ private fun ColumnScope.CharcoalPlayer(
                 asset = track.artAsset,
                 modifier = Modifier.fillMaxSize(),
                 shape = RoundedCornerShape(30.dp),
+                glass = true,
             )
         }
     }
@@ -987,9 +999,14 @@ private fun ColumnScope.CharcoalPlayer(
             glyphSize = 25.dp,
             busy = state.buffering,
             stroke = 2.4.dp,
-            // The one lit object on the page. On the other buns this is a plain
-            // disc; on Nebula the accent is a light source, so the button casts it.
-            modifier = if (Skin.isNebula) Modifier.neon(Ink.Lime, radius = 34.dp, elevation = 26.dp) else Modifier,
+            // The one lit object on the page. On Nebula the accent is a light
+            // source so the disc casts a neon glow; on Cloud it is glass, so it
+            // carries a specular top edge and a light sweep instead.
+            modifier = when {
+                Skin.isNebula -> Modifier.neon(Ink.Lime, radius = 34.dp, elevation = 26.dp)
+                Skin.isCloud -> Modifier.cloudShine(radius = 34.dp)
+                else -> Modifier
+            },
         ) { Playback.toggle() }
         Box(
             Modifier.size(44.dp).clip(CircleShape).tapable(label = G.Next.label) { Playback.next() },
@@ -1066,7 +1083,7 @@ private fun DiscArt(track: Track, playing: Boolean, tint: Color) {
                 .aspectRatio(1f)
                 .rotate(rotation.value)
         ) {
-            ArtImage(track.artUrl, track.artAsset, Modifier.fillMaxSize(), CircleShape)
+            ArtImage(track.artUrl, track.artAsset, Modifier.fillMaxSize(), CircleShape, glass = true)
             Box(
                 Modifier.align(Alignment.Center).size(18.dp).clip(CircleShape).background(Ink.Void)
             )
@@ -1122,6 +1139,7 @@ private fun VinylArt(track: Track, playing: Boolean, tint: Color) {
                 asset = track.artAsset,
                 modifier = Modifier.fillMaxWidth(0.52f).aspectRatio(1f),
                 shape = CircleShape,
+                glass = true,
             )
             Box(
                 Modifier.align(Alignment.Center).size(10.dp).clip(CircleShape).background(Ink.Void)
@@ -1154,6 +1172,7 @@ private fun CardArt(track: Track, tint: Color) {
             asset = track.artAsset,
             modifier = Modifier.fillMaxSize(),
             shape = RoundedCornerShape(26.dp),
+            glass = true,
         )
         Box(
             Modifier

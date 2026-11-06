@@ -43,6 +43,7 @@ import app.bunmusic.core.G
 import app.bunmusic.core.Glyph
 import app.bunmusic.core.Ink
 import app.bunmusic.core.LocalReducedMotion
+import app.bunmusic.core.Skin
 import app.bunmusic.core.SoraFamily
 import kotlin.math.min
 
@@ -74,8 +75,15 @@ fun NebulaBackdrop(
 /**
  * A surface that holds light at its top edge.
  *
- * On a light bun this degrades to the card the rest of the app already uses,
- * because white-on-white glass is just a slightly wrong white.
+ * Three behaviours, not one:
+ *  - **Cloud** gets real frosted glass ([cloudGlass]) over a drifting sky. It is
+ *    the one light bun where translucency has something to refract.
+ *  - **The other light buns** degrade to the solid card, because white-on-white
+ *    glass over a flat page is just a slightly wrong white.
+ *  - **The dark buns** keep the top-lit translucent fill they already had.
+ *
+ * Routing through this one function is what lets every `.glass(...)` call site
+ * across the app pick up Cloud's new surface language with a single edit.
  */
 @Composable
 fun Modifier.glass(
@@ -84,6 +92,9 @@ fun Modifier.glass(
     topAlpha: Float = 0.10f,
     bottomAlpha: Float = 0.025f,
 ): Modifier {
+    if (Skin.isCloud) {
+        return this.cloudGlass(radius = radius, tint = tint)
+    }
     val shape = RoundedCornerShape(radius)
     if (Ink.isLight) {
         return this

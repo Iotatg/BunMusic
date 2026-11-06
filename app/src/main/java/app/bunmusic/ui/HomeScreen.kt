@@ -112,6 +112,11 @@ fun HomeScreen(
     val seed = state.track?.id ?: recents.firstOrNull()?.id
     if (Skin.isNebula) {
         NebulaBackdrop(seed = seed, modifier = Modifier.fillMaxSize())
+    } else if (Skin.isCloud) {
+        // A bright sky with drifting light pools. It is what the frosted hero,
+        // search pill and cards refract; a flat page would make them all read as
+        // slightly-wrong white rectangles.
+        CloudBackdrop(modifier = Modifier.fillMaxSize(), intensity = 0.95f)
     } else {
         AuroraBackdrop(
             seed = seed,
@@ -342,9 +347,10 @@ private fun SearchPill(onClick: () -> Unit, modifier: Modifier = Modifier) {
         modifier
             .fillMaxWidth()
             .then(
-                if (Skin.isNebula) {
+                if (Skin.isNebula || Skin.isCloud) {
                     // Glass rather than a solid card: on a star field a flat
-                    // rectangle reads as a hole punched in the sky.
+                    // rectangle reads as a hole punched in the sky; on Cloud the
+                    // same pane refracts the drifting light pools behind it.
                     Modifier.glass(radius = 16.dp)
                 } else {
                     Modifier
@@ -381,8 +387,15 @@ private fun StartCard(onOpenSearch: () -> Unit) {
         Modifier
             .padding(horizontal = LocalBunWindow.current.gutter)
             .fillMaxWidth()
-            .clip(RoundedCornerShape(28.dp))
-            .background(Ink.Card)
+            .then(
+                if (Skin.isNebula || Skin.isCloud) {
+                    Modifier.glass(radius = 28.dp)
+                } else {
+                    Modifier
+                        .clip(RoundedCornerShape(28.dp))
+                        .background(Ink.Card)
+                }
+            )
             .tapable(scale = 0.985f) { onOpenSearch() }
             .padding(22.dp),
     ) {
@@ -484,6 +497,7 @@ private fun HeroCard(track: Track, playing: Boolean, onOpen: () -> Unit, onToggl
             .then(if (Skin.isNebula) Modifier.neon(Ink.Lime, radius = 28.dp, elevation = 26.dp) else Modifier)
             .clip(RoundedCornerShape(28.dp))
             .background(Brush.linearGradient(Ink.Hero))
+            .then(if (Skin.isCloud) Modifier.cloudShine(radius = 28.dp) else Modifier)
             .tapable(scale = 0.985f) { onOpen() }
             .padding(20.dp)
     ) {

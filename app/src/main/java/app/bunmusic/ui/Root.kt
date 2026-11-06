@@ -257,6 +257,15 @@ private fun Shell(
                 clouds = false,
             )
         }
+        // Cloud's glass needs a sky behind it. The secondary pages get a quieter
+        // version; Home and the player draw their own, louder one, and the bun
+        // picker shows each bun's own preview rather than the live weather.
+        if (Skin.isCloud && !playerOpen && route != Route.Home && route != Route.Buns) {
+            CloudBackdrop(
+                modifier = Modifier.fillMaxSize(),
+                intensity = 0.6f,
+            )
+        }
         Row(Modifier.fillMaxSize()) {
             // 600 dp and up: the tabs move to the edge a thumb isn't holding, and
             // the content keeps the 84 dp the bottom bar used to eat — which on a
@@ -812,9 +821,17 @@ private fun LightNav(current: Route, onSelect: (Route) -> Unit, modifier: Modifi
         modifier
             .fillMaxWidth()
             .padding(horizontal = 14.dp, vertical = 8.dp)
-            .shadow(16.dp, shape, clip = false, ambientColor = Ink.Shadow, spotColor = Ink.Shadow)
-            .clip(shape)
-            .background(Ink.NavBg)
+            .then(
+                if (Skin.isCloud) {
+                    // A lit pane, not a white bar: the nav floats over the sky.
+                    Modifier.cloudGlass(radius = 30.dp, elevation = 0.45f)
+                } else {
+                    Modifier
+                        .shadow(16.dp, shape, clip = false, ambientColor = Ink.Shadow, spotColor = Ink.Shadow)
+                        .clip(shape)
+                        .background(Ink.NavBg)
+                }
+            )
             .padding(horizontal = 6.dp, vertical = 9.dp),
         horizontalArrangement = Arrangement.SpaceEvenly,
         verticalAlignment = Alignment.CenterVertically,
@@ -894,15 +911,20 @@ private fun NavRail(current: Route, onSelect: (Route) -> Unit, onSettings: () ->
             .navigationBarsPadding()
             .padding(start = 12.dp, top = 10.dp, bottom = 10.dp)
             .then(
-                if (light) {
-                    Modifier.shadow(14.dp, shape, clip = false, ambientColor = Ink.Shadow, spotColor = Ink.Shadow)
+                if (Skin.isCloud) {
+                    Modifier.cloudGlass(radius = 26.dp, elevation = 0.35f)
+                } else if (light) {
+                    Modifier
+                        .shadow(14.dp, shape, clip = false, ambientColor = Ink.Shadow, spotColor = Ink.Shadow)
+                        .clip(shape)
+                        .background(Ink.NavBg)
+                        .border(1.dp, Ink.Hairline, shape)
                 } else {
                     Modifier
+                        .clip(shape)
+                        .background(Ink.NavBg)
                 }
             )
-            .clip(shape)
-            .background(Ink.NavBg)
-            .then(if (light) Modifier.border(1.dp, Ink.Hairline, shape) else Modifier)
             .padding(vertical = 14.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
