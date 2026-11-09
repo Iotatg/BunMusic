@@ -136,8 +136,15 @@ class SessionBridge(base: Player) : ForwardingPlayer(base) {
         setMediaItems(listOf(mediaItem), 0, C.TIME_UNSET)
 
     private fun adopt(tracks: List<Track>, startIndex: Int, startPositionMs: Long) {
-        Playback.play(tracks, startIndex.coerceIn(0, tracks.lastIndex))
-        if (startPositionMs > 0 && startPositionMs != C.TIME_UNSET) Playback.seekTo(startPositionMs)
+        // Seeking right after play() used to hit an empty timeline: play()
+        // starts an async load, so the seek was discarded when the media source
+        // was finally prepared. Pass the position through instead — Playback
+        // holds it in pendingSeekMs and applies it immediately after prepare().
+        Playback.play(
+            tracks,
+            startIndex.coerceIn(0, tracks.lastIndex),
+            startPositionMs,
+        )
     }
 
     companion object {

@@ -48,7 +48,8 @@ data class CornerRadii(
 ) {
     /** The same silhouette at a real size, in pixels. */
     fun scaled(shortSide: Float): CornerRadii {
-        val s = shortSide.coerceAtLeast(0f)
+        // coerceAtLeast returns NaN unchanged; a NaN size would poison all four radii.
+        val s = shortSide.finiteOr().coerceAtLeast(0f)
         return CornerRadii(topStart * s, topEnd * s, bottomEnd * s, bottomStart * s)
     }
 
@@ -94,7 +95,8 @@ object Shapes {
      * like the container relaxing rather than like two cross-fades.
      */
     fun morph(from: CornerRadii, to: CornerRadii, t: Float): CornerRadii {
-        val k = t.coerceIn(0f, 1f)
+        // coerceIn returns NaN unchanged; guard so a stray fraction cannot yield NaN corners.
+        val k = t.finiteOr().coerceIn(0f, 1f)
         fun mix(a: Float, b: Float) = a + (b - a) * k
         return CornerRadii(
             topStart = mix(from.topStart, to.topStart),

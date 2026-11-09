@@ -429,12 +429,15 @@ object Skin {
      */
     fun apply(context: Context, skin: BunSkin) {
         val written = store(context).edit().putString(KEY, skin.id).commit()
-        Prefs.update { it.copy(skin = skin.id) }
-        current = skin
         if (!written) {
             // Disk refused the write — restarting would only reload the old bun.
+            // Bail out *before* touching in-memory state, or the UI immediately
+            // shows the new skin while a cold start silently reverts it, and the
+            // two stores briefly disagree.
             return
         }
+        Prefs.update { it.copy(skin = skin.id) }
+        current = skin
         // The launcher icon has to be swapped before the relaunch, otherwise the
         // new process comes back wearing the previous bun's face.
         Icons.apply(context, skin)

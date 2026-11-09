@@ -82,7 +82,9 @@ object Eq {
             return
         }
         val count = runCatching { eq.numberOfBands.toInt() }.getOrDefault(0)
-        val range = runCatching { eq.bandLevelRange }.getOrNull() ?: shortArrayOf(-1500, 1500)
+        // OEMs sometimes return a short or reversed bandLevelRange. Reading
+        // [0]/[1] blindly threw, and min > max made every coerceIn below throw.
+        val range = safeBandRange(runCatching { eq.bandLevelRange }.getOrNull())
         val bands = (0 until count).map { i ->
             val idx = i.toShort()
             val centre = runCatching { eq.getCenterFreq(idx) / 1000 }.getOrDefault(0)
@@ -90,8 +92,8 @@ object Eq {
                 index = i,
                 hz = centre,
                 levelMb = runCatching { eq.getBandLevel(idx).toInt() }.getOrDefault(0),
-                minMb = range[0].toInt(),
-                maxMb = range[1].toInt(),
+                minMb = range.first,
+                maxMb = range.last,
             )
         }
         _state.value = State(
@@ -214,6 +216,26 @@ object Eq {
                 bassBoost = bass,
             )
         }
+    }
+
+    /**
+     * Turn whatever the hardware reported into a valid, ordered millibel range.
+     * The platform contract says `bandLevelRange` is `[min, max]`, but some OEMs
+     * return a short (even single-element) array or swap the two values. Reading
+     * `[0]/[1]` blindly threw, and a `min > max` makes every `coerceIn` in this
+     * file throw. Pure so the guard is testable without an audio session.
+     */
+    internal fun safeBandRange(raw: ShortArray?): IntRange {
+        // A malformed array (null / empty / one element) carries no usable pair;
+        // trusting a single element would invent a bogus lower bound. Fall back
+        // to the platform's standard ±15 dB range as one whole.
+        if (raw == null || raw.size < 2) return -1500..1500
+        val a = raw[0].toInt()
+        val b = raw[1].toInt()
+        val lo = minOf(a, b)
+        val hi = maxOf(a, b)
+        // An empty range still makes coerceIn throw; keep at least one step.
+        return lo..if (hi > lo) hi else lo + 1
     }
 
     /** Map a five-point curve onto an arbitrary band count. */

@@ -6,12 +6,15 @@ import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.os.Build
+import android.os.Looper
 import android.os.Process
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineExceptionHandler
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import java.util.concurrent.Executors
 
 /**
  * The last line of defence.
@@ -183,11 +186,31 @@ object CrashGuard {
 
     // -------------------------------------------------------------------- write
 
+    /**
+     * One daemon thread owns the log file. A coroutine that throws on Main used
+     * to run the whole read-modify-write synchronously on the UI thread — an ANR
+     * on a slow device — and two coroutines recording at once could interleave
+     * their rewrites and lose a line.
+     */
+    private val io = Executors.newSingleThreadExecutor { runnable ->
+        Thread(runnable, "bunmusic-crashlog").apply { isDaemon = true }
+    }
+
     /** Record a failure that was caught and survived. Never throws. */
     fun record(throwable: Throwable, where: String) {
         val application = context ?: return
+        val entry = runCatching {
+            summarise(throwable, Thread.currentThread().name, where, System.currentTimeMillis())
+        }.getOrElse { return }
+        // On a background thread keep the synchronous path, so a startup failure
+        // is on disk before the process can die. On Main, hand the disk work off.
+        val onMain = runCatching { Looper.myLooper() === Looper.getMainLooper() }.getOrDefault(false)
+        if (onMain) io.execute { write(application, entry) } else write(application, entry)
+    }
+
+    private fun write(application: Application, entry: Entry) {
         try {
-            append(application, summarise(throwable, Thread.currentThread().name, where, System.currentTimeMillis()))
+            append(application, entry)
         } catch (_: Throwable) {
             // Recording must never be the reason something fails.
         }
@@ -202,6 +225,10 @@ object CrashGuard {
     inline fun <T> safe(where: String, block: () -> T): T? = try {
         block()
     } catch (t: Throwable) {
+        // CancellationException and Errors (OOM, StackOverflow) must propagate:
+        // swallowing them would leave the app running with a half-initialised
+        // state or a corrupt heap, which is worse than a visible crash.
+        if (t is CancellationException || t is Error) throw t
         record(t, where)
         null
     }
@@ -210,13 +237,31 @@ object CrashGuard {
     fun handler(tag: String): CoroutineExceptionHandler =
         CoroutineExceptionHandler { _, t -> record(t, "coroutine:$tag") }
 
+    /**
+     * Pure: the next contents of the log after adding one entry. Exposed so the
+     * read-modify-write contract is testable without an Application.
+     */
+    internal fun appendLines(lines: List<String>, entry: Entry): List<String> =
+        trim(lines + format(entry), MAX_ENTRIES)
+
+    /**
+     * The read-modify-write is synchronized so concurrent records cannot lose a
+     * line, and the rewrite goes through a temp file + rename: a process killed
+     * mid-write leaves the previous complete log, never a half line.
+     */
+    @Synchronized
     private fun append(application: Application, entry: Entry) {
         val file = logFile(application) ?: return
-        val lines = runCatching { file.readLines() }.getOrDefault(emptyList())
-        val kept = trim(lines + format(entry), MAX_ENTRIES)
+        val kept = appendLines(runCatching { file.readLines() }.getOrDefault(emptyList()), entry)
+        val text = kept.joinToString("\n")
         runCatching {
             file.parentFile?.mkdirs()
-            file.writeText(kept.joinToString("\n"))
+            val tmp = File(file.parentFile, "${file.name}.tmp")
+            tmp.writeText(text)
+            if (!tmp.renameTo(file)) {
+                tmp.delete()
+                file.writeText(text)
+            }
         }
     }
 
@@ -305,11 +350,18 @@ object CrashGuard {
 
     fun format(entry: Entry): String = listOf(
         entry.at.toString(),
-        entry.thread.replace(SEP, ' ').replace('\n', ' '),
-        entry.where.replace(SEP, ' ').replace('\n', ' '),
-        entry.message.replace(SEP, ' ').replace('\n', ' '),
-        entry.stack.replace(SEP, ' ').replace('\n', BR),
+        cleanField(entry.thread),
+        cleanField(entry.where),
+        cleanField(entry.message),
+        // A stack trace keeps its line breaks (as BR) but must not carry a raw
+        // \r either: readLines() treats CR, LF and CRLF all as terminators, so
+        // one stray \r would split this record into two unparseable lines.
+        entry.stack.replace(SEP, ' ').replace('\r', ' ').replace('\n', BR),
     ).joinToString(SEP.toString())
+
+    /** One field on one line: no field separator, no line terminator of any kind. */
+    private fun cleanField(s: String): String =
+        s.replace(SEP, ' ').replace('\r', ' ').replace('\n', ' ')
 
     fun parse(line: String): Entry? {
         if (line.isBlank()) return null

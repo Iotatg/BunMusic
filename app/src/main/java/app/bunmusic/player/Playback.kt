@@ -9,6 +9,7 @@ import androidx.media3.common.PlaybackParameters
 import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
 import app.bunmusic.core.CrashGuard
+import app.bunmusic.core.LoadGuard
 import app.bunmusic.data.Cache
 import app.bunmusic.data.Downloads
 import app.bunmusic.data.Eq
@@ -43,9 +44,12 @@ data class PlayerState(
     val speed: Float = 1f,
     val sleepEndsAt: Long = 0L,
     val error: String? = null,
-    /** A–B repeat markers. 0 means unset. */
-    val abStartMs: Long = 0L,
-    val abEndMs: Long = 0L,
+    /**
+     * A–B repeat markers. -1 means unset; 0 is a *valid* A (marking A at the
+     * very start of a track) and must not double as the "not set" sentinel.
+     */
+    val abStartMs: Long = -1L,
+    val abEndMs: Long = -1L,
 ) {
     val hasTrack: Boolean get() = track != null
     val hasNext: Boolean get() = index >= 0 && index < queue.lastIndex
@@ -98,10 +102,19 @@ object Playback {
     private var shuffleOrder: List<Int> = emptyList()
     private var ticker: Job? = null
     private var loadJob: Job? = null
+    /** Bumped on every load: a resolve that finishes late must not touch the player. */
+    @Volatile
+    private var loadGeneration = 0L
     private var radioJob: Job? = null
     private var eqSession: Int = -1
-    /** Guards against a failing item bouncing between error and retry forever. */
-    private var retrying = false
+    /**
+     * The id of the item we already retried once. load() is a plain function that
+     * only *starts* a coroutine, so a boolean guard reset right after calling it
+     * was already false by the time the second error arrived — the same broken
+     * track retried forever. The id stays until any listener-initiated load.
+     */
+    @Volatile
+    private var retriedId: String? = null
     /** Where a restored session should start once the item is prepared. */
     private var pendingSeekMs = 0L
     /** Session writes are throttled; the ticker calls publish() twice a second. */
@@ -166,7 +179,7 @@ object Playback {
             override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
                 val s = _state.value
                 val track = s.track ?: return
-                if (retrying || track.isLocal) {
+                if (retriedId == track.id || track.isLocal) {
                     _state.value = s.copy(isPlaying = false, buffering = false, error = "This track could not be played")
                     return
                 }
@@ -174,11 +187,10 @@ object Playback {
                     _state.value = s.copy(isPlaying = false, buffering = false, error = friendlyError(error))
                     return
                 }
-                retrying = true
-                scope.launch {
-                    runCatching { load(index, autoplay = true) }
-                    retrying = false
-                }
+                // One retry per item. A fresh URL may have gone stale, but a
+                // second failure means the item itself is unplayable here.
+                retriedId = track.id
+                scope.launch { runCatching { load(index, autoplay = true, fromRetry = true) } }
             }
 
             override fun onPlaybackStateChanged(playbackState: Int) {
@@ -220,7 +232,7 @@ object Playback {
         queue = saved.queue
         index = saved.index
         rebuildShuffle()
-        pendingSeekMs = saved.positionMs.coerceAtLeast(0L)
+        pendingSeekMs = Session.resumePositionMs(saved.positionMs, track.durationMs)
         _state.value = PlayerState(
             track = track,
             isPlaying = false,
@@ -251,11 +263,20 @@ object Playback {
 
     // ------------------------------------------------------------- commands
 
-    fun play(tracks: List<Track>, startIndex: Int = 0) {
+    fun play(tracks: List<Track>, startIndex: Int = 0, startPositionMs: Long = 0L) {
         if (tracks.isEmpty()) return
         queue = tracks
         index = startIndex.coerceIn(0, tracks.lastIndex)
         rebuildShuffle()
+        // A caller resuming a queue (Media3 hands one back on a media-button
+        // press) gives us a position. Stash it for *after* prepare(): seeking
+        // now would land on an empty timeline and be thrown away. Passing 0
+        // also clears any position left over from a cold-start restore, so a
+        // freshly chosen song never jumps to the previous one's progress.
+        pendingSeekMs = Session.resumePositionMs(
+            LoadGuard.pendingSeek(startPositionMs, C.TIME_UNSET),
+            tracks[index].durationMs,
+        )
         load(index, autoplay = true)
     }
 
@@ -636,25 +657,30 @@ object Playback {
     /** Mark A. Marking B without an A first marks both ends at once. */
     fun markA() {
         val at = _state.value.positionMs.coerceAtLeast(0L)
-        _state.value = _state.value.copy(abStartMs = at, abEndMs = 0L)
+        _state.value = _state.value.copy(abStartMs = at, abEndMs = -1L)
     }
 
     fun markB() {
         val s = _state.value
         val at = s.positionMs
-        if (s.abStartMs <= 0L || at <= s.abStartMs + 1_000L) {
-            // A single button press on a fresh track: loop from here to the end of
+        // -1 means A was never marked: a single press on a fresh track loops
+        // from the very start. 0 is a legitimate A (marked at 0:00), so the
+        // "unset" test must be `< 0`, not `<= 0` — otherwise marking A at the
+        // start of a song could never advance to B.
+        val start = if (s.abStartMs < 0L) 0L else s.abStartMs
+        if (at <= start + 1_000L) {
+            // B too close to A (or A just marked at the start): loop to the end of
             // the song rather than refusing with a toast nobody asked for.
-            val end = s.durationMs.takeIf { it > s.abStartMs + 2_000L } ?: return
-            _state.value = s.copy(abEndMs = end)
+            val end = s.durationMs.takeIf { it > start + 2_000L } ?: return
+            _state.value = s.copy(abStartMs = start, abEndMs = end)
         } else {
-            _state.value = s.copy(abEndMs = at)
+            _state.value = s.copy(abStartMs = start, abEndMs = at)
         }
-        _player?.seekTo(s.abStartMs)
+        _player?.seekTo(start)
     }
 
     fun clearAb() {
-        _state.value = _state.value.copy(abStartMs = 0L, abEndMs = 0L)
+        _state.value = _state.value.copy(abStartMs = -1L, abEndMs = -1L)
     }
 
     /** One button that walks A → B → clear, for the row under the transport. */
@@ -662,7 +688,7 @@ object Playback {
         val s = _state.value
         when {
             s.abActive -> clearAb()
-            s.abStartMs <= 0L -> markA()
+            s.abStartMs < 0L -> markA()
             else -> markB()
         }
     }
@@ -694,8 +720,8 @@ object Playback {
             index = 0
             rebuildShuffle()
         }
-        retrying = false
         _state.value = _state.value.copy(error = null, buffering = true)
+        // A deliberate retry starts a fresh attempt; load() clears retriedId.
         load(index.coerceIn(0, queue.lastIndex), autoplay = true)
     }
 
@@ -711,7 +737,9 @@ object Playback {
      */
     fun dismissCard() {
         _player?.pause()
-        saveSession(force = true)
+        // A cold start has no loaded track; saving then would overwrite the
+        // saved session with an empty snapshot and lose the resume queue.
+        if (Dismiss.shouldSaveSession(_state.value.hasTrack)) saveSession(force = true)
         if (::appContext.isInitialized) ServiceLauncher.stop(appContext)
     }
 
@@ -729,9 +757,13 @@ object Playback {
 
     // --------------------------------------------------------------- loading
 
-    private fun load(i: Int, autoplay: Boolean) {
+    private fun load(i: Int, autoplay: Boolean, fromRetry: Boolean = false) {
         val track = queue.getOrNull(i) ?: return
+        // Any listener-initiated load (tap, next, deliberate retry) starts a new
+        // item and is allowed one retry of its own. The automatic retry is not.
+        if (!fromRetry) retriedId = null
         loadJob?.cancel()
+        val generation = ++loadGeneration
         _state.value = _state.value.copy(
             track = track,
             index = i,
@@ -784,6 +816,7 @@ object Playback {
                             cacheKey = resolved.key
                             resolved.url
                         } catch (t: Throwable) {
+                            if (LoadGuard.isFatal(t)) throw t
                             _state.value = _state.value.copy(
                                 buffering = false,
                                 isPlaying = false,
@@ -804,6 +837,7 @@ object Playback {
                     cacheKey = resolved.key
                     resolved.url
                 } catch (t: Throwable) {
+                    if (LoadGuard.isFatal(t)) throw t
                     val cached = Cache.cached(track.videoId)
                     _state.value = _state.value.copy(
                         buffering = false,
@@ -818,6 +852,11 @@ object Playback {
                     return@launch
                 }
             }
+
+            // The resolve ran on IO. If the listener asked for another song
+            // while it was in flight, this URL belongs to a track that has
+            // already been skipped — do not prepare it over the new one.
+            if (LoadGuard.isStale(generation, loadGeneration)) return@launch
 
             val p = _player ?: return@launch
             val builder = MediaItem.Builder()
@@ -852,10 +891,13 @@ object Playback {
             }
             p.prepare()
             bindEffects(p)
-            // A restored session starts where it stopped, not at 0:00.
+            // A restored session starts where it stopped, not at 0:00. Clamp
+            // again here: the duration can be known only after prepare(), and an
+            // un-clamped seek would jump straight to STATE_ENDED and skip ahead.
             if (pendingSeekMs > 0) {
-                p.seekTo(pendingSeekMs)
-                _state.value = _state.value.copy(positionMs = pendingSeekMs)
+                val resume = Session.resumePositionMs(pendingSeekMs, track.durationMs)
+                p.seekTo(resume)
+                _state.value = _state.value.copy(positionMs = resume)
                 pendingSeekMs = 0L
             }
             if (autoplay) p.play()
@@ -872,9 +914,11 @@ object Playback {
             runCatching { Scrobble.nowPlaying(track) }
 
             // Keep the whole song, not just the part that played. This is what makes
-            // the second play offline-capable.
-            if (info != null && !Prefs.settings.value.offlineOnly) {
-                Cache.prefetch(info!!)
+            // the second play offline-capable. A local val (rather than a `!!` on
+            // the captured var) keeps the non-null contract explicit.
+            val resolved = info
+            if (resolved != null && !Prefs.settings.value.offlineOnly) {
+                Cache.prefetch(resolved)
             }
             // ...and quietly pull the next couple down as well, so the end of this
             // song does not have to wait on a resolve.

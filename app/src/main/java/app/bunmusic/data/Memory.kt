@@ -60,11 +60,15 @@ object Memory {
         minTracks: Int = 1,
     ): List<DayMemory> {
         if (events.isEmpty() || yearsBack <= 0) return emptyList()
+        // yearsBack is a caller-supplied capacity; an absurd value used to
+        // allocate a giant array (and loop billions of times). Cap it well
+        // above the documented YEARS_BACK without changing normal behaviour.
+        val span = yearsBack.coerceAtMost(50)
         val today = LocalDate.ofEpochDay(Listening.dayIndex(nowMs, offsetMs))
         val byDay = events.groupBy { Listening.dayIndex(it.atMs, offsetMs) }
 
-        val out = ArrayList<DayMemory>(yearsBack)
-        for (years in 1..yearsBack) {
+        val out = ArrayList<DayMemory>(span)
+        for (years in 1..span) {
             val date = today.minusYears(years.toLong())
             // A 29 February memory would otherwise be reported on the 28th of a
             // common year, which is a different day. `minusYears` clamps, so the

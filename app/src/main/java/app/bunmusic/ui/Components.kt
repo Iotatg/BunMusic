@@ -1118,6 +1118,20 @@ private fun MidnightMiniPlayer(
 // ------------------------------------------------------------------- seekbar
 
 /**
+ * Turn a pointer's x into a 0…1 seek fraction.
+ *
+ * A Canvas can be laid out at width 0 (a collapsing container, first frame of a
+ * split-screen transition), which makes `x / width` Infinity or NaN; coerceIn
+ * leaves NaN untouched and it would flow into a seek offset or a draw coordinate.
+ * The width floor and finite guard keep the normal path bit-for-bit unchanged.
+ */
+private fun seekFraction(x: Float, width: Int): Float {
+    // PointerInputScope.size is an IntSize; a collapsed container reports 0.
+    val f = x / width.coerceAtLeast(1).toFloat()
+    return if (f.isNaN() || f.isInfinite()) 0f else f.coerceIn(0f, 1f)
+}
+
+/**
  * A progress fraction that moves continuously between playback ticks.
  *
  * The player publishes its position twice a second. A bar drawn straight from
@@ -1133,7 +1147,13 @@ private fun MidnightMiniPlayer(
 @Composable
 private fun smoothProgress(value: Float, dragging: Boolean, local: Float): Float {
     val anim = remember { androidx.compose.animation.core.Animatable(value) }
-    androidx.compose.runtime.LaunchedEffect(value, dragging) {
+    // `local` must be a key while dragging: the finger moves it every frame, but
+    // an effect keyed only on (value, dragging) snaps the Animatable once at the
+    // drag-start offset. On release `dragging` flips false and the bar briefly
+    // returns that stale anim.value — a visible thumb jump back. Snapping anim to
+    // the latest local (cheap) also means the release frame starts from the right
+    // position instead of the drag-start one.
+    androidx.compose.runtime.LaunchedEffect(value, dragging, local) {
         when {
             dragging -> anim.snapTo(local)
             value < anim.value - 0.02f || value > anim.value + 0.35f -> anim.snapTo(value)
@@ -1215,7 +1235,7 @@ fun WaveSeekBar(
                 detectHorizontalDragGestures(
                     onDragStart = { offset ->
                         dragging = true
-                        local = (offset.x / size.width.toFloat()).coerceIn(0f, 1f)
+                        local = seekFraction(offset.x, size.width)
                     },
                     onDragEnd = {
                         dragging = false
@@ -1223,7 +1243,7 @@ fun WaveSeekBar(
                         Haptics.tick()
                     },
                 ) { change, _ ->
-                    local = (change.position.x / size.width.toFloat()).coerceIn(0f, 1f)
+                    local = seekFraction(change.position.x, size.width)
                 }
             }
             // Drag alone meant a tap on the waveform did nothing at all — the
@@ -1231,7 +1251,7 @@ fun WaveSeekBar(
             // how the same control behaves.
             .pointerInput(durationMs) {
                 detectTapGestures { offset ->
-                    onSeek(((offset.x / size.width.toFloat()).coerceIn(0f, 1f) * durationMs).toLong())
+                    onSeek((seekFraction(offset.x, size.width) * durationMs).toLong())
                     Haptics.tick()
                 }
             }
@@ -1255,9 +1275,12 @@ fun WaveSeekBar(
         }
         // playhead
         if (durationMs > 0) {
+            // Clamp the upper bound first: when size.width < 1.5f,
+            // coerceIn(0f, width-1.5f) is an empty range and throws.
+            val maxX = (size.width - 1.5f).coerceAtLeast(0f)
             drawRect(
                 color = activeColor,
-                topLeft = Offset((played - 0.75f).coerceIn(0f, size.width - 1.5f), 0f),
+                topLeft = Offset((played - 0.75f).coerceIn(0f, maxX), 0f),
                 size = Size(1.5f, size.height),
             )
         }
@@ -1309,7 +1332,7 @@ fun LineSeekBar(
                 detectHorizontalDragGestures(
                     onDragStart = { offset ->
                         dragging = true
-                        local = (offset.x / size.width.toFloat()).coerceIn(0f, 1f)
+                        local = seekFraction(offset.x, size.width)
                     },
                     onDragEnd = {
                         dragging = false
@@ -1317,12 +1340,12 @@ fun LineSeekBar(
                         Haptics.tick()
                     },
                 ) { change, _ ->
-                    local = (change.position.x / size.width.toFloat()).coerceIn(0f, 1f)
+                    local = seekFraction(change.position.x, size.width)
                 }
             }
             .pointerInput(durationMs) {
                 detectTapGestures { offset ->
-                    val f = (offset.x / size.width.toFloat()).coerceIn(0f, 1f)
+                    val f = seekFraction(offset.x, size.width)
                     onSeek((f * durationMs).toLong())
                     Haptics.tick()
                 }
@@ -1332,7 +1355,13 @@ fun LineSeekBar(
         val track = 6.dp.toPx()
         val knob = 7.dp.toPx() + 1.5f.dp.toPx() * halo
         val corner = androidx.compose.ui.geometry.CornerRadius(track / 2f)
-        val x = (animated * size.width).coerceIn(knob, size.width - knob)
+        // A narrow split-screen container can be narrower than 2*knob; in that
+        // case coerceIn(knob, width-knob) is an empty range and throws. Clamp the
+        // upper bound first, and keep NaN out of the animated fraction.
+        val w = size.width
+        val a = if (animated.isNaN() || animated.isInfinite()) 0f else animated
+        val hi = (w - knob).coerceAtLeast(knob)
+        val x = (a * w).coerceIn(knob, hi)
 
         // 1. Frosted trough: a dim blue base plus a bright top specular line,
         //    so the track reads as a shallow channel cut into glass, not a rule.

@@ -39,6 +39,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -63,7 +64,10 @@ import app.bunmusic.core.SoraFamily
 import app.bunmusic.data.Auth
 import app.bunmusic.data.GoogleAuth
 import app.bunmusic.data.Prefs
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 private enum class Door { EMAIL, PHONE }
 
@@ -91,6 +95,11 @@ fun AuthScreen(onGuest: () -> Unit) {
     var notice by remember { mutableStateOf<String?>(null) }
     var googleSetup by remember { mutableStateOf(false) }
     var secondsLeft by remember { mutableStateOf(0) }
+    // Auth does a password hash and several Preference writes. Calling it
+    // inline in a click handler blocked the main thread *and* set busy=true /
+    // busy=false in the same frame, so Compose never drew the loading state.
+    // A coroutine yields first and does the work on IO.
+    val scope = rememberCoroutineScope()
 
     LaunchedEffect(challenge?.resendAt) {
         while (true) {
@@ -107,9 +116,17 @@ fun AuthScreen(onGuest: () -> Unit) {
     ) { result ->
         busy = false
         if (result.resultCode == Activity.RESULT_OK) {
-            runCatching { GoogleAuth.idTokenFrom(result.data) }
-                .onSuccess { token -> Auth.signInWithGoogle(token).onFailure { error = it.message } }
-                .onFailure { error = it.message }
+            val token = runCatching { GoogleAuth.idTokenFrom(result.data) }.getOrNull()
+            if (token == null) {
+                error = "Google sign-in did not return a token"
+            } else {
+                scope.launch {
+                    val failure = withContext(Dispatchers.IO) {
+                        Auth.signInWithGoogle(token).exceptionOrNull()
+                    }
+                    if (failure != null) error = failure.message
+                }
+            }
         }
     }
 
@@ -306,13 +323,14 @@ fun AuthScreen(onGuest: () -> Unit) {
                         ) {
                             error = null
                             busy = true
-                            val result = if (signUp) {
-                                Auth.signUp(name, email, password)
-                            } else {
-                                Auth.signIn(email, password)
+                            scope.launch {
+                                val result = withContext(Dispatchers.IO) {
+                                    if (signUp) Auth.signUp(name, email, password)
+                                    else Auth.signIn(email, password)
+                                }
+                                busy = false
+                                if (result.isFailure) error = result.exceptionOrNull()?.message
                             }
-                            busy = false
-                            if (result.isFailure) error = result.exceptionOrNull()?.message
                         }
 
                         Spacer(Modifier.height(12.dp))
@@ -366,15 +384,17 @@ fun AuthScreen(onGuest: () -> Unit) {
                             PrimaryButton("Send code", busy = busy) {
                                 error = null
                                 busy = true
-                                val result = Auth.requestOtp(phone)
-                                busy = false
-                                result.fold(
-                                    onSuccess = {
-                                        challenge = it
-                                        notice = if (it.demo) "Demo code: ${it.code}" else "Code sent to ${Auth.prettyPhone(it.phone)}"
-                                    },
-                                    onFailure = { error = it.message },
-                                )
+                                scope.launch {
+                                    val result = withContext(Dispatchers.IO) { Auth.requestOtp(phone) }
+                                    busy = false
+                                    result.fold(
+                                        onSuccess = {
+                                            challenge = it
+                                            notice = if (it.demo) "Demo code: ${it.code}" else "Code sent to ${Auth.prettyPhone(it.phone)}"
+                                        },
+                                        onFailure = { error = it.message },
+                                    )
+                                }
                             }
                         } else {
                             Text(
@@ -446,9 +466,13 @@ fun AuthScreen(onGuest: () -> Unit) {
                             PrimaryButton("Verify and continue", busy = busy, enabled = otp.length == 6) {
                                 error = null
                                 busy = true
-                                val result = Auth.verifyOtp(challenge!!.phone, otp)
-                                busy = false
-                                if (result.isFailure) error = result.exceptionOrNull()?.message
+                                scope.launch {
+                                    val result = withContext(Dispatchers.IO) {
+                                        Auth.verifyOtp(challenge!!.phone, otp)
+                                    }
+                                    busy = false
+                                    if (result.isFailure) error = result.exceptionOrNull()?.message
+                                }
                             }
 
                             Spacer(Modifier.height(12.dp))

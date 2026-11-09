@@ -109,6 +109,24 @@ object Auth {
     private const val OTP_COOLDOWN_MS = 30_000L
     private const val OTP_MAX_ATTEMPTS = 5
 
+    /**
+     * Seconds the user must wait before another OTP, or 0 when allowed.
+     *
+     * The device clock can jump backwards (manual change, a restored backup or a
+     * bad NTP update). With a naive `now - last < cooldown`, a negative elapsed
+     * is `< cooldown` forever and `last > 0` stays true — the account is locked
+     * out of OTP permanently, and the computed wait is a huge positive number.
+     * Treat a negative (or zero) elapsed as "no cooldown". Pure, so the edge
+     * cases are testable without SharedPreferences or a real clock.
+     */
+    internal fun otpCooldownWaitSeconds(nowMs: Long, lastMs: Long, cooldownMs: Long): Long {
+        if (lastMs <= 0L) return 0L
+        val elapsed = nowMs - lastMs
+        if (elapsed < 0L) return 0L              // clock rolled back: never lock out
+        if (elapsed >= cooldownMs) return 0L     // cooldown already elapsed
+        return ((cooldownMs - elapsed) / 1000L) + 1
+    }
+
     private lateinit var sp: SharedPreferences
 
     private val _account = MutableStateFlow<Account?>(null)
@@ -231,8 +249,8 @@ object Auth {
 
         val now = System.currentTimeMillis()
         val last = sp.getString(KEY_OTP, null)?.split(F)?.getOrNull(4)?.toLongOrNull() ?: 0L
-        if (now - last < OTP_COOLDOWN_MS && last > 0) {
-            val wait = ((OTP_COOLDOWN_MS - (now - last)) / 1000) + 1
+        val wait = otpCooldownWaitSeconds(now, last, OTP_COOLDOWN_MS)
+        if (wait > 0L) {
             fail("Wait ${wait}s before asking for another code", AuthError.Kind.RATE_LIMITED)
         }
 
@@ -244,7 +262,7 @@ object Auth {
             resendAt = now + OTP_COOLDOWN_MS,
             demo = !sender.send(phone, code),
         )
-        sp.edit().putString(KEY_OTP, listOf(phone, code, challenge.expiresAt.toString(), "0", now.toString()).joinToString(F.toString())).apply()
+        sp.edit().putString(KEY_OTP, listOf(phone, code, challenge.expiresAt.toString(), "0", now.toString()).joinToString(F.toString()) { Store.clean(it) }).apply()
         _pending.value = challenge
         challenge
     }
@@ -255,7 +273,7 @@ object Auth {
         if (row.size < 5 || row[0] != clean) fail("Request a code for this number first", AuthError.Kind.INVALID)
         if (row[1] != code.trim()) {
             val attempts = (row[3].toIntOrNull() ?: 0) + 1
-            sp.edit().putString(KEY_OTP, listOf(row[0], row[1], row[2], attempts.toString(), row[4]).joinToString(F.toString())).apply()
+            sp.edit().putString(KEY_OTP, listOf(row[0], row[1], row[2], attempts.toString(), row[4]).joinToString(F.toString()) { Store.clean(it) }).apply()
             if (attempts >= OTP_MAX_ATTEMPTS) {
                 sp.edit().remove(KEY_OTP).apply()
                 fail("Too many tries — request a fresh code", AuthError.Kind.RATE_LIMITED)
@@ -476,7 +494,7 @@ object Auth {
                 a.id, a.name, a.email ?: "", a.phone ?: "", a.provider.name, a.avatarUrl ?: "",
                 a.createdAt.toString(), a.lastLoginAt.toString(),
                 if (a.emailVerified) "1" else "0", if (a.phoneVerified) "1" else "0",
-            ).joinToString(F.toString())
+            ).joinToString(F.toString()) { Store.clean(it) }
         }
         val editor = sp.edit().putString(KEY_ACCOUNTS, body)
         if (hash != null) editor.putString("hash_" + hash.first, hash.second)

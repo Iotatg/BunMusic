@@ -120,6 +120,16 @@ private val Route.depth: Int
         Route.Home, Route.Explore, Route.Library, Route.Search -> 0
         else -> 1
     }
+
+/** Navigation rules, kept pure so a double tap cannot regress into a two-press back. */
+object NavStack {
+    /** Pushing the route already on top is a no-op. */
+    fun push(stack: List<Route>, route: Route): List<Route> =
+        if (stack.lastOrNull() == route) stack else stack + route
+
+    fun pop(stack: List<Route>): List<Route> =
+        if (stack.size > 1) stack.dropLast(1) else stack
+}
 @Composable
 fun Root(launch: Launch = Launch(), recovered: Boolean = false) {
     val account by Auth.account.collectAsState()
@@ -182,8 +192,8 @@ private fun Shell(
         }
     }
 
-    val push: (Route) -> Unit = { stack = stack + it }
-    val pop: () -> Unit = { if (stack.size > 1) stack = stack.dropLast(1) }
+    val push: (Route) -> Unit = { stack = NavStack.push(stack, it) }
+    val pop: () -> Unit = { stack = NavStack.pop(stack) }
     val tab: (Route) -> Unit = { stack = listOf(it) }
 
     // The app closed and came back. Said once, in the same toast the rest of the

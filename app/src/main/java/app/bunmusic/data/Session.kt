@@ -37,6 +37,21 @@ object Session {
     private const val BEHIND = 5
 
     /**
+     * Clamp a restored position into a playable window.
+     *
+     * A saved position at (or past) the end makes Media3 fire STATE_ENDED the
+     * moment it is prepared, so "resume where I left off" silently skipped to the
+     * next track. Leaving one second of runway avoids that. When the duration is
+     * unknown or implausibly short there is nothing safe to clamp against, so the
+     * saved value is kept rather than replaced with 0.
+     */
+    fun resumePositionMs(savedMs: Long, durationMs: Long): Long {
+        val start = savedMs.coerceAtLeast(0L)
+        if (durationMs <= 1_000L) return start
+        return start.coerceAtMost(durationMs - 1_000L)
+    }
+
+    /**
      * Row separator. Deliberately not `\n`: a local file's ID3 title can contain
      * a line break, and the queue is one string of encoded tracks joined end to
      * end — a newline inside a title used to split one track into two broken
@@ -95,20 +110,51 @@ object Session {
             .apply()
     }
 
+    /**
+     * Normalise values read back from prefs before they ever reach the player.
+     * A persisted speed can be NaN/0/negative (feeding PlaybackParameters an
+     * illegal float), a position can be negative, and repeat can be out of the
+     * 0..2 range. Pure, so a corrupt session is testable without a device.
+     */
+    internal fun sanitize(
+        tracks: List<Track>,
+        index: Int,
+        positionMs: Long,
+        speed: Float,
+        repeat: Int,
+        shuffle: Boolean,
+        savedAt: Long,
+    ): Saved = Saved(
+        queue = tracks,
+        index = index.coerceIn(0, tracks.lastIndex.coerceAtLeast(0)),
+        positionMs = positionMs.coerceAtLeast(0L),
+        speed = if (speed.isFinite() && speed > 0f) speed.coerceIn(0.5f, 2f) else 1f,
+        repeat = repeat.coerceIn(0, 2),
+        shuffle = shuffle,
+        savedAt = savedAt,
+    )
+
     fun load(): Saved? {
         if (!::sp.isInitialized) return null
-        val raw = sp.getString(KEY_QUEUE, null) ?: return null
-        val tracks = raw.split(ROW).mapNotNull { Store.decodeTrack(it) }
-        if (tracks.isEmpty()) return null
-        return Saved(
-            queue = tracks,
-            index = sp.getInt("index", 0).coerceIn(0, tracks.lastIndex),
-            positionMs = sp.getLong("position", 0L),
-            speed = sp.getFloat("speed", 1f),
-            repeat = sp.getInt("repeat", 0),
-            shuffle = sp.getBoolean("shuffle", false),
-            savedAt = sp.getLong("savedAt", 0L),
-        )
+        // A preference key written by an older build under a different type
+        // throws ClassCastException on getInt/getFloat/getString. One bad key
+        // must not abort the whole cold-start restore.
+        return try {
+            val raw = sp.getString(KEY_QUEUE, null) ?: return null
+            val tracks = raw.split(ROW).mapNotNull { Store.decodeTrack(it) }
+            if (tracks.isEmpty()) return null
+            sanitize(
+                tracks = tracks,
+                index = sp.getInt("index", 0),
+                positionMs = sp.getLong("position", 0L),
+                speed = sp.getFloat("speed", 1f),
+                repeat = sp.getInt("repeat", 0),
+                shuffle = sp.getBoolean("shuffle", false),
+                savedAt = sp.getLong("savedAt", 0L),
+            )
+        } catch (e: ClassCastException) {
+            null
+        }
     }
 
     fun clear() {

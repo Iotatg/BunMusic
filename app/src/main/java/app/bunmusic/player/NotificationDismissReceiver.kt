@@ -25,7 +25,14 @@ class NotificationDismissReceiver : BroadcastReceiver() {
     }
 }
 
-/** The decision, kept out of the receiver so it can be tested without Android. */
+/** The decisions, kept out of the receiver so they can be tested without Android. */
 object Dismiss {
     fun shouldStop(isPlaying: Boolean): Boolean = !isPlaying
+
+    /**
+     * On a cold start nothing has been adopted yet, so Playback.state is an
+     * empty PlayerState. Saving that snapshot over the persisted session would
+     * erase the resume queue just because someone swiped a stale card away.
+     */
+    fun shouldSaveSession(hasTrack: Boolean): Boolean = hasTrack
 }

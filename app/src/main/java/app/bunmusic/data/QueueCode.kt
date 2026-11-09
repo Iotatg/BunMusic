@@ -43,6 +43,17 @@ object QueueCode {
     private const val MAX_FIELD = 120
     private const val SEP = '\t'
 
+    /** A single track is never longer than a day; cap untrusted seconds before * 1000. */
+    private const val MAX_DURATION_SECONDS = 86_400L
+
+    /**
+     * Hard ceiling on inflated bytes. A legitimate 50-track queue is ~2 KB raw;
+     * a deflate stream can expand by >1000x, so without a cap a short pasted code
+     * (a zip bomb) could balloon to gigabytes and OOM the process before decode
+     * ever looks at a row.
+     */
+    private const val MAX_INFLATE_BYTES = 64 * 1024
+
     data class Item(
         val videoId: String,
         val title: String,
@@ -110,6 +121,10 @@ object QueueCode {
         if (!body.startsWith(PREFIX)) return null
         val packed = body.removePrefix(PREFIX)
         if (packed.isEmpty()) return null
+        // A pasted string is untrusted: encode() never emits more than MAX_CHARS,
+        // so anything far beyond that is either corrupt or an attempt to make us
+        // allocate/inflate an unbounded buffer. Refuse before Base64 decoding.
+        if (packed.length > MAX_CHARS * 2) return null
 
         val raw = try {
             inflate(Base64.getUrlDecoder().decode(pad(packed)))
@@ -130,7 +145,9 @@ object QueueCode {
                 videoId = id,
                 title = parts[1].ifBlank { "Unknown track" },
                 artist = parts[2],
-                durationMs = parts[3].toLongOrNull()?.times(1000) ?: 0L,
+                // Untrusted field: clamp *before* multiplying by 1000 so a huge
+                // seconds value cannot overflow Long into a negative duration.
+                durationMs = (parts[3].toLongOrNull()?.coerceIn(0L, MAX_DURATION_SECONDS) ?: 0L) * 1000L,
             )
             if (items.size >= MAX_TRACKS) break
         }
@@ -204,9 +221,16 @@ object QueueCode {
             inflater.setInput(bytes)
             val out = ByteArrayOutputStream(bytes.size * 4)
             val buffer = ByteArray(4096)
+            var total = 0
             while (!inflater.finished()) {
                 val n = inflater.inflate(buffer)
                 if (n == 0) break
+                total += n
+                // Reject a zip bomb as soon as it crosses the ceiling, rather
+                // than allocating until the process runs out of heap.
+                if (total > MAX_INFLATE_BYTES) {
+                    throw java.util.zip.DataFormatException("inflated payload too large")
+                }
                 out.write(buffer, 0, n)
             }
             // A cut-off code still inflates a prefix of rows without complaint.

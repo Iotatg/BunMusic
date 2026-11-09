@@ -165,8 +165,11 @@ object Cosmos {
      * no allocation, no emission schedule, no gap in the sky.
      */
     fun step(field: List<Dust>, dt: Float): List<Dust> {
-        if (dt <= 0f) return field
-        val d = dt.coerceAtMost(0.1f)
+        // dt <= 0f is false for NaN, and coerceAtMost leaves NaN unchanged —
+        // a non-finite delta would turn every mote coordinate into NaN.
+        val safeDt = dt.finiteOr()
+        if (safeDt <= 0f) return field
+        val d = safeDt.coerceAtMost(0.1f)
         return field.map { p ->
             val nvx = (p.vx + p.ax * d).coerceIn(-0.05f, 0.05f)
             val nvy = (p.vy + p.ay * d).coerceIn(-0.05f, 0.05f)
@@ -189,17 +192,21 @@ object Cosmos {
      * sky for that instant instead of a frozen first frame. [DustTest] asserts
      * the two agree.
      */
-    fun at(field: List<Dust>, seconds: Float): List<Dust> = field.map { p ->
-        p.copy(
-            x = wrap01(p.x + p.vx * seconds + 0.5f * p.ax * seconds * seconds),
-            y = wrap01(p.y + p.vy * seconds),
-            vx = (p.vx + p.ax * seconds).coerceIn(-0.05f, 0.05f),
-        )
+    fun at(field: List<Dust>, seconds: Float): List<Dust> {
+        val t = seconds.finiteOr()
+        return field.map { p ->
+            p.copy(
+                x = wrap01(p.x + p.vx * t + 0.5f * p.ax * t * t),
+                y = wrap01(p.y + p.vy * t),
+                vx = (p.vx + p.ax * t).finiteOr().coerceIn(-0.05f, 0.05f),
+            )
+        }
     }
 
     /** Wrap a page fraction into 0…1, including negative drift. */
     fun wrap01(v: Float): Float {
-        val r = v % 1f
+        // NaN % 1f is NaN, and both comparisons are false — guard before wrapping.
+        val r = v.finiteOr() % 1f
         return if (r < 0f) r + 1f else r
     }
 

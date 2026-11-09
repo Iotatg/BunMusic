@@ -26,7 +26,9 @@ object QueueMath {
 
     fun insertNext(queue: List<Track>, index: Int, track: Track): List<Track> {
         val q = queue.toMutableList()
-        val at = (index + 1).coerceIn(0, q.size)
+        // Clamp before adding: index == Int.MAX_VALUE would overflow (index + 1)
+        // to Int.MIN_VALUE and coerce to 0, inserting at the head by accident.
+        val at = (index.coerceIn(0, q.size) + 1).coerceAtMost(q.size)
         q.add(at, track)
         return q
     }
@@ -47,7 +49,8 @@ object QueueMath {
      */
     fun jumpTarget(queue: List<Track>, index: Int, delta: Int): Int {
         if (queue.isEmpty()) return -1
-        return (index + delta).coerceIn(0, queue.lastIndex)
+        // Long arithmetic avoids Int overflow for a hostile index/delta pair.
+        return (index.toLong() + delta.toLong()).coerceIn(0L, queue.lastIndex.toLong()).toInt()
     }
 
     /**

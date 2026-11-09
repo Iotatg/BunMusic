@@ -88,7 +88,9 @@ fun buildCommands(host: CommandHost): List<Command> {
     add("Playback", "play.back30", "Back 30 seconds", "", G.Back, "seek jump") { Playback.seekBy(-30_000) }
     add("Playback", "play.shuffle", "Toggle shuffle", "", G.Shuffle) { Playback.toggleShuffle() }
     add("Playback", "play.repeat.off", "Repeat off", "", G.Repeat) {
-        if (Playback.state.value.repeat != 0) Playback.cycleRepeat()
+        // cycleRepeat walks 0→1→2→0, so a single `if` from state 1 lands on 2
+        // ("repeat one"), not 0. Loop to the target like the sibling commands do.
+        while (Playback.state.value.repeat != 0) Playback.cycleRepeat()
         host.toast("Repeat off")
     }
     add("Playback", "play.repeat.all", "Repeat the queue", "", G.Repeat) {

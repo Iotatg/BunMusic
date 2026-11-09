@@ -24,6 +24,8 @@ object Store {
      * Every key is written through [k] so signing in swaps the whole library view
      * without touching a single call site.
      */
+    /** Read from unsynchronised getters via [k], so writes must be visible. */
+    @Volatile
     private var scope: String = ""
 
     fun init(context: Context) {
@@ -128,17 +130,25 @@ object Store {
      * is invalidated whenever the stored blob is rewritten or the library scope
      * changes.
      */
+    @Volatile
     private var regCache: LinkedHashMap<String, Track>? = null
 
-    private fun registry(): LinkedHashMap<String, Track> {
-        regCache?.let { return it }
+    /**
+     * Each caller gets its own snapshot. The cache used to be handed out by
+     * reference, so a UI thread iterating it while [remember] mutated the same
+     * LinkedHashMap could throw ConcurrentModificationException. Copying at most
+     * 600 entries is cheaper than a crash. [remember] is @Synchronized and writes
+     * the mutated snapshot back, so ordering and the 600-entry cap are preserved.
+     */
+    private fun registry(): LinkedHashMap<String, Track> = synchronized(this) {
+        regCache?.let { return@synchronized LinkedHashMap(it) }
         val map = LinkedHashMap<String, Track>()
         for (line in regRaw().split(R)) {
             val t = decodeTrack(line) ?: continue
             map[t.id] = t
         }
-        regCache = map
-        return map
+        regCache = LinkedHashMap(map)
+        return@synchronized map
     }
 
     /** Everything the registry knows, as a map — for callers resolving many ids. */
@@ -315,6 +325,24 @@ object Store {
             // The log is history too. Leaving it behind would let the year in
             // review keep showing plays the user just asked to forget.
             .remove(k(KEY_EVENTS))
+            .apply()
+    }
+
+    /** Full history, with timestamps, for a backup. */
+    fun exportHistory(): List<Backup.HistoryEntry> =
+        history().map { Backup.HistoryEntry(it.track, it.atMs) }
+
+    /**
+     * Merge imported history into the current one instead of replacing it.
+     * The ids are remembered first because [history] resolves every row through
+     * the registry and would otherwise drop all restored rows.
+     */
+    @Synchronized
+    fun restoreHistory(incoming: List<Backup.HistoryEntry>) {
+        val items = Backup.mergeHistory(exportHistory(), incoming)
+        for (item in items) remember(item.track)
+        prefs.edit()
+            .putString(k(KEY_HISTORY), items.joinToString(R.toString()) { "${it.track.id}$F${it.atMs}" })
             .apply()
     }
 
@@ -565,6 +593,36 @@ object Store {
         )
     }
 
+    /** Full counter state for a backup. [Backup] owns the merge semantics. */
+    fun exportStats(): Backup.Stats = Backup.Stats(
+        plays = prefs.getInt(k(KEY_PLAYS), 0).coerceAtLeast(0),
+        listeningMs = prefs.getLong(k(KEY_TOTAL_MS), 0L).coerceAtLeast(0L),
+        dayKeys = (prefs.getStringSet(k(KEY_DAYS), emptySet()) ?: emptySet())
+            .filter { it.toLongOrNull() != null }.toSet(),
+        artists = counter(KEY_ARTISTS),
+        tracks = counter(KEY_TRACKS),
+        playIds = counter(KEY_PLAY_IDS),
+        events = events(),
+    )
+
+    /**
+     * Merge imported stats into the current ones. Importing the same backup
+     * twice is idempotent because every counter takes the max, never a sum.
+     */
+    @Synchronized
+    fun restoreStats(incoming: Backup.Stats) {
+        val s = Backup.mergeStats(exportStats(), incoming)
+        prefs.edit()
+            .putInt(k(KEY_PLAYS), s.plays)
+            .putLong(k(KEY_TOTAL_MS), s.listeningMs)
+            .putString(k(KEY_ARTISTS), writeCounter(s.artists))
+            .putString(k(KEY_TRACKS), writeCounter(s.tracks))
+            .putString(k(KEY_PLAY_IDS), writeCounter(s.playIds))
+            .putStringSet(k(KEY_DAYS), s.dayKeys)
+            .putString(k(KEY_EVENTS), s.events.joinToString(R.toString()) { Listening.encode(it) })
+            .apply()
+    }
+
     /** track id -> times played, for the auto playlists. */
     fun playCounts(): Map<String, Int> = counter(KEY_PLAY_IDS)
 
@@ -618,8 +676,16 @@ object Store {
      * round-tripped, and a space is a fairer rendering of a line break than a
      * record that no longer parses.
      */
-    private fun clean(value: String): String =
+    /**
+     * A field in any control-character-delimited record. Shared with [Auth] and
+     * [Downloads]: a user-entered name or an ID3 title containing a separator
+     * would otherwise split its own row and shift every field after it.
+     */
+    internal fun clean(value: String): String =
         value.replace(F, ' ').replace(R, ' ').replace(L, ' ').replace('\u0002', ' ')
+            // readLines() treats a bare CR as a terminator too; one stray \r in
+            // a title would otherwise split a record into two unparseable lines.
+            .replace('\r', ' ')
 
     /**
      * A track field, which is allowed to contain a line break.

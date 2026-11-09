@@ -114,6 +114,10 @@ fun SettingsScreen(
     var googleSheet by remember { mutableStateOf(false) }
     var tokenSheet by remember { mutableStateOf(false) }
     var cacheTick by remember { mutableIntStateOf(0) }
+    // Scrobble.enabled is a plain SharedPreferences getter, not observable
+    // state. Reading it directly in composition meant the switch never repainted
+    // after setEnabled() — the value changed on disk but the UI kept the old one.
+    var scrobbleOn by remember { mutableStateOf(Scrobble.enabled) }
     val streamBytes by produceState(0L, cacheTick) {
         value = withContext(Dispatchers.IO) { Cache.streamBytes() }
     }
@@ -517,12 +521,13 @@ fun SettingsScreen(
                     } else {
                         "Sends each play to your ListenBrainz profile"
                     },
-                    Scrobble.enabled,
+                    scrobbleOn,
                 ) { v ->
                     if (v && Scrobble.token.isBlank()) {
                         tokenSheet = true
                     } else {
                         Scrobble.setEnabled(v)
+                        scrobbleOn = Scrobble.enabled
                         onToast(if (v) "Scrobbling on" else "Scrobbling off")
                     }
                 }
@@ -803,6 +808,8 @@ fun SettingsScreen(
             onSave = { value ->
                 Scrobble.token = value
                 Scrobble.setEnabled(value.isNotBlank())
+                // Saving or clearing a token changes effective enablement too.
+                scrobbleOn = Scrobble.enabled
                 tokenSheet = false
                 onToast(if (value.isBlank()) "Token cleared" else "Token saved")
             },

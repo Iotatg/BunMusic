@@ -46,7 +46,17 @@ object Sorting {
             SortKey.DURATION -> tracks.sortedBy { it.durationMs }
             SortKey.PLAYS -> tracks.sortedBy { plays[it.id] ?: 0 }
         }
-        return if (spec.descending) base.reversed() else base
+        if (!spec.descending) return base
+        // RECENT parks "never added" tracks at Int.MAX_VALUE so they stay last.
+        // A plain reversed() would flip exactly those to the very front — the
+        // opposite of the documented "go to the end" rule. Keep the tail in
+        // place and reverse only the tracks that actually have an added order.
+        if (spec.key == SortKey.RECENT) {
+            val known = base.indexOfLast { it.id in pos }
+            if (known < 0) return base
+            return base.subList(0, known + 1).reversed() + base.subList(known + 1, base.size)
+        }
+        return base.reversed()
     }
 
     fun filter(

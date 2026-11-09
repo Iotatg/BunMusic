@@ -3,6 +3,7 @@ package app.bunmusic.player
 import android.app.PendingIntent
 import android.content.Intent
 import androidx.core.app.NotificationCompat
+import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaSessionService
@@ -252,7 +253,17 @@ class PlaybackService : MediaSessionService() {
             val saved = Session.load()
             val track = saved?.track
             if (saved == null || track == null) {
-                return Futures.immediateFuture(null)
+                // Media3 dereferences the future's result unconditionally
+                // (setMediaItemsWithStartIndexAndPosition reads startIndex with
+                // no null check), so returning a null result crashes the process
+                // on a media-button/resumption request with nothing saved. An
+                // empty list with unset index/position is the correct "nothing
+                // to resume" answer.
+                return Futures.immediateFuture(
+                    MediaSession.MediaItemsWithStartPosition(
+                        emptyList(), C.INDEX_UNSET, C.TIME_UNSET,
+                    )
+                )
             }
             val items: List<MediaItem> = saved.queue.map { SessionBridge.item(it) }
             return Futures.immediateFuture(

@@ -48,7 +48,12 @@ object Cache {
     const val KEY_PREFIX = "yt:"
 
     private var context: Context? = null
+    // Both are published outside the synchronized block in streamCache()'s
+    // double-checked lock; without volatile another thread can observe a
+    // partially constructed SimpleCache / database provider.
+    @Volatile
     private var stream: SimpleCache? = null
+    @Volatile
     private var database: StandaloneDatabaseProvider? = null
     private val prefetching = ConcurrentHashMap.newKeySet<String>()
     // A throw inside a background coroutine used to reach the default handler
@@ -85,7 +90,10 @@ object Cache {
      */
     data class CachedStream(val videoId: String, val itag: Int, val bytes: Long, val savedAt: Long)
 
-    private val registry = HashMap<String, CachedStream>()
+    // Written from IO coroutines, read from the UI (and iterated by refreshIndex).
+    // A plain HashMap could corrupt its buckets or throw CME mid-iteration.
+    private val registry = ConcurrentHashMap<String, CachedStream>()
+    @Volatile
     private var registryPrefs: android.content.SharedPreferences? = null
 
     private fun loadRegistry() {
@@ -300,10 +308,21 @@ object Cache {
     /** Drop every buffered stream. Safe to call while something is playing. */
     fun clearStream() {
         synchronized(this) {
-            runCatching { stream?.release() }
-            stream = null
-            streamDir().deleteRecursively()
+            val cache = stream
+            if (cache != null) {
+                // Never release() here: an active CacheDataSource still holds this
+                // SimpleCache and would read a released object. removeResource
+                // deletes the files AND their index rows, so the two never drift.
+                runCatching {
+                    for (key in cache.getKeys().toList()) cache.removeResource(key)
+                }
+            } else {
+                // Nothing is open, so there is no index to keep in sync.
+                streamDir().deleteRecursively()
+            }
             completeIds.clear()
+            registry.clear()
+            runCatching { registryPrefs?.edit()?.clear()?.apply() }
         }
     }
 
@@ -370,5 +389,10 @@ object Cache {
             val size = file.length()
             if (runCatching { file.delete() }.getOrDefault(false)) total -= size
         }
+        // The deletions above bypass SimpleCache's index, which would keep
+        // claiming the spans exist. Reopen so the cache re-scans the folder and
+        // drops stale rows. Only called while idle (onLimitChanged guards on
+        // playbackActive), so releasing the instance here is safe.
+        reopen()
     }
 }

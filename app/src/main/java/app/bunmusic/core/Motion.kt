@@ -158,13 +158,14 @@ object SwipeSkip {
 
     /** Rubber band: the offset actually shown for a raw drag. */
     fun clamp(dx: Float, width: Float): Float {
-        if (width <= 0f) return 0f
-        val limit = width * LIMIT
-        return dx.coerceIn(-limit, limit)
+        val w = width.finiteOr()
+        if (w <= 0f) return 0f
+        val limit = w * LIMIT
+        return dx.finiteOr().coerceIn(-limit, limit)
     }
 
     fun commits(dx: Float, width: Float): Boolean =
-        width > 0f && kotlin.math.abs(dx) > width * THRESHOLD
+        width.finiteOr() > 0f && kotlin.math.abs(dx.finiteOr()) > width.finiteOr() * THRESHOLD
 
     /**
      * -1 for next (dragged left), +1 for previous (dragged right), 0 for "put it
@@ -173,13 +174,15 @@ object SwipeSkip {
      */
     fun direction(dx: Float, width: Float): Int = when {
         !commits(dx, width) -> 0
-        dx < 0f -> -1
+        dx.finiteOr() < 0f -> -1
         else -> 1
     }
 
     /** Opacity of the strip at [dx]: it fades as it is pulled away. */
     fun alpha(dx: Float, width: Float): Float {
-        if (width <= 0f) return 1f
-        return 1f - 0.30f * (kotlin.math.abs(dx) / width).coerceIn(0f, 1f)
+        val w = width.finiteOr()
+        if (w <= 0f) return 1f
+        // Finite inputs for both sides: a NaN dx would otherwise leak into graphicsLayer alpha.
+        return 1f - 0.30f * (kotlin.math.abs(dx.finiteOr()) / w).coerceIn(0f, 1f)
     }
 }

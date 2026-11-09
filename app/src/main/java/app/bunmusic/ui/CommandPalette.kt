@@ -119,6 +119,10 @@ fun CommandPalette(host: CommandHost, onDismiss: () -> Unit) {
                         cursorBrush = SolidColor(Ink.Lime),
                         keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
                         keyboardActions = KeyboardActions(onSearch = {
+                            // With a blank query filterCommands() returns the whole
+                            // catalogue, so firstOrNull() would silently run
+                            // "play.toggle" and close the palette on a stray Enter.
+                            if (query.isBlank()) return@KeyboardActions
                             results.firstOrNull()?.let {
                                 keyboard?.hide()
                                 it.run()

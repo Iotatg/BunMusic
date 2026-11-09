@@ -6,6 +6,7 @@ import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job as CoroutineJob
 import kotlinx.coroutines.SupervisorJob
@@ -162,16 +163,34 @@ object Downloads {
         return out.sortedByDescending { it.atMs }
     }
 
-    private fun write(list: List<Entry>) {
-        sp.edit().putString(
-            "entries",
-            list.joinToString(R.toString()) {
-                listOf(it.trackId, it.title, it.artist, it.artUrl ?: "", it.bytes.toString(), it.path, it.atMs.toString())
-                    .joinToString(F.toString())
-            },
-        ).apply()
-        _entries.value = list
+    /**
+     * Every change to the registry goes through here. Holding [lock] across
+     * read → transform → write means two workers completing at the same instant
+     * can no longer each read a stale list and overwrite the other's row.
+     */
+    private fun mutate(transform: (List<Entry>) -> List<Entry>) {
+        synchronized(lock) {
+            val list = transform(_entries.value)
+            sp.edit().putString(
+                "entries",
+                list.joinToString(R.toString()) {
+                    listOf(it.trackId, it.title, it.artist, it.artUrl ?: "", it.bytes.toString(), it.path, it.atMs.toString())
+                        .joinToString(F.toString()) { field -> Store.clean(field) }
+                },
+            ).apply()
+            _entries.value = list
+        }
     }
+
+    private fun write(list: List<Entry>) = mutate { list }
+
+    /**
+     * Fold a finished download into the registry: one row per track, newest
+     * first. Pure so the JVM tests can prove no row disappears.
+     */
+    fun mergeEntry(current: List<Entry>, finished: Entry): List<Entry> =
+        (current.filterNot { it.trackId == finished.trackId } + finished)
+            .sortedByDescending { it.atMs }
 
     /**
      * The queue survives the process, not the file system.
@@ -346,7 +365,7 @@ object Downloads {
     fun remove(trackId: String) {
         val entry = _entries.value.firstOrNull { it.trackId == trackId }
         if (entry != null) runCatching { File(entry.path).delete() }
-        write(_entries.value.filterNot { it.trackId == trackId })
+        mutate { list -> list.filterNot { it.trackId == trackId } }
         cancel(trackId)
     }
 
@@ -473,8 +492,13 @@ object Downloads {
 
     private fun start(track: Track) {
         update(track.id) { it.copy(state = State.RUNNING, doneBytes = 0, totalBytes = 0, error = null) }
-        val handle = scope.launch { run(track) }
+        // Register the handle *before* the coroutine can run. With an eager
+        // launch, a cancel arriving between `launch` and `handles[id] =` was
+        // lost, and a job that finished immediately could remove a handle that
+        // had not been stored yet. LAZY + start() closes that window.
+        val handle = scope.launch(start = CoroutineStart.LAZY) { run(track) }
         synchronized(lock) { handles[track.id] = handle }
+        handle.start()
     }
 
     /**
@@ -528,17 +552,26 @@ object Downloads {
             }
             update(track.id) { it.copy(doneBytes = read) }
 
+            // The second rename used to have its result discarded: when the
+            // target could not be replaced we still recorded a "downloaded"
+            // entry pointing at a file that was never written. Fail the job
+            // instead so the queue shows an honest error.
             if (!temp.renameTo(target)) {
                 target.delete()
-                temp.renameTo(target)
+                if (!temp.renameTo(target)) {
+                    throw java.io.IOException("Could not move the finished download into place")
+                }
             }
-            write(
-                _entries.value + Entry(
-                    trackId = track.id, title = track.title, artist = track.artist,
-                    artUrl = track.artUrl, path = target.absolutePath,
-                    bytes = target.length(), atMs = System.currentTimeMillis(),
+            mutate { current ->
+                mergeEntry(
+                    current,
+                    Entry(
+                        trackId = track.id, title = track.title, artist = track.artist,
+                        artUrl = track.artUrl, path = target.absolutePath,
+                        bytes = target.length(), atMs = System.currentTimeMillis(),
+                    ),
                 )
-            )
+            }
             Store.remember(track)
             synchronized(lock) { jobs.remove(track.id); handles.remove(track.id) }
             publish()

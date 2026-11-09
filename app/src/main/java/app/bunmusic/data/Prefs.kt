@@ -129,7 +129,12 @@ object Prefs {
             wordLyrics = sp.getBoolean("wordLyrics", d.wordLyrics),
             artColour = sp.getBoolean("artColour", d.artColour),
             reducedMotion = sp.getBoolean("reducedMotion", d.reducedMotion),
-            fontScale = sp.getFloat("fontScale", d.fontScale).coerceIn(0.85f, 1.30f),
+            // SharedPreferences can persist Float.NaN (XML writes "NaN"); a plain
+            // coerceIn leaves NaN untouched and it propagates into Compose's
+            // Density(fontScale) as a NaN text size. Fall back to the default.
+            fontScale = sp.getFloat("fontScale", d.fontScale).let {
+                if (it.isFinite()) it.coerceIn(0.85f, 1.30f) else d.fontScale
+            },
             highContrast = sp.getBoolean("highContrast", d.highContrast),
             libraryGrid = sp.getBoolean("libraryGrid", d.libraryGrid),
             smartShuffle = sp.getBoolean("smartShuffle", d.smartShuffle),
@@ -141,6 +146,12 @@ object Prefs {
         )
     }
 
+    /**
+     * Read-modify-write on [_settings] plus a full preference rewrite. Without
+     * the lock two concurrent callers each compute `next` from the same old
+     * value and the later one silently discards the earlier change.
+     */
+    @Synchronized
     fun update(block: (Settings) -> Settings) {
         if (!::sp.isInitialized) return
         val next = block(_settings.value)

@@ -145,7 +145,8 @@ object Contrast {
 
     /** Linear mix in sRGB, [t] = 0 gives [a], 1 gives [b]. */
     fun blend(a: Int, b: Int, t: Float): Int {
-        val k = t.coerceIn(0f, 1f)
+        // coerceIn returns NaN unchanged; guard first or a NaN t yields pure black.
+        val k = t.finiteOr().coerceIn(0f, 1f)
         fun ch(shift: Int): Int {
             val x = (a shr shift) and 0xFF
             val y = (b shr shift) and 0xFF

@@ -232,11 +232,11 @@ object Wrapped {
         "July", "August", "September", "October", "November", "December",
     )
 
-    fun yearOf(atMs: Long, offsetMs: Long): Int {
-        val cal = java.util.Calendar.getInstance()
-        cal.timeInMillis = atMs + offsetMs
-        return cal.get(java.util.Calendar.YEAR)
-    }
+    fun yearOf(atMs: Long, offsetMs: Long): Int =
+        // Same pseudo-UTC convention as Listening.dayIndex. Using a device-zone
+        // Calendar here added the offset twice, so a play just before New Year
+        // local midnight could be filed under the wrong year.
+        Listening.localDate(atMs, offsetMs).year
 
     fun hourOf(atMs: Long, offsetMs: Long): Int {
         val local = atMs + offsetMs

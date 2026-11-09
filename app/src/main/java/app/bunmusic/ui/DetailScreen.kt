@@ -28,6 +28,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.platform.LocalContext
@@ -274,8 +275,10 @@ fun DetailScreen(
 
     // A collection header gets the colour of its own cover, the same way the
     // player does — falling back to the id hash until the image decodes.
+    // Collect as state so toggling "art colour" in Settings actually redraws it.
+    val settings by Prefs.settings.collectAsState()
     val fallbackTint = Ambient.colorFor(browseId ?: title)
-    val artColour = Prefs.settings.value.artColour
+    val artColour = settings.artColour
     val artTint by produceState(fallbackTint, headerArt, artColour) {
         value = if (artColour) {
             ArtColors.forUrl(ctx, headerArt)?.primary ?: fallbackTint

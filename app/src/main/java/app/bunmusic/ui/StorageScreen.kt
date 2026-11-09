@@ -88,7 +88,8 @@ fun StorageScreen(
                 )
                 Text(
                     Storage.verdict(total, limitBytes),
-                    color = if (total > limitBytes) Ink.Rose else Ink.Muted,
+                    // A negative limit means "unlimited": never flag it as over.
+                    color = if (limitBytes >= 0 && total > limitBytes) Ink.Rose else Ink.Muted,
                     fontSize = 12.sp,
                     fontFamily = SoraFamily,
                 )
@@ -163,7 +164,11 @@ fun StorageScreen(
             Column(Modifier.padding(horizontal = 20.dp, vertical = 12.dp)) {
                 if (plan.isEmpty()) {
                     Text(
-                        "Nothing to clean: you are under the ${settings.cacheLimitMb} MB limit.",
+                        if (settings.cacheLimitMb < 0) {
+                            "Nothing to clean: the stream cache is unlimited."
+                        } else {
+                            "Nothing to clean: you are under the ${settings.cacheLimitMb} MB limit."
+                        },
                         color = Ink.Mint,
                         fontSize = 11.5.sp,
                         fontFamily = SoraFamily,

@@ -54,6 +54,17 @@ fun AboutScreen(onBack: () -> Unit) {
             }
         }
 
+        item { GroupTitle("New in 2.12.0") }
+        item {
+            AboutCard {
+                Change("Numbers you can trust", "Kotlin's coerceIn returns NaN unchanged, so one stray non-finite number used to sail through every clamp and become an alpha, a radius, a font scale or a particle coordinate that silently failed to paint. A shared guard now folds non-finite input first, and untrusted pasted codes, durations and timestamps are capped before they can overflow. The listening stats no longer apply the timezone offset twice — wall-clock day and year come from pure pseudo-UTC helpers instead of a Calendar in the device zone")
+                Change("A backup is a round trip", "Export wrote your listening history and statistics, but import never read them back, so restoring a backup quietly lost both. Backup is now pure snapshot / serialize / parse / merge: import is a merge rather than a replace — counters keep the max, histories keep the newest play per track, and event logs dedupe and cap — with type-checked, bounded parsing so a malformed file cannot poison the library")
+                Change("Downloads that cannot lie", "A read-modify-write race lost finished rows, the gap between launching a job and registering its handle made cancel ineffective, and an ignored second rename recorded a download pointing at a file that did not exist. Registry writes are now locked, a lazy coroutine is registered before it starts, every file move is checked, and a pure merge keeps one row per track, newest first, so a concurrent finish cannot drop one")
+                Change("Playback survives the awkward moments", "Media resumption returned a null future that Media3 dereferenced on a cold start. A late stream resolve could configure an older song over a newer one, a broad catch swallowed cancellation, and a restored position was sought onto an empty timeline. A load generation and a small set of pure rules now reject stale results, let cancellation through, and hold the saved position until the player has a timeline")
+                Change("Settings that change, on a thread that can breathe", "Five places read a settings flow directly in composition, so a change never refreshed them; the Scrobble switch and the Saved tab were not observable and bulk actions had no rows; signing in hashed a password and wrote preferences on the main thread, so the busy state never appeared. These now subscribe to state, map through a pure tab rule, and run in a coroutine on IO — backed by 42 new JVM regression tests, 639 in total, all passing")
+            }
+        }
+
         item { GroupTitle("New in 2.11.0") }
         item {
             AboutCard {

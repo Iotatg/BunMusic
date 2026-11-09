@@ -158,7 +158,9 @@ object PlaybackControls {
             notificationsEnabled = NotificationManagerCompat.from(context).areNotificationsEnabled(),
             channelBlocked = channel?.importance == NotificationManager.IMPORTANCE_NONE,
             serviceRunning = ServiceLauncher.isRunning(context),
-            batteryRestricted = power?.isIgnoringBatteryOptimizations(context.packageName) != true,
+            // A null PowerManager means "couldn't check", not "restricted".
+            // `!= true` misreported that as a restriction on every such device.
+            batteryRestricted = power?.isIgnoringBatteryOptimizations(context.packageName) == false,
         )
     }
 }

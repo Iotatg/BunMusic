@@ -284,10 +284,12 @@ object WidgetArt {
 object WidgetText {
 
     fun clock(ms: Long): String {
-        val total = (ms.coerceAtLeast(0L) / 1000L).toInt()
-        val h = total / 3600
-        val m = (total % 3600) / 60
-        val s = total % 60
+        // Keep the whole computation in Long: a dirty Track.durationMs past
+        // ~24.8 days would overflow the old Int cast into a negative clock.
+        val total = ms.coerceAtLeast(0L) / 1000L
+        val h = total / 3600L
+        val m = (total % 3600L) / 60L
+        val s = total % 60L
         return if (h > 0) "%d:%02d:%02d".format(h, m, s) else "%d:%02d".format(m, s)
     }
 

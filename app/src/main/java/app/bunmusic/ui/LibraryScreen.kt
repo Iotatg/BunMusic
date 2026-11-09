@@ -177,11 +177,16 @@ fun LibraryScreen(
         )
     }
 
-    val shown = when (tab) {
-        1 -> shape(liked)
-        2 -> shape(recents)
-        else -> emptyList()
-    }
+    // The Saved tab (3) renders downloadTracks directly. `shown` is what the
+    // selection bar reads (select-all, bulk like/queue/download), so it has to
+    // be that exact list — it used to fall through to emptyList(), which made
+    // every bulk action on the Saved tab silently do nothing.
+    val shown = LibraryTabs.shownFor(
+        tab,
+        shape(liked),
+        shape(recents),
+        downloadTracks,
+    )
 
     fun toggle(t: Track) {
         selection = selection.toggle(t.id)

@@ -529,7 +529,16 @@ object YtMusic {
         val parts = raw.trim().split(':')
         val numbers = parts.mapNotNull { it.toLongOrNull() }
         if (numbers.isEmpty() || numbers.size != parts.size) return 0L
-        return numbers.fold(0L) { acc, value -> acc * 60 + value } * 1000
+        // Server text is untrusted: a malformed "999999:999999:…" would overflow
+        // the fold into a negative duration. Stop the accumulation before
+        // Long.MAX_VALUE and cap the result to a day. Finite, well-formed
+        // durations ("3:45", "1:02:03") are bit-for-bit unchanged.
+        var seconds = 0L
+        for (value in numbers) {
+            if (value < 0L || seconds > (Long.MAX_VALUE - value) / 60L) return 0L
+            seconds = seconds * 60L + value
+        }
+        return if (seconds > 86_400L) 0L else seconds * 1000L
     }
 
     private fun firstOf(root: JsonElement, key: String): JsonObject? {

@@ -216,11 +216,20 @@ object ArtColors {
 
     private val cache = LruCache<String, Palette.Swatch>(64)
 
-    /** URLs that failed once are not tried again this session. */
-    private val broken = HashSet<String>()
+    /**
+     * URLs that failed once are not tried again this session.
+     * Touched from the caller's thread (contains) and several IO threads (add),
+     * so a plain HashSet could corrupt its buckets or loop forever on resize.
+     */
+    private val broken: MutableSet<String> = java.util.concurrent.ConcurrentHashMap.newKeySet()
 
-    /** Whatever is already known, without suspending — for the first frame. */
-    fun peek(url: String?): Palette.Swatch? = url?.let { cache.get(it) }
+    /**
+     * Whatever is already known, without suspending — for the first frame.
+     * forUrl() keys the cache by the hq()-normalised URL, so peek must use the
+     * very same key or a YouTube cover can never be found in the first frame.
+     */
+    fun peek(url: String?): Palette.Swatch? =
+        url?.takeIf { it.isNotBlank() }?.let { cache.get(hq(it)) }
 
     suspend fun forTrack(context: Context, track: Track?): Palette.Swatch? =
         forUrl(context, track?.artUrl)

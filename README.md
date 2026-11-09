@@ -7,10 +7,45 @@ saved offline.
 
 ```
 package   app.bunmusic
-version   2.7.0 (29)
+version   2.12.0 (34)
 minSdk    26  ·  target/compile 37
 author    Iota Coder · iota14934@gmail.com
 ```
+
+---
+
+## 2.12.0 — every bug, looked at
+
+A stability release. No new screens, no new skin — a full audit of the app
+against open-source bug-finding tooling (ECC's `kotlin-reviewer` checklist,
+detekt, semgrep-rules, mini-swe-agent, Agentless), Android Lint, a dangerous-
+pattern static scan and four module reviews. Every finding was re-read in the
+real source before a line was changed, and several agent reports that were wrong
+or contradicted each other were discarded. Four batches of fixes closed the
+24 pure-logic, 14 concurrency/state and 19 lifecycle/framework findings in
+`bug-inventory.md`:
+
+- **Numbers that could not be trusted** — a shared `finiteOr` guard stops Kotlin's
+  `coerceIn` from returning NaN unchanged (which silently became an un-painted
+  alpha, radius, font scale or coordinate); untrusted pasted codes, durations and
+  timestamps are capped before they can overflow; listening stats no longer apply
+  the timezone offset twice.
+- **A backup is a round trip** — export wrote history and stats, import never read
+  them back; `Backup` is now pure snapshot/serialize/parse/merge with a true merge
+  (max counters, newest-per-track history, deduped event logs) and bounded parsing.
+- **Thread-safety, made provable** — concurrent registries, locked download writes,
+  a lazy coroutine closed the cancel window, and a checked second file move; each
+  rule pulled into a pure function a JVM test can hold without a phone.
+- **Playback and lifecycle** — Media3 resumption no longer returns a null future,
+  a load generation rejects stale stream resolves, cancellation is no longer
+  swallowed, and restored positions wait for a timeline before seeking.
+- **Compose and the main thread** — settings subscribe to state, the Scrobble switch
+  and Saved tab are observable, and auth hashing/preference writes run on IO.
+
+**639 JVM tests, 0 failures** (65 suites), up from 597 at 2.11.0, with six new
+regression suites (42 tests). `AppVersionTest` guards the About screen against
+`build.gradle.kts`. V2-signed with the same key as 2.11.0. Full notes live in the
+About screen and the GitHub release.
 
 ---
 

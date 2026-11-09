@@ -93,10 +93,12 @@ object Listening {
     fun monthly(events: List<Event>, year: Int, offsetMs: Long = 0L): List<Int> {
         val out = IntArray(12)
         for (e in events) {
-            val cal = java.util.Calendar.getInstance()
-            cal.timeInMillis = e.atMs + offsetMs
-            if (cal.get(java.util.Calendar.YEAR) != year) continue
-            out[cal.get(java.util.Calendar.MONTH)] += 1
+            // localDate reads the pseudo-UTC timestamp back in UTC, so the offset
+            // is applied exactly once. The old Calendar(device zone) applied it a
+            // second time and pushed plays near midnight into the wrong month/year.
+            val date = localDate(e.atMs, offsetMs)
+            if (date.year != year) continue
+            out[date.monthValue - 1] += 1
         }
         return out.toList()
     }
@@ -105,7 +107,7 @@ object Listening {
     fun hourly(events: List<Event>, offsetMs: Long = 0L): List<Int> {
         val out = IntArray(24)
         for (e in events) {
-            val local = e.atMs + offsetMs
+            val local = localMillis(e.atMs, offsetMs)
             out[((local % DAY + DAY) % DAY / 3_600_000L).toInt().coerceIn(0, 23)] += 1
         }
         return out.toList()
@@ -169,7 +171,38 @@ object Listening {
             .map { it.key to it.value }
     }
 
-    fun dayIndex(atMs: Long, offsetMs: Long): Long = Math.floorDiv(atMs + offsetMs, DAY)
+    /**
+     * Local wall-clock time expressed as a pseudo-UTC epoch millis.
+     *
+     * A saturating add keeps a corrupt `atMs` (or a hostile offset) from
+     * wrapping Long and silently inventing a date decades away.
+     */
+    fun localMillis(atMs: Long, offsetMs: Long): Long {
+        val sum = atMs + offsetMs
+        // Signed-overflow check: operands share a sign but the result does not.
+        // Saturate in the direction of the offset that pushed us over.
+        if (((atMs xor sum) and (offsetMs xor sum)) < 0L) {
+            return if (offsetMs > 0) Long.MAX_VALUE else Long.MIN_VALUE
+        }
+        return sum
+    }
+
+    fun dayIndex(atMs: Long, offsetMs: Long): Long =
+        Math.floorDiv(localMillis(atMs, offsetMs), DAY)
+
+    /**
+     * The local calendar date of a play.
+     *
+     * `atMs + offsetMs` is already local wall-clock time written as if it were
+     * UTC, so it must be read back in UTC. A device-zone Calendar (the old
+     * implementation of monthly/yearOf) applied the offset a *second* time and
+     * filed plays near midnight under the wrong month or year.
+     *
+     * dayIndex is bounded by Long/DAY, well inside LocalDate's supported
+     * epoch-day range, so ofEpochDay cannot throw even for corrupt input.
+     */
+    fun localDate(atMs: Long, offsetMs: Long): java.time.LocalDate =
+        java.time.LocalDate.ofEpochDay(dayIndex(atMs, offsetMs))
 
     /** Local offset of the device right now, in ms east of UTC. */
     fun zoneOffset(nowMs: Long = System.currentTimeMillis()): Long =

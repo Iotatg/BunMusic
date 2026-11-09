@@ -55,6 +55,10 @@ object Storage {
 
     /** Cache first, artwork second — downloads are never in the plan. */
     fun cleanupPlan(buckets: List<Bucket>, limitBytes: Long): List<Bucket> {
+        // A negative limit means "unlimited" (Prefs.cacheLimitMb == -1). There
+        // is nothing to reclaim; treating it as a tiny limit would otherwise
+        // put every removable bucket into the plan and show a false "over limit".
+        if (limitBytes < 0) return emptyList()
         var over = total(buckets) - limitBytes
         if (over <= 0) return emptyList()
         val out = ArrayList<Bucket>()
@@ -71,6 +75,7 @@ object Storage {
 
     fun verdict(totalBytes: Long, limitBytes: Long): String = when {
         totalBytes <= 0 -> "Nothing stored yet"
+        limitBytes < 0 -> "${human(totalBytes)} used · no limit set"
         totalBytes <= limitBytes -> "${human(totalBytes)} used · ${human(limitBytes - totalBytes)} under your limit"
         else -> "${human(totalBytes - limitBytes)} over your limit"
     }

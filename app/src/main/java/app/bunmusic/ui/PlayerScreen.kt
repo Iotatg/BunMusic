@@ -1299,6 +1299,9 @@ private fun QueueSheet(state: PlayerState, onClose: () -> Unit, onSaved: (String
 
 @Composable
 private fun LyricsSheet(track: Track, positionMs: Long, onClose: () -> Unit) {
+    // Collect as state: reading StateFlow.value during composition does not
+    // subscribe, so changing the offset/word-lyrics setting never redrew this sheet.
+    val settings by Prefs.settings.collectAsState()
     var lyrics by remember(track.id) { mutableStateOf<Lyrics?>(null) }
     var loading by remember(track.id) { mutableStateOf(true) }
     val listState = rememberLazyListState()
@@ -1311,7 +1314,7 @@ private fun LyricsSheet(track: Track, positionMs: Long, onClose: () -> Unit) {
     }
 
     val lines = lyrics?.lines ?: emptyList()
-    val shift = Prefs.settings.value.lyricsOffsetMs.toLong()
+    val shift = settings.lyricsOffsetMs.toLong()
     val activeIndex = lines.indexOfLast { it.atMs <= positionMs + shift }
 
     LaunchedEffect(activeIndex) {
@@ -1359,7 +1362,7 @@ private fun LyricsSheet(track: Track, positionMs: Long, onClose: () -> Unit) {
                         ms > 0 -> "+${ms / 1000}"
                         else -> "${ms / 1000}"
                     },
-                    selected = Prefs.settings.value.lyricsOffsetMs == ms,
+                    selected = settings.lyricsOffsetMs == ms,
                 ) { Prefs.update { it.copy(lyricsOffsetMs = ms) } }
             }
         }
@@ -1406,7 +1409,7 @@ private fun LyricsSheet(track: Track, positionMs: Long, onClose: () -> Unit) {
                         0f
                     }
                     LyricLineView(
-                        annotated = if (active && Prefs.settings.value.wordLyrics) {
+                        annotated = if (active && settings.wordLyrics) {
                             wipeLine(line.text, progress, Ink.Lime, Ink.Lime.copy(alpha = 0.34f))
                         } else {
                             null
@@ -1495,13 +1498,14 @@ private fun shareLyrics(ctx: android.content.Context, track: Track, lyrics: Lyri
 
 @Composable
 fun LyricsPeek(track: Track, positionMs: Long, expanded: Boolean, onToggle: () -> Unit) {
+    val settings by Prefs.settings.collectAsState()
     var lyrics by remember(track.id) { mutableStateOf<Lyrics?>(null) }
     LaunchedEffect(track.id) {
         lyrics = runCatching { LyricsApi.forTrack(track) }.getOrNull()
     }
     val lines = lyrics?.lines ?: emptyList()
     if (lines.isEmpty()) return
-    val active = lines.indexOfLast { it.atMs <= positionMs + Prefs.settings.value.lyricsOffsetMs }
+    val active = lines.indexOfLast { it.atMs <= positionMs + settings.lyricsOffsetMs }
     val current = lines.getOrNull(active)?.text ?: lines.firstOrNull()?.text ?: ""
     val next = lines.getOrNull(active + 1)?.text ?: ""
 
