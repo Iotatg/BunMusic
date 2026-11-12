@@ -8,6 +8,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
@@ -48,13 +49,16 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import app.bunmusic.core.Accent
 import app.bunmusic.core.AppVersion
 import app.bunmusic.core.BunSkin
 import app.bunmusic.core.BunShape
+import app.bunmusic.core.Contrast
 import app.bunmusic.core.G
 import app.bunmusic.core.Glyph
 import app.bunmusic.core.Ink
@@ -317,6 +321,8 @@ fun SettingsScreen(
                     G.Grid,
                     bun = Skin.current,
                 ) { onOpenBuns() }
+                Divider()
+                AccentRow()
                 Divider()
                 ChoiceRow("Player style", settings.playerStyle.label) {
                     Prefs.PlayerStyle.entries.forEach { s ->
@@ -1059,6 +1065,84 @@ private fun TokenSheet(initial: String, onDismiss: () -> Unit, onSave: (String) 
  * The swatch is the actual shape at 13 dp rather than an icon of it, so the list
  * is a preview: what you tap is what every cover becomes.
  */
+/**
+ * 2.13.0 — Accent Studio.
+ *
+ * One row, but it does two things the app cares about: it lets a person
+ * re-colour the bun they are wearing, and it *shows* the measured contrast of
+ * the result. The subtitle is not decoration — it is [Contrast.label] reading
+ * the same arithmetic that [Accent.derive] used to pick the ink, so a swatch
+ * that had to be lifted to stay legible says so instead of quietly lying.
+ *
+ * "Default" is a real swatch: it clears the override so the bun wears its own
+ * accent again. Reading [Skin.accentFor] subscribes to the accent state, so a
+ * tap recomposes every screen without a restart — unlike a bun swap.
+ */
+@Composable
+private fun AccentRow() {
+    val override = Skin.accentFor()
+    val own = Skin.paletteOf(Skin.current).accent.toArgb()
+    val active = override ?: own
+    val ratio = Contrast.label(Accent.onInk(active), active)
+    Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp)) {
+        Text("Accent", color = Ink.Text, fontSize = 13.5.sp, fontFamily = SoraFamily, fontWeight = FontWeight.Medium)
+        Text(
+            if (override == null) {
+                "${Skin.current.title}'s own colour · $ratio on accent buttons"
+            } else {
+                "Custom · $ratio on accent buttons · AA checked for every swatch"
+            },
+            color = Ink.Faint,
+            fontSize = 11.sp,
+            fontFamily = SoraFamily,
+        )
+        Spacer(Modifier.height(10.dp))
+        Row(
+            Modifier.horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            AccentDot(own, "Default", override == null) {
+                Skin.setAccent(Skin.current, null)
+            }
+            Accent.SWATCHES.forEach { swatch ->
+                AccentDot(swatch.argb, swatch.label, override == swatch.argb) {
+                    Skin.setAccent(Skin.current, swatch.argb)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun AccentDot(argb: Int, label: String, selected: Boolean, onPick: () -> Unit) {
+    Column(
+        Modifier.tapable(scale = 0.92f) { onPick() }.width(54.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Box(
+            Modifier
+                .size(30.dp)
+                .clip(CircleShape)
+                .background(Color(argb))
+                .then(if (selected) Modifier.border(2.dp, Ink.Text, CircleShape) else Modifier),
+            contentAlignment = Alignment.Center,
+        ) {
+            if (selected) {
+                Glyph(G.Check, Color(Accent.onInk(argb)), 14.dp)
+            }
+        }
+        Spacer(Modifier.height(5.dp))
+        Text(
+            label,
+            color = if (selected) Ink.Text else Ink.Faint,
+            fontSize = 9.5.sp,
+            fontFamily = SoraFamily,
+            maxLines = 1,
+        )
+    }
+}
+
 @Composable
 private fun ShapeChip(label: String, shapeId: String, selected: Boolean, onPick: () -> Unit) {
     Row(

@@ -54,6 +54,16 @@ fun AboutScreen(onBack: () -> Unit) {
             }
         }
 
+        item { GroupTitle("New in 2.13.0") }
+        item {
+            AboutCard {
+                Change("A bun you can re-colour", "A bun swaps the whole surface language and restarts the process, but its accent — the lime, the blue, the rose — was the one colour with no setting at all. Accent Studio gives each bun its own picker: eight swatches across the colour wheel, plus the bun's own colour as a real swatch to come back to. The choice is per bun, kept in preferences, and restored before the first frame so a cold start never flashes the old colour")
+                Change("Picking a colour cannot break the reading", "The accent is also 11 sp text and a button fill, so a bright yellow on chalk or a deep violet on near-black would quietly disappear. Every choice goes through Contrast's WCAG arithmetic: ink on an accent button is black or white by measured ratio, and a selected nav label is lifted toward the better ink until it clears 4.5:1 on the surface it actually sits on. The Settings row prints the ratio it measured instead of hiding it")
+                Change("The shape of the bun survives", "Midnight's selection is a 14 % wash of the accent while the other four buns use a solid pill. The override keeps each bun's alpha and only moves the hue, and a solid pill switches its label to neutral ink instead of painting accent-coloured words on an accent-coloured block. With no override the original palette is returned byte for byte — no colour conversion, no drift")
+                Change("One colour, everywhere", "Every tone in the app resolves through a single palette getter, so the override recolours the nav bar, buttons, mini player and Material theme at once without a screen being touched. Accent is also addressable from the command deck, and the arithmetic — hex parsing, per-bun storage, contrast and the two nav rules — is pure Kotlin covered by JVM tests")
+            }
+        }
+
         item { GroupTitle("New in 2.12.0") }
         item {
             AboutCard {

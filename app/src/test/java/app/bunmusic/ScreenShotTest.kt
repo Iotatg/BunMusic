@@ -8,9 +8,12 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.asAndroidBitmap
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onRoot
+import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.swipe
 import androidx.test.core.app.ApplicationProvider
 import app.bunmusic.core.BunMotion
 import app.bunmusic.core.BunSkin
@@ -93,6 +96,7 @@ class ScreenShotTest {
         name: String,
         skin: BunSkin = BunSkin.MIDNIGHT,
         endless: Boolean = false,
+        scrollSwipes: Int = 0,
         content: @Composable () -> Unit,
     ) {
         Skin.preview(skin)
@@ -133,6 +137,23 @@ class ScreenShotTest {
             }
         }
         if (endless) compose.mainClock.advanceTimeBy(700) else compose.waitForIdle()
+        // Some screens are taller than the phone. A LazyColumn only composes
+        // what is on screen, so a section below the fold has no node to scroll
+        // to — swipe like a person instead, then let it settle.
+        repeat(scrollSwipes) {
+            compose.onRoot().performTouchInput {
+                val w = width.toFloat()
+                val h = height.toFloat()
+                // A slow, short drag: no fling, so the list lands exactly where
+                // the swipe ends instead of coasting three screens further.
+                swipe(
+                    start = Offset(w / 2f, h * 0.78f),
+                    end = Offset(w / 2f, h * 0.42f),
+                    durationMillis = 900,
+                )
+            }
+            compose.waitForIdle()
+        }
         val bmp = compose.onRoot().captureToImage().asAndroidBitmap()
         File(outDir, "$name.png").outputStream().use {
             bmp.compress(Bitmap.CompressFormat.PNG, 100, it)
@@ -253,6 +274,15 @@ class ScreenShotTest {
     }
 
     @Test fun settings() = shot("settings") {
+        SettingsScreen(
+            onBack = {}, onOpenStats = {}, onOpenWrapped = {}, onOpenDownloads = {},
+            onOpenProfile = {}, onOpenEqualizer = {}, onOpenBuns = {}, onOpenAbout = {},
+            onOpenWidgets = {}, onOpenCommands = {}, onToast = {},
+        )
+    }
+
+    /** 2.13.0 — the Accent Studio row, scrolled into view instead of cropped. */
+    @Test fun settingsAccent() = shot("settings-accent", scrollSwipes = 3) {
         SettingsScreen(
             onBack = {}, onOpenStats = {}, onOpenWrapped = {}, onOpenDownloads = {},
             onOpenProfile = {}, onOpenEqualizer = {}, onOpenBuns = {}, onOpenAbout = {},

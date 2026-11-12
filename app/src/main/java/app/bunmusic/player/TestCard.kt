@@ -1,10 +1,14 @@
 package app.bunmusic.player
 
+import android.Manifest
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
+import android.os.Build
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
+import androidx.core.content.ContextCompat
 import app.bunmusic.R
 
 /**
@@ -30,6 +34,13 @@ object TestCard {
         BunNotificationProvider.ensureChannel(context)
         val manager = NotificationManagerCompat.from(context)
         if (!manager.areNotificationsEnabled()) return false
+        // API 33+ makes POST_NOTIFICATIONS a runtime permission. Checking it
+        // explicitly (rather than relying on notify() throwing) is both what
+        // Lint needs to see and the honest answer to "will this card show?".
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+            ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS)
+            != PackageManager.PERMISSION_GRANTED
+        ) return false
 
         val open = PendingIntent.getActivity(
             context,

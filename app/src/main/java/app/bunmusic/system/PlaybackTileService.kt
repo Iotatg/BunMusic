@@ -1,5 +1,6 @@
 package app.bunmusic.system
 
+import android.annotation.SuppressLint
 import android.app.PendingIntent
 import android.content.Intent
 import android.graphics.drawable.Icon
@@ -50,6 +51,10 @@ class PlaybackTileService : TileService() {
         }
     }
 
+    // API 34+ takes the PendingIntent overload above. On older devices that
+    // overload does not exist, so the Intent form is the only way to collapse
+    // the shade — the deprecation is unavoidable, not an oversight.
+    @SuppressLint("StartActivityAndCollapseDeprecated")
     private fun open() {
         val intent = Intent(this, MainActivity::class.java)
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)

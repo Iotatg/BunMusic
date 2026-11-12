@@ -7,10 +7,34 @@ saved offline.
 
 ```
 package   app.bunmusic
-version   2.12.0 (34)
+version   2.13.0 (35)
 minSdk    26  ·  target/compile 37
 author    Iota Coder · iota14934@gmail.com
 ```
+
+---
+
+## 2.13.0 — a bun you can re-colour
+
+The accent was the one colour a person could not choose. A bun swaps the whole
+surface language and restarts the process, but its lime, blue or rose was fixed.
+**Accent Studio** gives each bun its own picker — eight swatches across the wheel
+plus the bun's own colour — stored per bun and restored before the first frame.
+
+Picking a colour cannot break the reading: the accent is also 11 sp text and a
+button fill, so every choice goes through the app's existing WCAG arithmetic. Ink
+on an accent button is black or white by measured ratio; a selected nav label is
+lifted until it clears 4.5:1 on the surface it really sits on. Midnight's 14 %
+wash keeps its alpha while the four solid pills (Charcoal, Cloud, Pink, Nebula)
+switch to neutral ink — the shape of the bun survives, only the hue moves. The Settings row prints the ratio
+it measured, and with no override the original palette is returned byte for byte.
+
+The override resolves in one palette getter, so nav, buttons, mini player and the
+Material theme recolour at once without a screen being touched. Accent is also
+addressable from the command deck, and the arithmetic — hex parsing, per-bun
+storage, contrast and the two nav rules — is pure Kotlin under JVM tests. Also
+clears the last two Lint errors: `TestCard` now checks `POST_NOTIFICATIONS`, and
+the Quick Settings tile's legacy overload is precisely scoped to pre-34 devices.
 
 ---
 

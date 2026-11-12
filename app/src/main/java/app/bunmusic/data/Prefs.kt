@@ -88,6 +88,12 @@ object Prefs {
          * no setting at all — every card was the same 14 dp corner.
          */
         val coverShape: String = "AUTO",
+        /**
+         * Per-bun accent overrides, encoded by [app.bunmusic.core.Accent.encode]:
+         * `MIDNIGHT=#D8F65C;CLOUD=#2E6BFF`. Empty means every bun wears its own
+         * accent. Stored as one string so [update] stays the single write lock.
+         */
+        val accentByBun: String = "",
     )
 
     private lateinit var sp: SharedPreferences
@@ -143,6 +149,7 @@ object Prefs {
             sleepFade = sp.getBoolean("sleepFade", d.sleepFade),
             offlineBanner = sp.getBoolean("offlineBanner", d.offlineBanner),
             coverShape = sp.getString("coverShape", d.coverShape) ?: d.coverShape,
+            accentByBun = sp.getString("accentByBun", d.accentByBun) ?: d.accentByBun,
         )
     }
 
@@ -192,6 +199,7 @@ object Prefs {
             .putBoolean("sleepFade", next.sleepFade)
             .putBoolean("offlineBanner", next.offlineBanner)
             .putString("coverShape", next.coverShape)
+            .putString("accentByBun", next.accentByBun)
             .apply()
     }
 }

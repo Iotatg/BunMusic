@@ -4,6 +4,7 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
+import app.bunmusic.core.Accent
 import app.bunmusic.core.BunShape
 import app.bunmusic.core.BunSkin
 import app.bunmusic.core.AppVersion
@@ -342,6 +343,26 @@ fun buildCommands(host: CommandHost): List<Command> {
             Prefs.update { it.copy(coverShape = sh.name) }
             host.toast("Covers are ${sh.label.lowercase()}")
         }
+    }
+    // 2.13.0 — Accent Studio. Each swatch is addressable by name, and the
+    // contrast maths lives in Accent.derive, not here: a command only picks a
+    // colour, the palette decides what ink is safe on it. "Default" clears the
+    // override so the bun wears its own accent again.
+    Accent.SWATCHES.forEach { sw ->
+        add(
+            "Appearance", "accent.${sw.id}", "Accent: ${sw.label}",
+            "AA checked", G.Sparkle, "colour color theme tint lime violet blue rose ink amber mint coral",
+        ) {
+            Skin.setAccent(Skin.current, sw.argb)
+            host.toast("Accent: ${sw.label}")
+        }
+    }
+    add(
+        "Appearance", "accent.default", "Accent: the bun's own",
+        "Clear the custom colour", G.Refresh, "accent reset default colour theme",
+    ) {
+        Skin.setAccent(Skin.current, null)
+        host.toast("${Skin.current.title}'s own accent")
     }
 
     // ---------------------------------------------------------------- audio

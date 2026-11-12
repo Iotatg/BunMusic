@@ -11,6 +11,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toArgb
 import app.bunmusic.MainActivity
 import app.bunmusic.data.Prefs
 
@@ -327,7 +328,62 @@ object Skin {
      */
     var contrast: Boolean by mutableStateOf(false)
 
-    val p: BunPalette get() = paletteOf(current).let { if (contrast) highContrast(it) else it }
+    /**
+     * 2.13.0 — per-bun accent overrides, keyed by [BunSkin.id].
+     *
+     * A state, not a preference read inside [p]: changing an accent recomposes
+     * every screen for free. [Prefs.Settings.accentByBun] is the source of truth;
+     * this is its decoded mirror. Empty means every bun wears its own accent, so
+     * the default path is exactly the palette we shipped before 2.13.0.
+     */
+    var accents: Map<String, Int> by mutableStateOf(emptyMap())
+        private set
+
+    /**
+     * The one place colour is resolved. Every tone in the app comes through
+     * here, so a single overlay recolours the whole UI without touching a
+     * screen. With no override the original [BunPalette] is returned untouched
+     * — no `Color` allocation, no rounding, no drift from the 2.12.0 pixels.
+     */
+    val p: BunPalette get() {
+        val base = paletteOf(current).let { if (contrast) highContrast(it) else it }
+        val accent = accents[current.id] ?: return base
+        return withAccent(base, accent)
+    }
+
+    /** Compose [Color] ⇄ ARGB [Int] only happens when an override is active. */
+    private fun withAccent(base: BunPalette, accent: Int): BunPalette {
+        val tones = Accent.derive(
+            Accent.Tones(
+                accent = base.accent.toArgb(),
+                onAccent = base.onAccent.toArgb(),
+                navBg = base.navBg.toArgb(),
+                navActiveBg = base.navActiveBg.toArgb(),
+                navActiveInk = base.navActiveInk.toArgb(),
+            ),
+            accent,
+        )
+        return base.copy(
+            accent = Color(tones.accent),
+            onAccent = Color(tones.onAccent),
+            navActiveBg = Color(tones.navActiveBg),
+            navActiveInk = Color(tones.navActiveInk),
+        )
+    }
+
+    /** The override for [skin], or null when it wears its own accent. */
+    fun accentFor(skin: BunSkin = current): Int? = accents[skin.id]
+
+    /**
+     * Set (or clear) the accent for one bun. `null` restores the bun's own
+     * colour. Both the in-memory state and the preference move together, so a
+     * cold start comes back wearing the same choice.
+     */
+    fun setAccent(skin: BunSkin = current, argb: Int?) {
+        val next = if (argb == null) accents - skin.id else accents + (skin.id to argb)
+        accents = next
+        Prefs.update { it.copy(accentByBun = Accent.encode(next)) }
+    }
 
     /**
      * Push text and separators further apart in luminance without touching the
@@ -400,6 +456,9 @@ object Skin {
         // Mirror the contrast preference before the first frame, so a cold start
         // in sunlight does not paint one low-contrast frame first.
         contrast = Prefs.settings.value.highContrast
+        // 2.13.0 — restore per-bun accents before the first frame too, or a
+        // custom accent would flash the bun default on every cold start.
+        accents = Accent.decode(Prefs.settings.value.accentByBun)
         // keep the two stores honest if one of them was written by an older build
         if (stored != Prefs.settings.value.skin) {
             Prefs.update { it.copy(skin = stored) }
