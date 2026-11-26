@@ -166,4 +166,49 @@ class CodecTest {
         val odd = youtube.copy(title = "सावन", artist = "ए आर  रहमान")
         assertEquals(odd, Backup.trackFrom(Backup.trackJson(odd)))
     }
+
+    // ------------------------------------------------- 2.14.0 artist identity
+
+    @Test
+    fun `the artist id and portrait survive the row format`() {
+        val withArtist = youtube.copy(
+            artistId = "UCabc123",
+            artistArtUrl = "https://yt3.example/artist.jpg",
+        )
+        val back = Store.decodeTrack(Store.encodeTrack(withArtist))!!
+        assertEquals("UCabc123", back.artistId)
+        assertEquals("https://yt3.example/artist.jpg", back.artistArtUrl)
+        assertEquals(withArtist, back)
+    }
+
+    @Test
+    fun `the artist id and portrait survive backup json`() {
+        val withArtist = youtube.copy(
+            artistId = "UCabc123",
+            artistArtUrl = "https://yt3.example/artist.jpg",
+        )
+        assertEquals(withArtist, Backup.trackFrom(Backup.trackJson(withArtist)))
+    }
+
+    @Test
+    fun `a 2_13_0 row with only ten fields still decodes, with no artist identity`() {
+        // The exact shape 2.13.0 wrote: ten fields, no artist id or portrait.
+        // Restoring an older queue must not drop the row or invent an artist.
+        val legacy = listOf(
+            "yt:abc", "Midnight City", "M83", "Hurry Up", "https://img/art.jpg", "",
+            "244000", "YOUTUBE", "abc", "",
+        ).joinToString("\u0001")
+        val back = Store.decodeTrack(legacy)!!
+        assertEquals("M83", back.artist)
+        assertNull(back.artistId)
+        assertNull(back.artistArtUrl)
+    }
+
+    @Test
+    fun `a row with blank artist fields decodes them as null, not empty strings`() {
+        val blank = Store.encodeTrack(youtube.copy(artistId = null, artistArtUrl = null))
+        val back = Store.decodeTrack(blank)!!
+        assertNull(back.artistId)
+        assertNull(back.artistArtUrl)
+    }
 }

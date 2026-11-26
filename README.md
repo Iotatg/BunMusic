@@ -7,10 +7,44 @@ saved offline.
 
 ```
 package   app.bunmusic
-version   2.13.0 (35)
+version   2.14.0 (36)
 minSdk    26  ·  target/compile 37
 author    Iota Coder · iota14934@gmail.com
 ```
+
+---
+
+## 2.14.0 — the artist, finally visible
+
+The player could always draw the song and never the artist. That was not a
+rendering bug: a track carried the song's cover and an artist *name*, and
+nothing that could become a face. **The artist is now in the model** — a channel
+id and an optional portrait — so the credit line under the title has a picture
+instead of bare text.
+
+A real portrait is resolved once per channel from the artist page and cached; a
+track with no channel id never makes a request. When there is no photo yet, the
+circle is a **monogram**: up to two initials on a disc whose colour is derived
+from the name, so the same artist is always the same colour and it is never
+empty. The letters are black or white by measured ratio, so they clear WCAG AA
+on every one of those discs.
+
+The face is also a door. Tap the artist on the player, or choose **Go to
+artist** in a track's sheet, and you land on the artist page; when the row never
+carried a channel id the same tap falls back to a name search instead of doing
+nothing. The command deck gains **Open this artist** for the same move. Both
+player layouts — the standard one and Nebula — share one `ArtistLine`, so their
+typography and tap target cannot drift apart.
+
+Everything that decides the face is pure Kotlin under JVM tests: the initials
+rule (connectors, non-Latin scripts, three-word names), the deterministic hue,
+and the AA guarantee on the initials. The channel-id extraction is tested
+against real row shapes, including the album id that must never be mistaken for
+a person.
+
+This release also corrects two claims the README had outgrown: per-bun accents
+shipped in 2.13.0 and word-by-word lyrics were already live, so neither belongs
+on the "not implemented" list any more.
 
 ---
 
@@ -544,8 +578,8 @@ home, album pages, Explore, Charts, mood pages and the automix radio queue.
   plugged in, the code is shown in the UI so the flow stays usable and testable.
 - **Google sign-in needs your OAuth client ID** (see above). Until then the button opens the
   setup sheet rather than failing silently.
-- **Not implemented yet:** per-bun custom accents, Discord Rich Presence, Last.fm scrobbling, song recognition,
-  synced group listening, word-by-word lyrics and Android Auto.
+- **Not implemented yet:** Discord Rich Presence, Last.fm scrobbling, song recognition,
+  synced group listening and Android Auto.
 - **Debug builds** install as `app.bunmusic.debug`, so they can sit next to the release build.
 
 ---

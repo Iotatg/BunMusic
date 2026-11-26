@@ -14,6 +14,18 @@ data class Track(
     val source: Source = Source.YOUTUBE,
     val videoId: String = "",
     val assetAudio: String? = null,
+    /**
+     * The artist's channel id ("UC…"), when the source gave us one.
+     *
+     * The player used to draw the artist as plain text only: there was nowhere
+     * to put a face, because this model never carried the artist's identity —
+     * only the song's cover and a name string. This is the key that lets the
+     * player resolve a real portrait, and it survives a queue restore and a
+     * backup because both encoders carry it.
+     */
+    val artistId: String? = null,
+    /** The artist's portrait, when already known. Resolved lazily otherwise. */
+    val artistArtUrl: String? = null,
 ) {
     val isLocal: Boolean get() = source == Source.LOCAL
 

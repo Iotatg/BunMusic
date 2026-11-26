@@ -114,11 +114,12 @@ class CommandTest {
 
     @Test
     fun thereAreAtLeastOneHundredCommands() {
-        // 156 fixed commands, one "wear this bun" per skin, and 2.13.0's Accent
-        // Studio group: one "set accent" per swatch plus one "back to default".
-        // The generated parts are counted from the same tables the catalogue
-        // iterates, so adding a bun or a swatch moves both sides together.
-        val expected = 156 + BunSkin.entries.size + Accent.SWATCHES.size + 1
+        // 157 fixed commands (2.14.0 added "open this artist"), one "wear this
+        // bun" per skin, and 2.13.0's Accent Studio group: one "set accent" per
+        // swatch plus one "back to default". The generated parts are counted
+        // from the same tables the catalogue iterates, so adding a bun or a
+        // swatch moves both sides together.
+        val expected = 157 + BunSkin.entries.size + Accent.SWATCHES.size + 1
         assertEquals("the catalogue size is part of the deal", expected, commands.size)
     }
 

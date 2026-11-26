@@ -59,6 +59,7 @@ fun TrackSheet(
     isDownloaded: Boolean,
     onDismiss: () -> Unit,
     onToast: (String) -> Unit,
+    onOpenArtist: ((Track) -> Unit)? = null,
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -205,6 +206,12 @@ fun TrackSheet(
                     onDismiss()
                 }
                 SheetAction("Add to playlist", G.Plus) { picker = true }
+                if (onOpenArtist != null) {
+                    SheetAction("Go to artist", G.User) {
+                        onOpenArtist(track)
+                        onDismiss()
+                    }
+                }
                 SheetAction(
                     when {
                         saved -> "Remove download"

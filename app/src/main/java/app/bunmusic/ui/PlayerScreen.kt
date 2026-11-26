@@ -100,6 +100,7 @@ fun PlayerScreen(
     openShareOnStart: Boolean = false,
     onSearch: (String) -> Unit = {},
     onToast: (String) -> Unit = {},
+    onOpenArtist: (Track) -> Unit = {},
 ) {
     val track = state.track
     val settings by Prefs.settings.collectAsState()
@@ -253,6 +254,7 @@ fun PlayerScreen(
                 onSpeed = { showSpeed = true },
                 onCredits = { showCredits = true },
                 onLikeChanged = { now -> if (now) likePulse++ },
+                onOpenArtist = onOpenArtist,
             )
         } else {
         Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding()) {
@@ -293,6 +295,7 @@ fun PlayerScreen(
                     onLyrics = { showLyrics = true },
                     onSleep = { showSleep = true },
                     onSpeed = { showSpeed = true },
+                    onOpenArtist = onOpenArtist,
                 )
                 return@Column
             }
@@ -410,13 +413,12 @@ fun PlayerScreen(
                             )
                             Spacer(Modifier.width(7.dp))
                         }
-                        MarqueeText(
-                            text = track.artist,
+                        ArtistLine(
+                            track = track,
                             color = Ink.Muted,
                             size = 12,
-                            family = SoraFamily,
-                            weight = FontWeight.Normal,
                             modifier = Modifier.weight(1f),
+                            onClick = { onOpenArtist(track) },
                         )
                     }
                 }
@@ -708,6 +710,7 @@ private fun WidePlayer(
     onLyrics: () -> Unit,
     onSleep: () -> Unit,
     onSpeed: () -> Unit,
+    onOpenArtist: (Track) -> Unit,
 ) {
     var liked by remember(track.id) { mutableStateOf(Store.isLiked(track.id)) }
 
@@ -782,13 +785,12 @@ private fun WidePlayer(
                             )
                             Spacer(Modifier.width(7.dp))
                         }
-                        MarqueeText(
-                            text = track.artist,
+                        ArtistLine(
+                            track = track,
                             color = Ink.Muted,
                             size = 12,
-                            family = SoraFamily,
-                            weight = FontWeight.Normal,
                             modifier = Modifier.weight(1f),
+                            onClick = { onOpenArtist(track) },
                         )
                     }
                 }

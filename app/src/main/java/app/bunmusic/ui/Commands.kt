@@ -13,6 +13,7 @@ import app.bunmusic.core.Haptics
 import app.bunmusic.core.Skin
 import app.bunmusic.data.Auth
 import app.bunmusic.data.Cache
+import app.bunmusic.data.CollectionKind
 import app.bunmusic.data.Downloads
 import app.bunmusic.data.Eq
 import app.bunmusic.data.Library
@@ -108,6 +109,27 @@ fun buildCommands(host: CommandHost): List<Command> {
     }
     add("Playback", "play.radio", "Start a radio from this track", "Keeps going", G.Wave) {
         Playback.state.value.track?.let { Playback.startRadio(it) }
+    }
+    add("Playback", "play.artist", "Open this artist", "Profile", G.User, "artist channel profile credits") {
+        val t = Playback.state.value.track
+        if (t == null) {
+            host.toast("Nothing is playing")
+        } else {
+            val id = t.artistId
+            if (id != null) {
+                host.go(
+                    Route.Detail(
+                        title = t.artist.ifBlank { "Artist" },
+                        artUrl = t.artistArtUrl,
+                        artAsset = null,
+                        browseId = id,
+                        kind = CollectionKind.ARTIST,
+                    )
+                )
+            } else {
+                host.toast("No artist page for this track")
+            }
+        }
     }
     add("Playback", "play.speed.up", "Speed up", "", G.Speed, "faster tempo") {
         Playback.setSpeed(Playback.state.value.speed + 0.25f)

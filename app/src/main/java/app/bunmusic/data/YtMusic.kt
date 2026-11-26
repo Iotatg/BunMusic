@@ -29,6 +29,15 @@ object YtMusic {
 
     private val json = Json { ignoreUnknownKeys = true; isLenient = true }
 
+    /**
+     * Artist portraits already resolved, keyed by channel id.
+     *
+     * The player asks again every time a track by the same artist comes up, and
+     * a browse response is far larger than the one URL kept from it. A miss
+     * returns null and the UI draws a monogram instead of a blank circle.
+     */
+    private val artistArtCache = java.util.concurrent.ConcurrentHashMap<String, String>()
+
     private fun context(): JsonObject = buildJsonObject {
         putJsonObject("client") {
             put("clientName", "WEB_REMIX")
@@ -189,7 +198,9 @@ object YtMusic {
 
         val tracks = ArrayList<Track>()
         for (item in responsiveItems(root)) {
-            val t = toTrack(item) ?: continue
+            // On an artist page every row is by that artist, so the page id is
+            // a stronger signal than whatever the row's subtitle omitted.
+            val t = toTrack(item)?.let { if (kind == CollectionKind.ARTIST) it.copy(artistId = browseId) else it } ?: continue
             if (tracks.none { it.videoId == t.videoId }) tracks.add(t)
         }
 
@@ -445,7 +456,51 @@ object YtMusic {
             durationMs = duration,
             source = Source.YOUTUBE,
             videoId = videoId,
+            // The subtitle's artist run carries the channel id; without it the
+            // player can only ever show a name. Null when the row omits it.
+            artistId = artistBrowseId(item),
         )
+    }
+
+    /**
+     * The artist's channel id from a search/collection row, when present.
+     *
+     * A row's second flex column is the subtitle ("Artist • Album • 3:42"), and
+     * its runs carry a `browseEndpoint.browseId`. The artist run is the one
+     * whose id starts with `UC` — album ids start with `MPRE`, playlists with
+     * `VL`. Walking only that column keeps a stray id from another shelf out.
+     *
+     * Exposed internally so the rule can be tested without a network call.
+     */
+    internal fun artistBrowseId(item: JsonObject): String? {
+        val cols = item["flexColumns"] as? JsonArray ?: return null
+        val subtitle = (cols.getOrNull(1) as? JsonObject)
+            ?.get("musicResponsiveListItemFlexColumnRenderer") as? JsonObject
+            ?: return null
+        val runs = ((subtitle["text"] as? JsonObject)?.get("runs") as? JsonArray) ?: return null
+        for (r in runs) {
+            val id = findString(r, "browseId") ?: continue
+            if (id.startsWith("UC") && id.length > 2) return id
+        }
+        return null
+    }
+
+    /**
+     * The artist's portrait, resolved once per channel and cached.
+     *
+     * The artist header on the browse page is the only place YouTube Music
+     * publishes a square portrait; a track row itself only carries the song
+     * cover. A failure returns null — the player falls back to a monogram, so
+     * a blocked network never leaves an empty circle.
+     */
+    suspend fun artistArt(browseId: String): String? {
+        if (browseId.isBlank()) return null
+        artistArtCache[browseId]?.let { return it }
+        return runCatching {
+            val root = post("browse", buildJsonObject { put("browseId", browseId) })
+            val head = header(root) ?: return@runCatching null
+            thumbnails(head).lastOrNull()
+        }.getOrNull()?.also { artistArtCache[browseId] = it }
     }
 
     private fun toCollection(item: JsonObject): Collection? {

@@ -74,6 +74,7 @@ import app.bunmusic.core.label
 import app.bunmusic.data.Downloads
 import app.bunmusic.data.Prefs
 import app.bunmusic.data.Store
+import app.bunmusic.data.Track
 import app.bunmusic.player.Playback
 import app.bunmusic.player.PlayerState
 import kotlin.math.abs
@@ -125,6 +126,7 @@ fun NebulaPlayer(
     onSpeed: () -> Unit,
     onCredits: () -> Unit,
     onLikeChanged: (Boolean) -> Unit,
+    onOpenArtist: (Track) -> Unit = {},
 ) {
     val track = state.track ?: return
     val window = LocalBunWindow.current
@@ -191,6 +193,7 @@ fun NebulaPlayer(
                 if (now) Haptics.tick()
                 onLikeChanged(now)
             },
+            onOpenArtist = { onOpenArtist(track) },
         )
 
         val playbackError = state.error
@@ -648,6 +651,7 @@ private fun NebulaMeta(
     track: app.bunmusic.data.Track,
     liked: Boolean,
     onLike: () -> Unit,
+    onOpenArtist: () -> Unit,
 ) {
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
         Column(Modifier.weight(1f)) {
@@ -677,14 +681,12 @@ private fun NebulaMeta(
                     )
                     Spacer(Modifier.width(7.dp))
                 }
-                Text(
-                    track.artist,
+                ArtistLine(
+                    track = track,
                     color = Ink.Muted,
-                    fontSize = 12.5.sp,
-                    fontFamily = SoraFamily,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f, fill = false),
+                    size = 12,
+                    modifier = Modifier.weight(1f),
+                    onClick = onOpenArtist,
                 )
             }
         }

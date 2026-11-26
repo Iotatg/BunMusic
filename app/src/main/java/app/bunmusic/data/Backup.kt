@@ -294,6 +294,8 @@ object Backup {
         put("source", t.source.name)
         put("videoId", t.videoId)
         put("assetAudio", t.assetAudio ?: "")
+        put("artistId", t.artistId ?: "")
+        put("artistArtUrl", t.artistArtUrl ?: "")
     }
 
     internal fun trackFrom(o: JsonObject): Track? {
@@ -310,6 +312,8 @@ object Backup {
             source = if (primitive(o["source"])?.contentOrNull == Source.LOCAL.name) Source.LOCAL else Source.YOUTUBE,
             videoId = primitive(o["videoId"])?.contentOrNull.orEmpty(),
             assetAudio = primitive(o["assetAudio"])?.contentOrNull?.ifBlank { null },
+            artistId = primitive(o["artistId"])?.contentOrNull?.ifBlank { null },
+            artistArtUrl = primitive(o["artistArtUrl"])?.contentOrNull?.ifBlank { null },
         )
     }
 }

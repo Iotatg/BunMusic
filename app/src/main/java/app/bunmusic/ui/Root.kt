@@ -236,6 +236,30 @@ private fun Shell(
         )
     }
 
+    /**
+     * Open the artist behind a track.
+     *
+     * With a channel id this is a real artist page. Without one — an older
+     * queue row, a track code from a friend — it falls back to a name search,
+     * so tapping the face always does something honest instead of nothing.
+     */
+    val openArtist: (Track) -> Unit = { t ->
+        val id = t.artistId
+        if (id != null) {
+            push(
+                Route.Detail(
+                    title = t.artist.ifBlank { "Artist" },
+                    artUrl = t.artistArtUrl,
+                    artAsset = null,
+                    browseId = id,
+                    kind = CollectionKind.ARTIST,
+                )
+            )
+        } else {
+            push(Route.SearchFor(t.artist))
+        }
+    }
+
     Box(
         Modifier
             .fillMaxSize()
@@ -516,6 +540,7 @@ private fun Shell(
                 openShareOnStart = shareOnStart,
                 onSearch = { q -> push(Route.SearchFor(q)) },
                 onToast = { toast = it },
+                onOpenArtist = openArtist,
             )
         }
 
@@ -526,6 +551,7 @@ private fun Shell(
                 isDownloaded = Downloads.isDownloaded(track.id),
                 onDismiss = { sheetTrack = null },
                 onToast = { toast = it },
+                onOpenArtist = openArtist,
             )
         }
 

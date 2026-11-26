@@ -54,6 +54,16 @@ fun AboutScreen(onBack: () -> Unit) {
             }
         }
 
+        item { GroupTitle("New in 2.14.0") }
+        item {
+            AboutCard {
+                Change("The artist has a face", "The player could always draw the song and never the artist, because a track carried the song's cover and an artist name and nothing that could become a portrait. The model now carries the artist's channel id and, when known, a portrait. The credit line under the title shows that face instead of a bare string, and a real photo is resolved once per channel from the artist page and cached — a track with no channel id never makes a request")
+                Change("Never an empty circle", "Until a photo is known the circle is a monogram: up to two initials on a disc whose colour is derived from the name, so the same artist is always the same colour and the mark is never blank. The initials rule skips connectors (Simon & Garfunkel reads SG), keeps non-Latin scripts intact, and stops at two letters. The letters are black or white by measured ratio, so they clear WCAG AA on every disc the hash can produce")
+                Change("The face is a door", "Tap the artist on the player, or choose Go to artist in a track's sheet, and you land on that artist's page. When the row never carried a channel id the same tap falls back to a name search rather than doing nothing, and the command deck gains Open this artist for the same move")
+                Change("Two layouts, one credit line", "The standard player and Nebula used to draw the artist as separate text with separate typography. Both now share one ArtistLine — avatar, name, and tap target — so the two can never drift apart, and the avatar's size is the only thing each layout chooses")
+            }
+        }
+
         item { GroupTitle("New in 2.13.0") }
         item {
             AboutCard {

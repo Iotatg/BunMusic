@@ -706,6 +706,9 @@ object Store {
     fun encodeTrack(t: Track): String = listOf(
         t.id, t.title, t.artist, t.album, t.artUrl ?: "", t.artAsset ?: "",
         t.durationMs.toString(), t.source.name, t.videoId, t.assetAudio ?: "",
+        // Appended in 2.14.0. Older rows stop at field 10; decode reads these
+        // with getOrNull so a queue saved by 2.13.0 still restores cleanly.
+        t.artistId ?: "", t.artistArtUrl ?: "",
     ).joinToString(F.toString()) { cleanField(it) }
 
     fun decodeTrack(s: String): Track? {
@@ -723,6 +726,8 @@ object Store {
             source = if (p[7] == Source.LOCAL.name) Source.LOCAL else Source.YOUTUBE,
             videoId = p[8],
             assetAudio = p[9].ifBlank { null }?.let { restoreField(it) },
+            artistId = p.getOrNull(10)?.ifBlank { null }?.let { restoreField(it) },
+            artistArtUrl = p.getOrNull(11)?.ifBlank { null }?.let { restoreField(it) },
         )
     }
 }
